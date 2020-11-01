@@ -1,0 +1,8 @@
+*.pyc
+*.egg*
+gertty-env
+.tox
+doc/build
+AUTHORS
+ChangeLog
+build
