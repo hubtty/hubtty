@@ -1,7 +1,7 @@
-Gertty
+Ghubtty
 ======
 
-Gertty is a console-based interface to the Gerrit Code Review system.
+Ghubtty is a console-based interface to the Github Code Review system.
 
 As compared to the web interface, the main advantages are:
 
@@ -10,15 +10,15 @@ As compared to the web interface, the main advantages are:
    deal with a large number of review requests across a large number
    of projects.
 
- * Offline Use -- Gertty syncs information about changes in subscribed
+ * Offline Use -- Ghubtty syncs information about changes in subscribed
    projects to a local database and local git repos.  All review
    operations are performed against that database and then synced back
-   to Gerrit.
+   to Github.
 
  * Speed -- user actions modify locally cached content and need not
    wait for server interaction.
 
- * Convenience -- because Gertty downloads all changes to local git
+ * Convenience -- because Ghubtty downloads all changes to local git
    repos, a single command instructs it to checkout a change into that
    repo for detailed examination or testing of larger changes.
 

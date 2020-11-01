@@ -1,43 +1,43 @@
 Configuration
 -------------
 
-Gertty uses a YAML based configuration file that it looks for at
-``~/.config/gertty/gertty.yaml``.  Several sample configuration files
+Ghubtty uses a YAML based configuration file that it looks for at
+``~/.config/ghubtty/ghubtty.yaml``.  Several sample configuration files
 are included.  You can find them in the examples/ directory of the
 `source distribution
-<https://opendev.org/ttygroup/gertty/src/branch/master/examples>`_ or
-the share/gertty/examples directory after installation.
+<https://opendev.org/ttygroup/ghubtty/src/branch/master/examples>`_ or
+the share/ghubtty/examples directory after installation.
 
-Select one of the sample config files, copy it to ~/.config/gertty/gertty.yaml
+Select one of the sample config files, copy it to ~/.config/ghubtty/ghubtty.yaml
 and edit as necessary.  Search for ``CHANGEME`` to find parameters that need to
 be supplied.  The sample config files are as follows:
 
-**minimal-gertty.yaml**
-  Only contains the parameters required for Gertty to actually run.
+**minimal-ghubtty.yaml**
+  Only contains the parameters required for Ghubtty to actually run.
 
-**reference-gertty.yaml**
+**reference-ghubtty.yaml**
   An exhaustive list of all supported options with examples.
 
-**opendev-gertty.yaml**
+**opendev-ghubtty.yaml**
   A configuration designed for use with OpenDev's installation of
-  Gerrit.
+  Github.
 
-**googlesource-gertty.yaml**
-  A configuration designed for use with installations of Gerrit
+**googlesource-ghubtty.yaml**
+  A configuration designed for use with installations of Github
   running on googlesource.com.
 
-You will need your Gerrit password which you can generate or retrieve
+You will need your Github password which you can generate or retrieve
 by navigating to ``Settings``, then ``HTTP Password``.
 
-Gertty uses local git repositories to perform much of its work.  These
+Ghubtty uses local git repositories to perform much of its work.  These
 can be the same git repositories that you use when developing a
-project.  Gertty will not alter the working directory or index unless
+project.  Ghubtty will not alter the working directory or index unless
 you request it to (and even then, the usual git safeguards against
 accidentally losing work remain in place).  You will need to supply
-the name of a directory where Gertty will find or clone git
+the name of a directory where Ghubtty will find or clone git
 repositories for your projects as the ``git-root`` parameter.
 
-The config file is designed to support multiple Gerrit instances.  The
+The config file is designed to support multiple Github instances.  The
 first one is used by default, but others can be specified by supplying
 the name on the command line.
 
@@ -50,8 +50,8 @@ configuration file.
 Servers
 +++++++
 
-This section lists the servers that Gertty can talk to.  Multiple
-servers may be listed; by default, Gertty will use the first one
+This section lists the servers that Ghubtty can talk to.  Multiple
+servers may be listed; by default, Ghubtty will use the first one
 listed.  To select another, simply specify its name on the command
 line.
 
@@ -64,32 +64,32 @@ line.
     line.
 
   **url (required)**
-    The URL of the Gerrit server.  HTTPS should be preferred.
+    The URL of the Github server.  HTTPS should be preferred.
 
   **username (required)**
-    Your username in Gerrit. [required]
+    Your username in Github. [required]
 
   **password (required)**
-    Your password in Gerrit.  Obtain it from Settings -> HTTP Password
-    in the Gerrit web interface.
+    Your password in Github.  Obtain it from Settings -> HTTP Password
+    in the Github web interface.
 
   **auth-type**
-    Authentication type required by the Gerrit server. Can be 'basic',
+    Authentication type required by the Github server. Can be 'basic',
     'digest', or 'form'. Defaults to 'digest'.
 
   **git-root (required)**
-    A location where Gertty should store its git repositories.  These
+    A location where Ghubtty should store its git repositories.  These
     can be the same git repositories where you do your own work --
-    Gertty will not modify them unless you tell it to, and even then
+    Ghubtty will not modify them unless you tell it to, and even then
     the normal git protections against losing work remain in place.
 
   **dburi**
-    The location of Gertty's sqlite database.  If you have more than
+    The location of Ghubtty's sqlite database.  If you have more than
     one server, you should specify a dburi for any additional servers.
-    By default a SQLite database called ~/.gertty.db is used.
+    By default a SQLite database called ~/.ghubtty.db is used.
 
   **ssl-ca-path**
-    If your Gerrit server uses a non-standard certificate chain
+    If your Github server uses a non-standard certificate chain
     (e.g. on a test server), you can pass a full path to a bundle of
     CA certificates here:
 
@@ -99,18 +99,18 @@ line.
     turn off certificate validation.
 
   **log-file**
-    By default Gertty logs errors to a file and truncates that file
+    By default Ghubtty logs errors to a file and truncates that file
     each time it starts (so that it does not grow without bound).  If
     you would like to log to a different location, you may specify it
     with this option.
 
   **socket**
-    Gertty listens on a unix domain socket for remote commands at
-    ~/.gertty.sock.  This option may be used to change the path.
+    Ghubtty listens on a unix domain socket for remote commands at
+    ~/.ghubtty.sock.  This option may be used to change the path.
 
   **lock-file**
-    Gertty uses a lock file per server to prevent multiple processes
-    from running at the same time. The default is ~/.gertty.servername.lock
+    Ghubtty uses a lock file per server to prevent multiple processes
+    from running at the same time. The default is ~/.ghubtty.servername.lock
 
 Example:
 
@@ -125,7 +125,7 @@ Example:
 Palettes
 ++++++++
 
-Gertty comes with two palettes defined internally.  The default
+Ghubtty comes with two palettes defined internally.  The default
 palette is suitable for use on a terminal with a dark background.  The
 `light` palette is for a terminal with a white or light background.
 You may customize the colors in either of those palettes, or define
@@ -141,7 +141,7 @@ high-color terminals.
 For a reference of possible color names, see the `Urwid Manual
 <http://urwid.org/manual/displayattributes.html#foreground-and-background-settings>`_
 
-To see the list of possible palette entries, run `gertty --print-palette`.
+To see the list of possible palette entries, run `ghubtty --print-palette`.
 
 The following example alters two colors in the default palette, one
 color in the light palette, and one color in a custom palette.
@@ -171,10 +171,10 @@ may be overridden and custom keymaps defined and selected in the
 config file or the command line.
 
 Each keymap contains a mapping of command -> key(s).  If a command is
-not specified, Gertty will use the keybinding specified in the default
+not specified, Ghubtty will use the keybinding specified in the default
 map.  More than one key can be bound to a command.
 
-Run `gertty --print-keymap` for a list of commands that can be bound.
+Run `ghubtty --print-keymap` for a list of commands that can be bound.
 
 The following example modifies the `default` keymap:
 
@@ -248,7 +248,7 @@ links, or have colors applied.
         palette entry.
 
     **search**
-      A hyperlink that will perform a Gertty search when activated.
+      A hyperlink that will perform a Ghubtty search when activated.
 
       **text**
         The replacement text.
@@ -256,8 +256,8 @@ links, or have colors applied.
       **query**
         The search query to use.
 
-This example matches Gerrit change ids, and replaces them with a link
-to an internal Gertty search for that change id.
+This example matches Github change ids, and replaces them with a link
+to an internal Ghubtty search for that change id.
 
 .. code-block: yaml
    commentlinks:
@@ -280,7 +280,7 @@ Change List Options
   **sort-by**
     This key specifies the sort order, which can be `number` (the
     Change number), `updated` (when the change was last updated), or
-    `last-seen` (when the change was last opened in Gertty).
+    `last-seen` (when the change was last opened in Ghubtty).
 
   **reverse**
     This is a boolean value which indicates whether the list should be
@@ -329,8 +329,8 @@ Dashboards
 ++++++++++
 
 This section defines customized dashboards.  You may supply any
-Gertty search string and bind them to any key.  They will appear in
-the global help text, and pressing the key anywhere in Gertty will
+Ghubtty search string and bind them to any key.  They will appear in
+the global help text, and pressing the key anywhere in Ghubtty will
 run the query and display the results.
 
 **dashboards**
@@ -363,7 +363,7 @@ Reviewkeys are hotkeys that perform immediate reviews within the
 change screen.  Any pending comments or review messages will be
 attached to the review; otherwise an empty review message will be
 left.  The approvals list is exhaustive, so if you specify an empty
-list, Gertty will submit a review that clears any previous approvals.
+list, Ghubtty will submit a review that clears any previous approvals.
 Reviewkeys appear in the help text for the change screen.
 
 **reviewkeys**
@@ -388,7 +388,7 @@ Reviewkeys appear in the help text for the change screen.
     Optional, it can be used to include a message during the review.
 
   **submit**
-    Set this to `true` to instruct Gerrit to submit the change when
+    Set this to `true` to instruct Github to submit the change when
     this reviewkey is activated.
 
 The following example includes a reviewkey that clears all labels,
@@ -412,7 +412,7 @@ General Options
 +++++++++++++++
 
 **breadcrumbs**
-  Gertty displays a footer at the bottom of the screen by default
+  Ghubtty displays a footer at the bottom of the screen by default
   which contains navigation information in the form of "breadcrumbs"
   -- short descriptions of previous screens, with the right-most entry
   indicating the screen that will be displayed if you press the `ESC`
@@ -423,7 +423,7 @@ General Options
   them in UTC instead, set this value to `true`.
 
 **handle-mouse**
-  Gertty handles mouse input by default.  If you don't want it
+  Ghubtty handles mouse input by default.  If you don't want it
   interfering with your terminal's mouse handling, set this value to
   `false`.
 
@@ -433,7 +433,7 @@ General Options
   local git repos so that git may garbage collect them).  If you would
   like to change the expiration delay or disable it, uncomment the
   following line.  The time interval is specified in the same way as
-  the "age:" term in Gerrit's search syntax.  To disable it
+  the "age:" term in Github's search syntax.  To disable it
   altogether, set the value to the empty string.
 
 **size-column**

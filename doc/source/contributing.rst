@@ -1,7 +1,7 @@
 Contributing
 ------------
 
-For information on how to contribute to Gertty, please see the
+For information on how to contribute to Ghubtty, please see the
 contents of the CONTRIBUTING.rst file.
 
 Bugs

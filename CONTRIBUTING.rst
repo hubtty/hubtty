@@ -1,14 +1,14 @@
 Contributing
 ============
 
-To browse the latest code, see: https://opendev.org/ttygroup/gertty/src/branch/master/
-To clone the latest code, use `git clone https://opendev.org/ttygroup/gertty`
+To browse the latest code, see: https://opendev.org/ttygroup/ghubtty/src/branch/master/
+To clone the latest code, use `git clone https://opendev.org/ttygroup/ghubtty`
 
-Bugs are handled at: https://storyboard.openstack.org/#!/project/ttygroup/gertty
+Bugs are handled at: https://storyboard.openstack.org/#!/project/ttygroup/ghubtty
 
-Code reviews are handled by gerrit at: https://review.opendev.org
+Code reviews are handled by github at: https://review.opendev.org
 
-Use `git review` to submit patches (after creating a Gerrit account
+Use `git review` to submit patches (after creating a Github account
 that links to your launchpad account). Example::
 
     # Do your commits
@@ -18,7 +18,7 @@ that links to your launchpad account). Example::
 Philosophy
 ----------
 
-Gertty is based on the following precepts which should inform changes
+Ghubtty is based on the following precepts which should inform changes
 to the program:
 
 * Support large numbers of review requests across large numbers of
@@ -30,14 +30,14 @@ to the program:
   load (they have worked extremely well in supporting people who
   read/write a lot of mail/news).
 
-* Support off-line use.  Gertty should be completely usable off-line
-  with reliable syncing between local data and Gerrit when a
+* Support off-line use.  Ghubtty should be completely usable off-line
+  with reliable syncing between local data and Github when a
   connection is available (just like git or mail or news).
 
 * Ample use of color.  Unlike a web interface, a good text interface
   relies mostly on color and precise placement rather than whitespace
   and decoration to indicate to the user the purpose of a given piece
-  of information.  Gertty should degrade well to 16 colors, but more
+  of information.  Ghubtty should degrade well to 16 colors, but more
   (88 or 256) may be used.
 
 * Keyboard navigation (with easy-to-remember commands) should be
@@ -51,8 +51,8 @@ to the program:
   messages or comments) and navigating back intuitive (it matches
   expectations set by the web browsers).
 
-* Support a wide variety of Gerrit installations.  The initial
-  development of Gertty is against the OpenDev Gerrit, and many of the
+* Support a wide variety of Github installations.  The initial
+  development of Ghubtty is against the OpenDev Github, and many of the
   features are intended to help its users with their workflow,
   however, those features should be implemented in a generic way so
-  that the system does not require a specific Gerrit configuration.
+  that the system does not require a specific Github configuration.
