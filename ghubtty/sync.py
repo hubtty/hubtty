@@ -218,10 +218,17 @@ class SyncProjectListTask(Task):
 
     def run(self, sync):
         app = sync.app
-        # TODO(mandre) Get the user's repos and the ones of the organisations
-        # he belongs to
-        remote = sync.get('user/repos')
-        remote_keys = set(remote.keys())
+
+        page = 1
+        remote_keys = set()
+        remote_desc = dict()
+        while page == 1 or len(remote) > 0:
+            remote = sync.get('user/repos?page=%d&per_page=30' % page)
+            for r in remote:
+                remote_keys.add(r['full_name'])
+                remote_desc[r['full_name']] = r.get('description', '')
+            page = page + 1
+
         with app.db.getSession() as session:
             local = {}
             for p in session.getProjects():
@@ -233,9 +240,8 @@ class SyncProjectListTask(Task):
                 local[name].delete()
 
             for name in remote_keys-local_keys:
-                p = remote[name]
                 project = session.createProject(name,
-                                                description=p.get('description', ''))
+                                                description=remote_desc[name])
                 self.log.info("Created project %s", project.name)
                 self.results.append(ProjectAddedEvent(project))
 
