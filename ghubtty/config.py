@@ -44,15 +44,12 @@ class ConfigSchema(object):
               'url': str,
               v.Required('username'): str,
               'token': str,
-              'verify-ssl': bool,
-              'ssl-ca-path': str,
               'dburi': str,
               v.Required('git-root'): str,
               'git-url': str,
               'log-file': str,
               'lock-file': str,
               'socket': str,
-              'auth-type': v.Any('basic', 'digest', 'form'),
               }
 
     servers = [server]
@@ -172,17 +169,6 @@ class Config(object):
                     "not have permissions set to 0600.\n"
                     "Permissions are: {}".format(self.path, oct(mode)))
                 sys.exit(1)
-        self.auth_type = server.get('auth-type', 'digest')
-        self.verify_ssl = server.get('verify-ssl', True)
-        if not self.verify_ssl:
-            os.environ['GIT_SSL_NO_VERIFY']='true'
-        self.ssl_ca_path = server.get('ssl-ca-path', None)
-        if self.ssl_ca_path is not None:
-            self.ssl_ca_path = os.path.expanduser(self.ssl_ca_path)
-            # Ghubtty itself uses the Requests library
-            os.environ['REQUESTS_CA_BUNDLE'] = self.ssl_ca_path
-            # And this is to allow Git callouts
-            os.environ['GIT_SSL_CAINFO'] = self.ssl_ca_path
         self.git_root = os.path.expanduser(server['git-root'])
         git_url = server.get('git-url', self.url + 'p/')
         if not git_url.endswith('/'):

@@ -74,10 +74,6 @@ line.
     Your token in Github.  Obtain it from Settings -> Developer settings ->
     Personal access tokens in the Github interface.
 
-  **auth-type**
-    Authentication type required by the Github server. Can be 'basic',
-    'digest', or 'form'. Defaults to 'digest'.
-
   **git-root (required)**
     A location where Ghubtty should store its git repositories.  These
     can be the same git repositories where you do your own work --
@@ -88,16 +84,6 @@ line.
     The location of Ghubtty's sqlite database.  If you have more than
     one server, you should specify a dburi for any additional servers.
     By default a SQLite database called ~/.ghubtty.db is used.
-
-  **ssl-ca-path**
-    If your Github server uses a non-standard certificate chain
-    (e.g. on a test server), you can pass a full path to a bundle of
-    CA certificates here:
-
-  **verify-ssl**
-    In case you do not care about security and want to use a
-    sledgehammer approach to SSL, you can set this value to false to
-    turn off certificate validation.
 
   **log-file**
     By default Ghubtty logs errors to a file and truncates that file

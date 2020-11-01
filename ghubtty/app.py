@@ -753,10 +753,8 @@ class App(object):
             return
         if category == requestsexceptions.SNIMissingWarning:
             return
-        # Disable InsecureRequestWarning when certificate validation is disabled
-        if not self.config.verify_ssl:
-            if category == requestsexceptions.InsecureRequestWarning:
-                return
+        if category == requestsexceptions.InsecureRequestWarning:
+            return
         self.error_queue.put(('Warning', m))
         os.write(self.error_pipe, six.b('error\n'))
 

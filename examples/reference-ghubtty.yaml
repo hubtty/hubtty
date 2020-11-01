@@ -39,13 +39,6 @@ servers:
 # server, you should specify a dburi for any additional servers.
 # By default a SQLite database called ~/.ghubtty.db is used.
 #    dburi: sqlite:////home/user/.ghubtty.db
-# If your Github server uses a non-standard certificate chain (e.g. on a test
-# server), you can pass a full path to a bundle of CA certificates here:
-#    ssl-ca-path: ~/.pki/ca-chain.pem
-# In case you do not care about security and want to use a sledgehammer
-# approach to SSL, you can set this value to false to turn off certificate
-# validation.
-#    verify-ssl: true
 # By default Ghubtty logs errors to a file and truncates that file each
 # time it starts (so that it does not grow without bound).  If you
 # would like to log to a different location, you may specify it here.
