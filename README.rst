@@ -101,8 +101,8 @@ config files are as follows:
 **reference-ghubtty.yaml**
   An exhaustive list of all supported options with examples.
 
-You will need your Github password which you can generate or retrieve
-by navigating to ``Settings``, then ``HTTP Password``.
+You will need a Github token which you can generate from the `Github user settings
+<https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/creating-a-personal-access-token>`_.
 
 Ghubtty uses local git repositories to perform much of its work.  These
 can be the same git repositories that you use when developing a

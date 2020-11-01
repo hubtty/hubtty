@@ -26,8 +26,8 @@ be supplied.  The sample config files are as follows:
   A configuration designed for use with installations of Github
   running on googlesource.com.
 
-You will need your Github password which you can generate or retrieve
-by navigating to ``Settings``, then ``HTTP Password``.
+You will need a Github token which you can generate from the `Github user settings
+<https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/creating-a-personal-access-token>`_.
 
 Ghubtty uses local git repositories to perform much of its work.  These
 can be the same git repositories that you use when developing a
@@ -63,15 +63,16 @@ line.
     A name that describes the server, to reference on the command
     line.
 
-  **url (required)**
+  **url**
     The URL of the Github server.  HTTPS should be preferred.
+    Defaults to https://github.com.
 
   **username (required)**
     Your username in Github. [required]
 
-  **password (required)**
-    Your password in Github.  Obtain it from Settings -> HTTP Password
-    in the Github web interface.
+  **token (required)**
+    Your token in Github.  Obtain it from Settings -> Developer settings ->
+    Personal access tokens in the Github interface.
 
   **auth-type**
     Authentication type required by the Github server. Can be 'basic',
@@ -117,9 +118,8 @@ Example:
 .. code-block: yaml
    servers:
      - name: CHANGEME
-       url: https://CHANGEME.example.org/
        username: CHANGEME
-       password: CHANGEME
+       token: CHANGEME
        git-root: ~/git/
 
 Palettes

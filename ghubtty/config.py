@@ -41,9 +41,9 @@ FALLBACK_CONFIG_PATH = '~/.ghubtty.yaml'
 
 class ConfigSchema(object):
     server = {v.Required('name'): str,
-              v.Required('url'): str,
+              'url': str,
               v.Required('username'): str,
-              'password': str,
+              'token': str,
               'verify-ssl': bool,
               'ssl-ca-path': str,
               'dburi': str,
@@ -151,24 +151,24 @@ class Config(object):
         schema(self.config)
         server = self.getServer(server)
         self.server = server
-        url = server['url']
+        url = server.get('url', 'https://github.com')
         if not url.endswith('/'):
             url += '/'
         self.url = url
         result = urlparse.urlparse(url)
         self.hostname = result.netloc
         self.username = server['username']
-        self.password = server.get('password')
-        if self.password is None:
-            self.password = getpass.getpass("Password for %s (%s): "
+        self.token = server.get('token')
+        if self.token is None:
+            self.token = getpass.getpass("Token for %s (%s): "
                                             % (self.url, self.username))
         else:
-            # Ensure file is only readable by user as password is stored in
+            # Ensure file is only readable by user as token is stored in
             # file.
             mode = os.stat(self.path).st_mode & 0o0777
             if not mode == 0o600:
                 print (
-                    "Error: Config file '{}' contains a password and does "
+                    "Error: Config file '{}' contains a token and does "
                     "not have permissions set to 0600.\n"
                     "Permissions are: {}".format(self.path, oct(mode)))
                 sys.exit(1)
@@ -283,7 +283,7 @@ class Config(object):
     def printSample(self):
         filename = 'share/ghubtty/examples'
         print("""Ghubtty requires a configuration file at %s or %s
-If the file contains a password then permissions must be set to 0600.
+If the file contains a token then permissions must be set to 0600.
 
 Several sample configuration files were installed with Ghubtty and are
 available in %s in the root of the installation.

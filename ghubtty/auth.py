@@ -20,9 +20,9 @@ from six.moves.urllib import parse as urlparse
 
 class FormAuth(requests.auth.AuthBase):
 
-    def __init__(self, username, password):
+    def __init__(self, username, token):
         self.username = username
-        self.password = password
+        self.token = token
         self.log = logging.getLogger('ghubtty.auth')
 
     def _retry_using_form_auth(self, response, args):
@@ -33,12 +33,12 @@ class FormAuth(requests.auth.AuthBase):
         url = urlparse.urlunparse([u.scheme, u.netloc, '/login',
                                    None, None, None])
         auth = {'username': self.username,
-                'password': self.password}
+                'token': self.token}
         request2 = requests.Request('POST', url, data=auth).prepare()
         response2 = adapter.send(request2, **args)
 
         if response2.status_code == 401:
-            self.log.error('Login failed: Invalid username or password?')
+            self.log.error('Login failed: Invalid username or token?')
             return response
 
         cookie = response2.headers.get('set-cookie')

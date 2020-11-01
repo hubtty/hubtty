@@ -729,7 +729,7 @@ class SyncChangeTask(Task):
                     url = list(urlparse.urlsplit(sync.app.config.url + change.project.name))
                     url[1] = '%s:%s@%s' % (
                         urlparse.quote_plus(sync.app.config.username),
-                        urlparse.quote_plus(sync.app.config.password), url[1])
+                        urlparse.quote_plus(sync.app.config.token), url[1])
                     url = urlparse.urlunsplit(url)
                 elif 'ssh' in remote_revision['fetch']:
                     ref = remote_revision['fetch']['ssh']['ref']
@@ -1481,7 +1481,7 @@ class Sync(object):
         else:
             authclass = requests.auth.HTTPDigestAuth
         self.auth = authclass(
-            self.app.config.username, self.app.config.password)
+            self.app.config.username, self.app.config.token)
         self.submitTask(GetVersionTask(HIGH_PRIORITY))
         self.submitTask(SyncOwnAccountTask(HIGH_PRIORITY))
         if not disable_background_sync:

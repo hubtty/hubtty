@@ -9,24 +9,23 @@ servers:
   - name: CHANGEME
     url: https://CHANGEME.example.org/
     username: CHANGEME
-    # Your HTTP Password for github. Go to the "HTTP Password" section in your
-    # account settings to generate/retrieve this password.
-    password: CHANGEME
+    # Create yourself a github token
+    # https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/creating-a-personal-access-token
+    token: CHANGEME
     git-root: ~/git/
     lock-file: ~/.ghubtty.CHANGEME.lock
 
 # Each server section can have the following fields:
 # A name that describes the server, to reference on the command line. [required]
 #  - name: sample
-# The URL of the Github server.  HTTPS should be preferred. [required]
+# The URL of the Github server.  HTTPS should be preferred.
+# Defaults to https://github.com.
 #    url: https://example.org/
 # Your username in Github. [required]
 #    username: CHANGEME
-# Your password in Github (Settings -> HTTP Password). [required]
-#    password: CHANGEME
-# Authentication type required by the Github server. Can be 'basic',
-# 'digest', or 'form'. Defaults to 'digest'.
-#    auth-type: digest
+# Your authentication token in Github. [required]
+# https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/creating-a-personal-access-token
+#    token: CHANGEME
 # A location where Ghubtty should store its git repositories.  These
 # can be the same git repositories where you do your own work --
 # Ghubtty will not modify them unless you tell it to, and even then the
