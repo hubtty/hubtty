@@ -101,14 +101,6 @@ config files are as follows:
 **reference-ghubtty.yaml**
   An exhaustive list of all supported options with examples.
 
-**opendev-ghubtty.yaml**
-  A configuration designed for use with OpenDev's installation of
-  Github.
-
-**googlesource-ghubtty.yaml**
-  A configuration designed for use with installations of Github
-  running on googlesource.com.
-
 You will need your Github password which you can generate or retrieve
 by navigating to ``Settings``, then ``HTTP Password``.
 
