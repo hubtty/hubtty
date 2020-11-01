@@ -1454,9 +1454,7 @@ class Sync(object):
         self.queue = MultiQueue([HIGH_PRIORITY, NORMAL_PRIORITY, LOW_PRIORITY])
         self.result_queue = queue.Queue()
         self.session = requests.Session()
-        authclass = requests.auth.HTTPDigestAuth
-        self.auth = authclass(
-            self.app.config.username, self.app.config.token)
+        self.session.headers.update({'Authorization': 'token ' + self.app.config.token})
         self.submitTask(SyncOwnAccountTask(HIGH_PRIORITY))
         if not disable_background_sync:
             self.submitTask(CheckReposTask(HIGH_PRIORITY))
@@ -1540,7 +1538,7 @@ class Sync(object):
         url = self.url(path)
         self.log.debug('GET: %s' % (url,))
         r = self.session.get(url,
-                             auth=self.auth, timeout=TIMEOUT,
+                             timeout=TIMEOUT,
                              headers = {'Accept': 'application/vnd.github.v3+json',
                                         'Accept-Encoding': 'gzip',
                                         'User-Agent': self.user_agent})
@@ -1558,7 +1556,7 @@ class Sync(object):
         self.log.debug('POST: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.post(url, data=json.dumps(data).encode('utf8'),
-                              auth=self.auth, timeout=TIMEOUT,
+                              timeout=TIMEOUT,
                               headers = {'Content-Type': 'application/json;charset=UTF-8',
                                          'User-Agent': self.user_agent})
         self.checkResponse(r)
@@ -1581,7 +1579,7 @@ class Sync(object):
         self.log.debug('PUT: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.put(url, data=json.dumps(data).encode('utf8'),
-                             auth=self.auth, timeout=TIMEOUT,
+                             timeout=TIMEOUT,
                              headers = {'Content-Type': 'application/json;charset=UTF-8',
                                         'User-Agent': self.user_agent})
         self.checkResponse(r)
@@ -1592,7 +1590,7 @@ class Sync(object):
         self.log.debug('DELETE: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.delete(url, data=json.dumps(data).encode('utf8'),
-                                auth=self.auth, timeout=TIMEOUT,
+                                timeout=TIMEOUT,
                                 headers = {'Content-Type': 'application/json;charset=UTF-8',
                                            'User-Agent': self.user_agent})
         self.checkResponse(r)
