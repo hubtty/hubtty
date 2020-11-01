@@ -197,15 +197,15 @@ class SyncOwnAccountTask(Task):
 
     def run(self, sync):
         app = sync.app
-        remote = sync.get('accounts/self')
-        sync.account_id = remote['_account_id']
+        remote = sync.get('users/' + app.config.username)
+        sync.account_id = remote['id']
         with app.db.getSession() as session:
-            account = session.getAccountByID(remote['_account_id'],
+            account = session.getAccountByID(remote['id'],
                                              remote.get('name'),
-                                             remote.get('username'),
+                                             remote.get('login'),
                                              remote.get('email'))
             session.setOwnAccount(account)
-        app.own_account_id = remote['_account_id']
+        app.own_account_id = remote['id']
 
 class SyncProjectListTask(Task):
     def __repr__(self):
@@ -1529,7 +1529,7 @@ class Sync(object):
         return None
 
     def url(self, path):
-        return self.app.config.url + 'a/' + path
+        return self.app.config.url + path
 
     def checkResponse(self, response):
         self.log.debug('HTTP status code: %d', response.status_code)
@@ -1541,12 +1541,12 @@ class Sync(object):
         self.log.debug('GET: %s' % (url,))
         r = self.session.get(url,
                              auth=self.auth, timeout=TIMEOUT,
-                             headers = {'Accept': 'application/json',
+                             headers = {'Accept': 'application/vnd.github.v3+json',
                                         'Accept-Encoding': 'gzip',
                                         'User-Agent': self.user_agent})
         self.checkResponse(r)
         if r.status_code == 200:
-            ret = json.loads(r.text[4:])
+            ret = json.loads(r.text)
             if len(ret):
                 self.log.debug('200 OK, Received: %s' % (ret,))
             else:

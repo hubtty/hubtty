@@ -148,7 +148,7 @@ class Config(object):
         schema(self.config)
         server = self.getServer(server)
         self.server = server
-        url = server.get('url', 'https://github.com')
+        url = server.get('url', 'https://api.github.com/')
         if not url.endswith('/'):
             url += '/'
         self.url = url
@@ -170,7 +170,7 @@ class Config(object):
                     "Permissions are: {}".format(self.path, oct(mode)))
                 sys.exit(1)
         self.git_root = os.path.expanduser(server['git-root'])
-        git_url = server.get('git-url', self.url + 'p/')
+        git_url = server.get('git-url', 'https://github.com/')
         if not git_url.endswith('/'):
             git_url += '/'
         self.git_url = git_url
