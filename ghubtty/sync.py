@@ -218,7 +218,9 @@ class SyncProjectListTask(Task):
 
     def run(self, sync):
         app = sync.app
-        remote = sync.get('projects/?d')
+        # TODO(mandre) Get the user's repos and the ones of the organisations
+        # he belongs to
+        remote = sync.get('user/repos')
         remote_keys = set(remote.keys())
         with app.db.getSession() as session:
             local = {}
