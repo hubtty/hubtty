@@ -15,8 +15,6 @@ import warnings
 from alembic import op
 import sqlalchemy as sa
 
-from hubtty.dbsupport import sqlite_alter_columns
-
 
 def upgrade():
     with warnings.catch_warnings():

@@ -177,7 +177,6 @@ class ChangeRow(urwid.Button, ChangeListColumns):
         conf_thresholds = self.app.config.size_column['thresholds']
         # for threshold in [1, 10, 100, 1000]:
         for threshold in conf_thresholds:
-            color = []
             if (added > threshold and removed > threshold):
                 ret.append(('added-removed-graph', lower_box))
             elif (added > threshold):

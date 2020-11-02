@@ -20,7 +20,6 @@ import urwid
 from hubtty import gitrepo
 from hubtty import keymap
 from hubtty import mywid
-from hubtty import gitrepo
 from hubtty import sync
 from hubtty.view import mouse_scroll_decorator
 

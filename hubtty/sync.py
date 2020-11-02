@@ -23,7 +23,6 @@ import threading
 import json
 import time
 import datetime
-import warnings
 import itertools
 
 import dateutil.parser
@@ -39,7 +38,6 @@ from six.moves.urllib import parse as urlparse
 
 import hubtty.version
 from hubtty import gitrepo
-from hubtty.auth import FormAuth
 
 HIGH_PRIORITY=0
 NORMAL_PRIORITY=1
@@ -67,8 +65,8 @@ class MultiQueue(object):
         count = 0
         self.condition.acquire()
         try:
-            for queue in self.queues.values():
-                count += len(queue)
+            for q in self.queues.values():
+                count += len(q)
             return count + len(self.incomplete)
         finally:
             self.condition.release()
@@ -89,9 +87,9 @@ class MultiQueue(object):
         self.condition.acquire()
         try:
             while True:
-                for queue in self.queues.values():
+                for q in self.queues.values():
                     try:
-                        ret = queue.popleft()
+                        ret = q.popleft()
                         self.incomplete.append(ret)
                         return ret
                     except IndexError:
@@ -220,6 +218,7 @@ class SyncProjectListTask(Task):
         app = sync.app
 
         page = 1
+        remote = set()
         remote_keys = set()
         remote_desc = dict()
         while page == 1 or len(remote) > 0:
@@ -1000,7 +999,7 @@ class CheckReposTask(Task):
             try:
                 missing = False
                 try:
-                    repo = gitrepo.get_repo(project.name, app.config)
+                    gitrepo.get_repo(project.name, app.config)
                 except gitrepo.GitCloneError:
                     missing = True
                 if missing or app.fetch_missing_refs:
