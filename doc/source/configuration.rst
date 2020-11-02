@@ -1,40 +1,40 @@
 Configuration
 -------------
 
-Ghubtty uses a YAML based configuration file that it looks for at
-``~/.config/ghubtty/ghubtty.yaml``.  Several sample configuration files
+Hubtty uses a YAML based configuration file that it looks for at
+``~/.config/hubtty/hubtty.yaml``.  Several sample configuration files
 are included.  You can find them in the examples/ directory of the
 `source distribution
-<https://opendev.org/ttygroup/ghubtty/src/branch/master/examples>`_ or
-the share/ghubtty/examples directory after installation.
+<https://opendev.org/ttygroup/hubtty/src/branch/master/examples>`_ or
+the share/hubtty/examples directory after installation.
 
-Select one of the sample config files, copy it to ~/.config/ghubtty/ghubtty.yaml
+Select one of the sample config files, copy it to ~/.config/hubtty/hubtty.yaml
 and edit as necessary.  Search for ``CHANGEME`` to find parameters that need to
 be supplied.  The sample config files are as follows:
 
-**minimal-ghubtty.yaml**
-  Only contains the parameters required for Ghubtty to actually run.
+**minimal-hubtty.yaml**
+  Only contains the parameters required for Hubtty to actually run.
 
-**reference-ghubtty.yaml**
+**reference-hubtty.yaml**
   An exhaustive list of all supported options with examples.
 
-**opendev-ghubtty.yaml**
+**opendev-hubtty.yaml**
   A configuration designed for use with OpenDev's installation of
   Github.
 
-**googlesource-ghubtty.yaml**
+**googlesource-hubtty.yaml**
   A configuration designed for use with installations of Github
   running on googlesource.com.
 
 You will need a Github token which you can generate from the `Github user settings
 <https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/creating-a-personal-access-token>`_.
 
-Ghubtty uses local git repositories to perform much of its work.  These
+Hubtty uses local git repositories to perform much of its work.  These
 can be the same git repositories that you use when developing a
-project.  Ghubtty will not alter the working directory or index unless
+project.  Hubtty will not alter the working directory or index unless
 you request it to (and even then, the usual git safeguards against
 accidentally losing work remain in place).  You will need to supply
-the name of a directory where Ghubtty will find or clone git
+the name of a directory where Hubtty will find or clone git
 repositories for your projects as the ``git-root`` parameter.
 
 The config file is designed to support multiple Github instances.  The
@@ -50,8 +50,8 @@ configuration file.
 Servers
 +++++++
 
-This section lists the servers that Ghubtty can talk to.  Multiple
-servers may be listed; by default, Ghubtty will use the first one
+This section lists the servers that Hubtty can talk to.  Multiple
+servers may be listed; by default, Hubtty will use the first one
 listed.  To select another, simply specify its name on the command
 line.
 
@@ -75,29 +75,29 @@ line.
     Personal access tokens in the Github interface.
 
   **git-root (required)**
-    A location where Ghubtty should store its git repositories.  These
+    A location where Hubtty should store its git repositories.  These
     can be the same git repositories where you do your own work --
-    Ghubtty will not modify them unless you tell it to, and even then
+    Hubtty will not modify them unless you tell it to, and even then
     the normal git protections against losing work remain in place.
 
   **dburi**
-    The location of Ghubtty's sqlite database.  If you have more than
+    The location of Hubtty's sqlite database.  If you have more than
     one server, you should specify a dburi for any additional servers.
-    By default a SQLite database called ~/.ghubtty.db is used.
+    By default a SQLite database called ~/.hubtty.db is used.
 
   **log-file**
-    By default Ghubtty logs errors to a file and truncates that file
+    By default Hubtty logs errors to a file and truncates that file
     each time it starts (so that it does not grow without bound).  If
     you would like to log to a different location, you may specify it
     with this option.
 
   **socket**
-    Ghubtty listens on a unix domain socket for remote commands at
-    ~/.ghubtty.sock.  This option may be used to change the path.
+    Hubtty listens on a unix domain socket for remote commands at
+    ~/.hubtty.sock.  This option may be used to change the path.
 
   **lock-file**
-    Ghubtty uses a lock file per server to prevent multiple processes
-    from running at the same time. The default is ~/.ghubtty.servername.lock
+    Hubtty uses a lock file per server to prevent multiple processes
+    from running at the same time. The default is ~/.hubtty.servername.lock
 
 Example:
 
@@ -111,7 +111,7 @@ Example:
 Palettes
 ++++++++
 
-Ghubtty comes with two palettes defined internally.  The default
+Hubtty comes with two palettes defined internally.  The default
 palette is suitable for use on a terminal with a dark background.  The
 `light` palette is for a terminal with a white or light background.
 You may customize the colors in either of those palettes, or define
@@ -127,7 +127,7 @@ high-color terminals.
 For a reference of possible color names, see the `Urwid Manual
 <http://urwid.org/manual/displayattributes.html#foreground-and-background-settings>`_
 
-To see the list of possible palette entries, run `ghubtty --print-palette`.
+To see the list of possible palette entries, run `hubtty --print-palette`.
 
 The following example alters two colors in the default palette, one
 color in the light palette, and one color in a custom palette.
@@ -157,10 +157,10 @@ may be overridden and custom keymaps defined and selected in the
 config file or the command line.
 
 Each keymap contains a mapping of command -> key(s).  If a command is
-not specified, Ghubtty will use the keybinding specified in the default
+not specified, Hubtty will use the keybinding specified in the default
 map.  More than one key can be bound to a command.
 
-Run `ghubtty --print-keymap` for a list of commands that can be bound.
+Run `hubtty --print-keymap` for a list of commands that can be bound.
 
 The following example modifies the `default` keymap:
 
@@ -234,7 +234,7 @@ links, or have colors applied.
         palette entry.
 
     **search**
-      A hyperlink that will perform a Ghubtty search when activated.
+      A hyperlink that will perform a Hubtty search when activated.
 
       **text**
         The replacement text.
@@ -243,7 +243,7 @@ links, or have colors applied.
         The search query to use.
 
 This example matches Github change ids, and replaces them with a link
-to an internal Ghubtty search for that change id.
+to an internal Hubtty search for that change id.
 
 .. code-block: yaml
    commentlinks:
@@ -266,7 +266,7 @@ Change List Options
   **sort-by**
     This key specifies the sort order, which can be `number` (the
     Change number), `updated` (when the change was last updated), or
-    `last-seen` (when the change was last opened in Ghubtty).
+    `last-seen` (when the change was last opened in Hubtty).
 
   **reverse**
     This is a boolean value which indicates whether the list should be
@@ -315,8 +315,8 @@ Dashboards
 ++++++++++
 
 This section defines customized dashboards.  You may supply any
-Ghubtty search string and bind them to any key.  They will appear in
-the global help text, and pressing the key anywhere in Ghubtty will
+Hubtty search string and bind them to any key.  They will appear in
+the global help text, and pressing the key anywhere in Hubtty will
 run the query and display the results.
 
 **dashboards**
@@ -349,7 +349,7 @@ Reviewkeys are hotkeys that perform immediate reviews within the
 change screen.  Any pending comments or review messages will be
 attached to the review; otherwise an empty review message will be
 left.  The approvals list is exhaustive, so if you specify an empty
-list, Ghubtty will submit a review that clears any previous approvals.
+list, Hubtty will submit a review that clears any previous approvals.
 Reviewkeys appear in the help text for the change screen.
 
 **reviewkeys**
@@ -398,7 +398,7 @@ General Options
 +++++++++++++++
 
 **breadcrumbs**
-  Ghubtty displays a footer at the bottom of the screen by default
+  Hubtty displays a footer at the bottom of the screen by default
   which contains navigation information in the form of "breadcrumbs"
   -- short descriptions of previous screens, with the right-most entry
   indicating the screen that will be displayed if you press the `ESC`
@@ -409,7 +409,7 @@ General Options
   them in UTC instead, set this value to `true`.
 
 **handle-mouse**
-  Ghubtty handles mouse input by default.  If you don't want it
+  Hubtty handles mouse input by default.  If you don't want it
   interfering with your terminal's mouse handling, set this value to
   `false`.
 

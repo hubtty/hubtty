@@ -1,10 +1,10 @@
 Contributing
 ============
 
-To browse the latest code, see: https://opendev.org/ttygroup/ghubtty/src/branch/master/
-To clone the latest code, use `git clone https://opendev.org/ttygroup/ghubtty`
+To browse the latest code, see: https://opendev.org/ttygroup/hubtty/src/branch/master/
+To clone the latest code, use `git clone https://opendev.org/ttygroup/hubtty`
 
-Bugs are handled at: https://storyboard.openstack.org/#!/project/ttygroup/ghubtty
+Bugs are handled at: https://storyboard.openstack.org/#!/project/ttygroup/hubtty
 
 Code reviews are handled by github at: https://review.opendev.org
 
@@ -18,7 +18,7 @@ that links to your launchpad account). Example::
 Philosophy
 ----------
 
-Ghubtty is based on the following precepts which should inform changes
+Hubtty is based on the following precepts which should inform changes
 to the program:
 
 * Support large numbers of review requests across large numbers of
@@ -30,14 +30,14 @@ to the program:
   load (they have worked extremely well in supporting people who
   read/write a lot of mail/news).
 
-* Support off-line use.  Ghubtty should be completely usable off-line
+* Support off-line use.  Hubtty should be completely usable off-line
   with reliable syncing between local data and Github when a
   connection is available (just like git or mail or news).
 
 * Ample use of color.  Unlike a web interface, a good text interface
   relies mostly on color and precise placement rather than whitespace
   and decoration to indicate to the user the purpose of a given piece
-  of information.  Ghubtty should degrade well to 16 colors, but more
+  of information.  Hubtty should degrade well to 16 colors, but more
   (88 or 256) may be used.
 
 * Keyboard navigation (with easy-to-remember commands) should be
@@ -52,7 +52,7 @@ to the program:
   expectations set by the web browsers).
 
 * Support a wide variety of Github installations.  The initial
-  development of Ghubtty is against the OpenDev Github, and many of the
+  development of Hubtty is against the OpenDev Github, and many of the
   features are intended to help its users with their workflow,
   however, those features should be implemented in a generic way so
   that the system does not require a specific Github configuration.
