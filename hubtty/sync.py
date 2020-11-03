@@ -222,7 +222,7 @@ class SyncProjectListTask(Task):
         remote_keys = set()
         remote_desc = dict()
         while page == 1 or len(remote) > 0:
-            remote = sync.get('user/repos?page=%d&per_page=30' % page)
+            remote = sync.get('user/repos?page=%d&per_page=100' % page)
             for r in remote:
                 remote_keys.add(r['full_name'])
                 remote_desc[r['full_name']] = r.get('description', '')
@@ -316,12 +316,12 @@ class SyncSubscribedProjectsTask(Task):
             t = SyncProjectTask(keys[i:i+10], self.priority)
             self.tasks.append(t)
             sync.submitTask(t)
-        t = SyncQueriedChangesTask('owner', 'is:owner', self.priority)
-        self.tasks.append(t)
-        sync.submitTask(t)
-        t = SyncQueriedChangesTask('starred', 'is:starred', self.priority)
-        self.tasks.append(t)
-        sync.submitTask(t)
+        # t = SyncQueriedChangesTask('owner', 'is:owner', self.priority)
+        # self.tasks.append(t)
+        # sync.submitTask(t)
+        # t = SyncQueriedChangesTask('starred', 'is:starred', self.priority)
+        # self.tasks.append(t)
+        # sync.submitTask(t)
 
 class SyncProjectTask(Task):
     def __init__(self, project_keys, priority=NORMAL_PRIORITY):
@@ -346,12 +346,12 @@ class SyncProjectTask(Task):
         with app.db.getSession() as session:
             for project_key in self.project_keys:
                 project = session.getProject(project_key)
-                query = 'q=project:%s' % project.name
+                query = 'type:pr repo:%s' % project.name
                 if project.updated:
                     # Allow 4 seconds for request time, etc.
-                    query += ' -age:%ss' % (int(math.ceil((now-project.updated).total_seconds())) + 4,)
+                    query += ' created:%s' % ((project.updated - datetime.timedelta(seconds=4)).astimezone().replace(microsecond=0).isoformat(),)
                 else:
-                    query += ' status:open'
+                    query += ' state:open'
                 queries.append(query)
         changes = sync.query(queries)
         change_ids = [c['id'] for c in changes]
@@ -359,11 +359,11 @@ class SyncProjectTask(Task):
             # Winnow the list of IDs to only the ones in the local DB.
             change_ids = session.getChangeIDs(change_ids)
 
-        for c in changes:
-            # For now, just sync open changes or changes already
-            # in the db optionally we could sync all changes ever
-            if c['id'] in change_ids or (c['status'] not in CLOSED_STATUSES):
-                sync.submitTask(SyncChangeTask(c['id'], priority=self.priority))
+        # for c in changes:
+        #     # For now, just sync open changes or changes already
+        #     # in the db optionally we could sync all changes ever
+        #     if c['id'] in change_ids or (c['status'] not in CLOSED_STATUSES):
+        #         sync.submitTask(SyncChangeTask(c['id'], priority=self.priority))
         for key in self.project_keys:
             sync.submitTask(SetProjectUpdatedTask(key, now, priority=self.priority))
 
@@ -1645,19 +1645,20 @@ class Sync(object):
             query = '&'.join(queries)
             # We don't actually want to limit to 500, but that's the server-side default, and
             # if we don't specify this, we won't get a _more_changes flag.
-            q = 'changes/?n=500%s&%s' % (sortkey, query)
+            q = 'search/issues?q=%s' % query
             self.log.debug('Query: %s' % (q,))
             responses = self.get(q)
             if len(queries) == 1:
-                responses = [responses]
+                return responses.get('items', [])
+                # responses = [responses]
             done = True
-            for batch in responses:
-                changes += batch
-                if batch and '_more_changes' in batch[-1]:
-                    done = False
-                    if '_sortkey' in batch[-1]:
-                        sortkey = '&N=%s' % (batch[-1]['_sortkey'],)
-                    else:
-                        offset += len(batch)
-                        sortkey = '&start=%s' % (offset,)
+            # for batch in responses:
+            #     changes += batch
+            #     if batch and '_more_changes' in batch[-1]:
+            #         done = False
+            #         if '_sortkey' in batch[-1]:
+            #             sortkey = '&N=%s' % (batch[-1]['_sortkey'],)
+            #         else:
+            #             offset += len(batch)
+            #             sortkey = '&start=%s' % (offset,)
         return changes
