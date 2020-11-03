@@ -356,7 +356,7 @@ class SyncProjectTask(Task):
         changes = sync.query(queries)
 
         for c in changes:
-            sync.submitTask(SyncChangeTask(c['id'], priority=self.priority))
+            sync.submitTask(SyncChangeTask(c['pull_request']['url'].split('repos/')[1], priority=self.priority))
 
         for key in self.project_keys:
             sync.submitTask(SetProjectUpdatedTask(key, now, priority=self.priority))
@@ -609,58 +609,55 @@ class SyncChangeTask(Task):
 
     def _syncChange(self, sync):
         app = sync.app
-        remote_change = sync.get('changes/%s?o=DETAILED_LABELS&o=ALL_REVISIONS&o=ALL_COMMITS&o=MESSAGES&o=DETAILED_ACCOUNTS&o=CURRENT_ACTIONS&o=ALL_FILES' % self.change_id)
+        remote_change = sync.get('repos/%s' % self.change_id)
         # Perform subqueries this task will need outside of the db session
-        for remote_commit, remote_revision in remote_change.get('revisions', {}).items():
-            remote_comments_data = sync.get('changes/%s/revisions/%s/comments' % (self.change_id, remote_commit))
-            remote_revision['_hubtty_remote_comments_data'] = remote_comments_data
-            remote_robot_comments_data = sync.get('changes/%s/revisions/%s/robotcomments' % (
-                self.change_id, remote_commit))
-            remote_revision['_hubtty_remote_robot_comments_data'] = remote_robot_comments_data
+        # for remote_commit, remote_revision in remote_change.get('revisions', {}).items():
+        #     remote_comments_data = sync.get('changes/%s/revisions/%s/comments' % (self.change_id, remote_commit))
+        #     remote_revision['_hubtty_remote_comments_data'] = remote_comments_data
+        #     remote_robot_comments_data = sync.get('changes/%s/revisions/%s/robotcomments' % (
+        #         self.change_id, remote_commit))
+        #     remote_revision['_hubtty_remote_robot_comments_data'] = remote_robot_comments_data
 
-            if sync.checks_plugin:
-                remote_checks_data = sync.get('changes/%s/revisions/%s/checks' % (self.change_id, remote_commit))
-                if remote_checks_data is None:
-                    sync.checks_plugin = False
-                else:
-                    remote_revision['_hubtty_remote_checks_data'] = remote_checks_data
-        try:
-            remote_conflicts = sync.query(['q=status:open+is:mergeable+conflicts:%s' %
-                                           remote_change['_number']])
-        except Exception:
-            # Conflicts are now optional
-            self.log.debug("Unable to sync conflicts for change %s" % self.change_id)
-            remote_conflicts = []
+        #     if sync.checks_plugin:
+        #         remote_checks_data = sync.get('changes/%s/revisions/%s/checks' % (self.change_id, remote_commit))
+        #         if remote_checks_data is None:
+        #             sync.checks_plugin = False
+        #         else:
+        #             remote_revision['_hubtty_remote_checks_data'] = remote_checks_data
+        # try:
+        #     remote_conflicts = sync.query(['q=status:open+is:mergeable+conflicts:%s' %
+        #                                    remote_change['_number']])
+        # except Exception:
+        #     # Conflicts are now optional
+        #     self.log.debug("Unable to sync conflicts for change %s" % self.change_id)
+        #     remote_conflicts = []
 
         fetches = collections.defaultdict(list)
         parent_commits = set()
         with app.db.getSession() as session:
             change = session.getChangeByID(self.change_id)
-            account = session.getAccountByID(remote_change['owner']['_account_id'],
-                                             name=remote_change['owner'].get('name'),
-                                             username=remote_change['owner'].get('username'),
-                                             email=remote_change['owner'].get('email'))
+            account = session.getAccountByID(remote_change['user']['id'],
+                                             username=remote_change['user'].get('login'))
             if not change:
-                project = session.getProjectByName(remote_change['project'])
+                project = session.getProjectByName(remote_change['base']['repo']['full_name'])
                 if not project:
                     self.log.debug("Project %s unknown while syncing change" % (
-                        remote_change['project'],))
-                    remote_project = sync.get('projects/%s' %
-                                              (urlparse.quote_plus(remote_change['project']),))
-                    if remote_project:
-                        project = session.createProject(
-                            remote_project['name'],
-                            description=remote_project.get('description', ''))
-                        self.log.info("Created project %s", project.name)
-                        self.results.append(ProjectAddedEvent(project))
-                        sync.submitTask(SyncProjectBranchesTask(project.name, self.priority))
-                created = dateutil.parser.parse(remote_change['created'])
-                updated = dateutil.parser.parse(remote_change['updated'])
-                change = project.createChange(remote_change['id'], account, remote_change['_number'],
-                                              remote_change['branch'], remote_change['change_id'],
-                                              remote_change['subject'], created,
-                                              updated, remote_change['status'],
-                                              topic=remote_change.get('topic'))
+                        remote_change['base']['repo']['full_name'],))
+                    # remote_project = sync.get('projects/%s' %
+                    #                           (urlparse.quote_plus(remote_change['project']),))
+                    # if remote_project:
+                    #     project = session.createProject(
+                    #         remote_project['name'],
+                    #         description=remote_project.get('description', ''))
+                    #     self.log.info("Created project %s", project.name)
+                    #     self.results.append(ProjectAddedEvent(project))
+                    #     sync.submitTask(SyncProjectBranchesTask(project.name, self.priority))
+                created = dateutil.parser.parse(remote_change['created_at'])
+                updated = dateutil.parser.parse(remote_change['updated_at'])
+                change = project.createChange(remote_change['id'], account, remote_change['number'],
+                                              remote_change['head']['label'], remote_change['head']['sha'],
+                                              remote_change['title'], created,
+                                              updated, remote_change['state'])
                 self.log.info("Created new change %s in local DB.", change.id)
                 result = ChangeAddedEvent(change)
             else:
@@ -668,309 +665,309 @@ class SyncChangeTask(Task):
             app.project_cache.clear(change.project)
             self.results.append(result)
             change.owner = account
-            if change.status != remote_change['status']:
-                change.status = remote_change['status']
+            if change.status != remote_change['state']:
+                change.status = remote_change['state']
                 result.status_changed = True
             if remote_change.get('starred'):
                 change.starred = True
             else:
                 change.starred = False
-            change.subject = remote_change['subject']
-            change.updated = dateutil.parser.parse(remote_change['updated'])
+            change.subject = remote_change['title']
+            change.updated = dateutil.parser.parse(remote_change['updated_at'])
             change.topic = remote_change.get('topic')
-            unseen_conflicts = [x.id for x in change.conflicts]
-            for remote_conflict in remote_conflicts:
-                conflict_id = remote_conflict['id']
-                conflict = session.getChangeByID(conflict_id)
-                if not conflict:
-                    self.log.info("Need to sync conflicting change %s for change %s.",
-                                  conflict_id, change.number)
-                    sync.submitTask(SyncChangeTask(conflict_id, priority=self.priority))
-                else:
-                    if conflict not in change.conflicts:
-                        self.log.info("Added conflict %s for change %s in local DB.",
-                                      conflict.number, change.number)
-                        change.addConflict(conflict)
-                        self.results.append(ChangeUpdatedEvent(conflict))
-                if conflict_id in unseen_conflicts:
-                    unseen_conflicts.remove(conflict_id)
-            for conflict_id in unseen_conflicts:
-                conflict = session.getChangeByID(conflict_id)
-                self.log.info("Deleted conflict %s for change %s in local DB.",
-                              conflict.number, change.number)
-                change.delConflict(conflict)
-                self.results.append(ChangeUpdatedEvent(conflict))
-            repo = gitrepo.get_repo(change.project.name, app.config)
-            new_revision = False
-            for remote_commit, remote_revision in remote_change.get('revisions', {}).items():
-                revision = session.getRevisionByCommit(remote_commit)
-                # TODO: handle multiple parents
-                url = sync.app.config.git_url + change.project.name
-                if 'anonymous http' in remote_revision['fetch']:
-                    ref = remote_revision['fetch']['anonymous http']['ref']
-                    url = remote_revision['fetch']['anonymous http']['url']
-                    auth = False
-                elif 'http' in remote_revision['fetch']:
-                    auth = True
-                    ref = remote_revision['fetch']['http']['ref']
-                    url = list(urlparse.urlsplit(sync.app.config.url + change.project.name))
-                    url[1] = '%s:%s@%s' % (
-                        urlparse.quote_plus(sync.app.config.username),
-                        urlparse.quote_plus(sync.app.config.token), url[1])
-                    url = urlparse.urlunsplit(url)
-                elif 'ssh' in remote_revision['fetch']:
-                    ref = remote_revision['fetch']['ssh']['ref']
-                    url = remote_revision['fetch']['ssh']['url']
-                    auth = False
-                elif 'git' in remote_revision['fetch']:
-                    ref = remote_revision['fetch']['git']['ref']
-                    url = remote_revision['fetch']['git']['url']
-                    auth = False
-                else:
-                    if len(remote_revision['fetch']):
-                        errMessage = "No supported fetch method found.  Server offers: %s" % (
-                            ', '.join(remote_revision['fetch'].keys()))
-                    else:
-                        errMessage = "The server is missing the download-commands plugin."
-                    raise Exception(errMessage)
-                if (not revision) or self.force_fetch:
-                    fetches[url].append('+%(ref)s:%(ref)s' % dict(ref=ref))
-                if not revision:
-                    revision = change.createRevision(remote_revision['_number'],
-                                                     remote_revision['commit']['message'], remote_commit,
-                                                     remote_revision['commit']['parents'][0]['commit'],
-                                                     auth, ref)
-                    self.log.info("Created new revision %s for change %s revision %s in local DB.",
-                                  revision.key, self.change_id, remote_revision['_number'])
-                    new_revision = True
-                revision.message = remote_revision['commit']['message']
-                actions = remote_revision.get('actions', {})
-                revision.can_submit = 'submit' in actions
-                # TODO: handle multiple parents
-                if revision.parent not in parent_commits:
-                    parent_revision = session.getRevisionByCommit(revision.parent)
-                    if not parent_revision and change.status not in CLOSED_STATUSES:
-                        sync._syncChangeByCommit(revision.parent, self.priority)
-                        self.log.debug("Change %s revision %s needs parent commit %s synced" %
-                                       (change.id, remote_revision['_number'], revision.parent))
-                    parent_commits.add(revision.parent)
-                result.updateRelatedChanges(session, change)
+            # unseen_conflicts = [x.id for x in change.conflicts]
+            # for remote_conflict in remote_conflicts:
+            #     conflict_id = remote_conflict['id']
+            #     conflict = session.getChangeByID(conflict_id)
+            #     if not conflict:
+            #         self.log.info("Need to sync conflicting change %s for change %s.",
+            #                       conflict_id, change.number)
+            #         sync.submitTask(SyncChangeTask(conflict_id, priority=self.priority))
+            #     else:
+            #         if conflict not in change.conflicts:
+            #             self.log.info("Added conflict %s for change %s in local DB.",
+            #                           conflict.number, change.number)
+            #             change.addConflict(conflict)
+            #             self.results.append(ChangeUpdatedEvent(conflict))
+            #     if conflict_id in unseen_conflicts:
+            #         unseen_conflicts.remove(conflict_id)
+            # for conflict_id in unseen_conflicts:
+            #     conflict = session.getChangeByID(conflict_id)
+            #     self.log.info("Deleted conflict %s for change %s in local DB.",
+            #                   conflict.number, change.number)
+            #     change.delConflict(conflict)
+            #     self.results.append(ChangeUpdatedEvent(conflict))
+            # repo = gitrepo.get_repo(change.project.name, app.config)
+            # new_revision = False
+            # for remote_commit, remote_revision in remote_change.get('revisions', {}).items():
+            #     revision = session.getRevisionByCommit(remote_commit)
+            #     # TODO: handle multiple parents
+            #     url = sync.app.config.git_url + change.project.name
+            #     if 'anonymous http' in remote_revision['fetch']:
+            #         ref = remote_revision['fetch']['anonymous http']['ref']
+            #         url = remote_revision['fetch']['anonymous http']['url']
+            #         auth = False
+            #     elif 'http' in remote_revision['fetch']:
+            #         auth = True
+            #         ref = remote_revision['fetch']['http']['ref']
+            #         url = list(urlparse.urlsplit(sync.app.config.url + change.project.name))
+            #         url[1] = '%s:%s@%s' % (
+            #             urlparse.quote_plus(sync.app.config.username),
+            #             urlparse.quote_plus(sync.app.config.token), url[1])
+            #         url = urlparse.urlunsplit(url)
+            #     elif 'ssh' in remote_revision['fetch']:
+            #         ref = remote_revision['fetch']['ssh']['ref']
+            #         url = remote_revision['fetch']['ssh']['url']
+            #         auth = False
+            #     elif 'git' in remote_revision['fetch']:
+            #         ref = remote_revision['fetch']['git']['ref']
+            #         url = remote_revision['fetch']['git']['url']
+            #         auth = False
+            #     else:
+            #         if len(remote_revision['fetch']):
+            #             errMessage = "No supported fetch method found.  Server offers: %s" % (
+            #                 ', '.join(remote_revision['fetch'].keys()))
+            #         else:
+            #             errMessage = "The server is missing the download-commands plugin."
+            #         raise Exception(errMessage)
+            #     if (not revision) or self.force_fetch:
+            #         fetches[url].append('+%(ref)s:%(ref)s' % dict(ref=ref))
+            #     if not revision:
+            #         revision = change.createRevision(remote_revision['_number'],
+            #                                          remote_revision['commit']['message'], remote_commit,
+            #                                          remote_revision['commit']['parents'][0]['commit'],
+            #                                          auth, ref)
+            #         self.log.info("Created new revision %s for change %s revision %s in local DB.",
+            #                       revision.key, self.change_id, remote_revision['_number'])
+            #         new_revision = True
+            #     revision.message = remote_revision['commit']['message']
+            #     actions = remote_revision.get('actions', {})
+            #     revision.can_submit = 'submit' in actions
+            #     # TODO: handle multiple parents
+            #     if revision.parent not in parent_commits:
+            #         parent_revision = session.getRevisionByCommit(revision.parent)
+            #         if not parent_revision and change.status not in CLOSED_STATUSES:
+            #             sync._syncChangeByCommit(revision.parent, self.priority)
+            #             self.log.debug("Change %s revision %s needs parent commit %s synced" %
+            #                            (change.id, remote_revision['_number'], revision.parent))
+            #         parent_commits.add(revision.parent)
+            #     result.updateRelatedChanges(session, change)
 
-                f = revision.getFile('/COMMIT_MSG')
-                if f is None:
-                    f = revision.createFile('/COMMIT_MSG', None,
-                                            None, None, None)
-                for remote_path, remote_file in remote_revision['files'].items():
-                    f = revision.getFile(remote_path)
-                    if f is None:
-                        if remote_file.get('binary'):
-                            inserted = deleted = None
-                        else:
-                            inserted = remote_file.get('lines_inserted', 0)
-                            deleted = remote_file.get('lines_deleted', 0)
-                        f = revision.createFile(remote_path, remote_file.get('status', 'M'),
-                                                remote_file.get('old_path'),
-                                                inserted, deleted)
+            #     f = revision.getFile('/COMMIT_MSG')
+            #     if f is None:
+            #         f = revision.createFile('/COMMIT_MSG', None,
+            #                                 None, None, None)
+            #     for remote_path, remote_file in remote_revision['files'].items():
+            #         f = revision.getFile(remote_path)
+            #         if f is None:
+            #             if remote_file.get('binary'):
+            #                 inserted = deleted = None
+            #             else:
+            #                 inserted = remote_file.get('lines_inserted', 0)
+            #                 deleted = remote_file.get('lines_deleted', 0)
+            #             f = revision.createFile(remote_path, remote_file.get('status', 'M'),
+            #                                     remote_file.get('old_path'),
+            #                                     inserted, deleted)
 
-                remote_comments_items = list(remote_revision['_hubtty_remote_comments_data'].items())
-                remote_robot_comments_items = list(remote_revision.get('_hubtty_remote_robot_comments_data', {}).items())
-                for remote_file, remote_comments in itertools.chain(remote_comments_items, remote_robot_comments_items):
-                    for remote_comment in remote_comments:
-                        account = session.getAccountByID(remote_comment['author']['_account_id'],
-                                                         name=remote_comment['author'].get('name'),
-                                                         username=remote_comment['author'].get('username'),
-                                                         email=remote_comment['author'].get('email'))
-                        comment = session.getCommentByID(remote_comment['id'])
-                        if not comment:
-                            # Normalize updated -> created
-                            created = dateutil.parser.parse(remote_comment['updated'])
-                            parent = False
-                            if remote_comment.get('side', '') == 'PARENT':
-                                parent = True
-                            fileobj = revision.getFile(remote_file)
-                            if fileobj is None:
-                                fileobj = revision.createFile(remote_file, 'M')
-                            comment = fileobj.createComment(remote_comment['id'], account,
-                                                            remote_comment.get('in_reply_to'),
-                                                            created,
-                                                            parent, remote_comment.get('line'),
-                                                            remote_comment['message'],
-                                                            robot_id = remote_comment.get('robot_id'),
-                                                            robot_run_id = remote_comment.get('robot_run_id'),
-                                                            url = remote_comment.get('url'))
-                            self.log.info("Created new comment %s for revision %s in local DB.",
-                                          comment.key, revision.key)
-                        else:
-                            if comment.author != account:
-                                comment.author = account
-                if remote_revision.get('_hubtty_remote_checks_data'):
-                    self._updateChecks(session, change, revision, remote_revision['_hubtty_remote_checks_data'])
-            # End revisions
-            new_message = False
-            for remote_message in remote_change.get('messages', []):
-                if 'author' in remote_message:
-                    account = session.getAccountByID(remote_message['author']['_account_id'],
-                                                     name=remote_message['author'].get('name'),
-                                                     username=remote_message['author'].get('username'),
-                                                     email=remote_message['author'].get('email'))
-                    if account.username != app.config.username:
-                        new_message = True
-                else:
-                    account = session.getSystemAccount()
-                message = session.getMessageByID(remote_message['id'])
-                if not message:
-                    revision = session.getRevisionByNumber(change, remote_message.get('_revision_number', 1))
-                    if revision:
-                        # Normalize date -> created
-                        created = dateutil.parser.parse(remote_message['date'])
-                        message = revision.createMessage(remote_message['id'], account, created,
-                                                     remote_message['message'])
-                        self.log.info("Created new review message %s for revision %s in local DB.", message.key, revision.key)
-                    else:
-                        self.log.info("Unable to create new review message for revision %s because it is not in local DB (draft?).", remote_message.get('_revision_number'))
-                else:
-                    if message.author != account:
-                        message.author = account
-            remote_approval_entries = {}
-            remote_label_entries = {}
-            user_voted = False
-            for remote_label_name, remote_label_dict in remote_change.get('labels', {}).items():
-                for remote_approval in remote_label_dict.get('all', []):
-                    if remote_approval.get('value') is None:
-                        continue
-                    remote_approval['category'] = remote_label_name
-                    key = '%s~%s' % (remote_approval['category'], remote_approval['_account_id'])
-                    remote_approval_entries[key] = remote_approval
-                    if remote_approval['_account_id'] == sync.account_id and int(remote_approval['value']) != 0:
-                        user_voted = True
-                for key, value in remote_label_dict.get('values', {}).items():
-                    # +1: "LGTM"
-                    label = dict(value=key,
-                                 description=value,
-                                 category=remote_label_name)
-                    key = '%s~%s~%s' % (label['category'], label['value'], label['description'])
-                    remote_label_entries[key] = label
-            remote_approval_keys = set(remote_approval_entries.keys())
-            remote_label_keys = set(remote_label_entries.keys())
-            local_approvals = {}
-            local_labels = {}
-            user_votes = {}
-            for approval in change.approvals:
-                if approval.draft and not new_revision:
-                    # If we have a new revision, we need to delete
-                    # draft local approvals because they can no longer
-                    # be uploaded.  Otherwise, keep them because we
-                    # may be about to upload a review.  Ignoring an
-                    # approval here means it will not be deleted.
-                    # Also keep track of these approvals so we can
-                    # determine whether we should hold the change
-                    # later.
-                    user_votes[approval.category] = approval.value
-                    # Count draft votes as having voted for the
-                    # purposes of deciding whether to clear the
-                    # reviewed flag later.
-                    user_voted = True
-                    continue
-                key = '%s~%s' % (approval.category, approval.reviewer.id)
-                if key in local_approvals:
-                    # Delete duplicate approvals.
-                    session.delete(approval)
-                else:
-                    local_approvals[key] = approval
-            local_approval_keys = set(local_approvals.keys())
-            for label in change.labels:
-                key = '%s~%s~%s' % (label.category, label.value, label.description)
-                local_labels[key] = label
-            local_label_keys = set(local_labels.keys())
+            #     remote_comments_items = list(remote_revision['_hubtty_remote_comments_data'].items())
+            #     remote_robot_comments_items = list(remote_revision.get('_hubtty_remote_robot_comments_data', {}).items())
+            #     for remote_file, remote_comments in itertools.chain(remote_comments_items, remote_robot_comments_items):
+            #         for remote_comment in remote_comments:
+            #             account = session.getAccountByID(remote_comment['author']['_account_id'],
+            #                                              name=remote_comment['author'].get('name'),
+            #                                              username=remote_comment['author'].get('username'),
+            #                                              email=remote_comment['author'].get('email'))
+            #             comment = session.getCommentByID(remote_comment['id'])
+            #             if not comment:
+            #                 # Normalize updated -> created
+            #                 created = dateutil.parser.parse(remote_comment['updated'])
+            #                 parent = False
+            #                 if remote_comment.get('side', '') == 'PARENT':
+            #                     parent = True
+            #                 fileobj = revision.getFile(remote_file)
+            #                 if fileobj is None:
+            #                     fileobj = revision.createFile(remote_file, 'M')
+            #                 comment = fileobj.createComment(remote_comment['id'], account,
+            #                                                 remote_comment.get('in_reply_to'),
+            #                                                 created,
+            #                                                 parent, remote_comment.get('line'),
+            #                                                 remote_comment['message'],
+            #                                                 robot_id = remote_comment.get('robot_id'),
+            #                                                 robot_run_id = remote_comment.get('robot_run_id'),
+            #                                                 url = remote_comment.get('url'))
+            #                 self.log.info("Created new comment %s for revision %s in local DB.",
+            #                               comment.key, revision.key)
+            #             else:
+            #                 if comment.author != account:
+            #                     comment.author = account
+            #     if remote_revision.get('_hubtty_remote_checks_data'):
+            #         self._updateChecks(session, change, revision, remote_revision['_hubtty_remote_checks_data'])
+            # # End revisions
+            # new_message = False
+            # for remote_message in remote_change.get('messages', []):
+            #     if 'author' in remote_message:
+            #         account = session.getAccountByID(remote_message['author']['_account_id'],
+            #                                          name=remote_message['author'].get('name'),
+            #                                          username=remote_message['author'].get('username'),
+            #                                          email=remote_message['author'].get('email'))
+            #         if account.username != app.config.username:
+            #             new_message = True
+            #     else:
+            #         account = session.getSystemAccount()
+            #     message = session.getMessageByID(remote_message['id'])
+            #     if not message:
+            #         revision = session.getRevisionByNumber(change, remote_message.get('_revision_number', 1))
+            #         if revision:
+            #             # Normalize date -> created
+            #             created = dateutil.parser.parse(remote_message['date'])
+            #             message = revision.createMessage(remote_message['id'], account, created,
+            #                                          remote_message['message'])
+            #             self.log.info("Created new review message %s for revision %s in local DB.", message.key, revision.key)
+            #         else:
+            #             self.log.info("Unable to create new review message for revision %s because it is not in local DB (draft?).", remote_message.get('_revision_number'))
+            #     else:
+            #         if message.author != account:
+            #             message.author = account
+            # remote_approval_entries = {}
+            # remote_label_entries = {}
+            # user_voted = False
+            # for remote_label_name, remote_label_dict in remote_change.get('labels', {}).items():
+            #     for remote_approval in remote_label_dict.get('all', []):
+            #         if remote_approval.get('value') is None:
+            #             continue
+            #         remote_approval['category'] = remote_label_name
+            #         key = '%s~%s' % (remote_approval['category'], remote_approval['_account_id'])
+            #         remote_approval_entries[key] = remote_approval
+            #         if remote_approval['_account_id'] == sync.account_id and int(remote_approval['value']) != 0:
+            #             user_voted = True
+            #     for key, value in remote_label_dict.get('values', {}).items():
+            #         # +1: "LGTM"
+            #         label = dict(value=key,
+            #                      description=value,
+            #                      category=remote_label_name)
+            #         key = '%s~%s~%s' % (label['category'], label['value'], label['description'])
+            #         remote_label_entries[key] = label
+            # remote_approval_keys = set(remote_approval_entries.keys())
+            # remote_label_keys = set(remote_label_entries.keys())
+            # local_approvals = {}
+            # local_labels = {}
+            # user_votes = {}
+            # for approval in change.approvals:
+            #     if approval.draft and not new_revision:
+            #         # If we have a new revision, we need to delete
+            #         # draft local approvals because they can no longer
+            #         # be uploaded.  Otherwise, keep them because we
+            #         # may be about to upload a review.  Ignoring an
+            #         # approval here means it will not be deleted.
+            #         # Also keep track of these approvals so we can
+            #         # determine whether we should hold the change
+            #         # later.
+            #         user_votes[approval.category] = approval.value
+            #         # Count draft votes as having voted for the
+            #         # purposes of deciding whether to clear the
+            #         # reviewed flag later.
+            #         user_voted = True
+            #         continue
+            #     key = '%s~%s' % (approval.category, approval.reviewer.id)
+            #     if key in local_approvals:
+            #         # Delete duplicate approvals.
+            #         session.delete(approval)
+            #     else:
+            #         local_approvals[key] = approval
+            # local_approval_keys = set(local_approvals.keys())
+            # for label in change.labels:
+            #     key = '%s~%s~%s' % (label.category, label.value, label.description)
+            #     local_labels[key] = label
+            # local_label_keys = set(local_labels.keys())
 
-            for key in local_approval_keys-remote_approval_keys:
-                session.delete(local_approvals[key])
+            # for key in local_approval_keys-remote_approval_keys:
+            #     session.delete(local_approvals[key])
 
-            for key in local_label_keys-remote_label_keys:
-                session.delete(local_labels[key])
+            # for key in local_label_keys-remote_label_keys:
+            #     session.delete(local_labels[key])
 
-            for key in remote_approval_keys-local_approval_keys:
-                remote_approval = remote_approval_entries[key]
-                account = session.getAccountByID(remote_approval['_account_id'],
-                                                 name=remote_approval.get('name'),
-                                                 username=remote_approval.get('username'),
-                                                 email=remote_approval.get('email'))
-                change.createApproval(account,
-                                      remote_approval['category'],
-                                      remote_approval['value'])
-                self.log.info("Created approval for change %s in local DB.", change.id)
-                user_value = user_votes.get(remote_approval['category'], 0)
-                if user_value > 0 and remote_approval['value'] < 0:
-                    # Someone left a negative vote after the local
-                    # user created a draft positive vote.  Hold the
-                    # change so that it doesn't look like the local
-                    # user is ignoring negative feedback.
-                    if not change.held:
-                        change.held = True
-                        result.held_changed = True
-                        self.log.info("Setting change %s to held due to negative review after positive", change.id)
+            # for key in remote_approval_keys-local_approval_keys:
+            #     remote_approval = remote_approval_entries[key]
+            #     account = session.getAccountByID(remote_approval['_account_id'],
+            #                                      name=remote_approval.get('name'),
+            #                                      username=remote_approval.get('username'),
+            #                                      email=remote_approval.get('email'))
+            #     change.createApproval(account,
+            #                           remote_approval['category'],
+            #                           remote_approval['value'])
+            #     self.log.info("Created approval for change %s in local DB.", change.id)
+            #     user_value = user_votes.get(remote_approval['category'], 0)
+            #     if user_value > 0 and remote_approval['value'] < 0:
+            #         # Someone left a negative vote after the local
+            #         # user created a draft positive vote.  Hold the
+            #         # change so that it doesn't look like the local
+            #         # user is ignoring negative feedback.
+            #         if not change.held:
+            #             change.held = True
+            #             result.held_changed = True
+            #             self.log.info("Setting change %s to held due to negative review after positive", change.id)
 
-            for key in remote_label_keys-local_label_keys:
-                remote_label = remote_label_entries[key]
-                change.createLabel(remote_label['category'],
-                                   remote_label['value'],
-                                   remote_label['description'])
+            # for key in remote_label_keys-local_label_keys:
+            #     remote_label = remote_label_entries[key]
+            #     change.createLabel(remote_label['category'],
+            #                        remote_label['value'],
+            #                        remote_label['description'])
 
-            for key in remote_approval_keys.intersection(local_approval_keys):
-                local_approval = local_approvals[key]
-                remote_approval = remote_approval_entries[key]
-                local_approval.value = remote_approval['value']
-                # For the side effect of updating account info:
-                account = session.getAccountByID(remote_approval['_account_id'],
-                                                 name=remote_approval.get('name'),
-                                                 username=remote_approval.get('username'),
-                                                 email=remote_approval.get('email'))
+            # for key in remote_approval_keys.intersection(local_approval_keys):
+            #     local_approval = local_approvals[key]
+            #     remote_approval = remote_approval_entries[key]
+            #     local_approval.value = remote_approval['value']
+            #     # For the side effect of updating account info:
+            #     account = session.getAccountByID(remote_approval['_account_id'],
+            #                                      name=remote_approval.get('name'),
+            #                                      username=remote_approval.get('username'),
+            #                                      email=remote_approval.get('email'))
 
-            remote_permitted_entries = {}
-            for remote_label_name, remote_label_values in remote_change.get('permitted_labels', {}).items():
-                for remote_label_value in remote_label_values:
-                    remote_label = dict(category=remote_label_name,
-                                        value=remote_label_value)
-                    key = '%s~%s' % (remote_label['category'], remote_label['value'])
-                    remote_permitted_entries[key] = remote_label
-            remote_permitted_keys = set(remote_permitted_entries.keys())
-            local_permitted = {}
-            for permitted in change.permitted_labels:
-                key = '%s~%s' % (permitted.category, permitted.value)
-                local_permitted[key] = permitted
-            local_permitted_keys = set(local_permitted.keys())
+            # remote_permitted_entries = {}
+            # for remote_label_name, remote_label_values in remote_change.get('permitted_labels', {}).items():
+            #     for remote_label_value in remote_label_values:
+            #         remote_label = dict(category=remote_label_name,
+            #                             value=remote_label_value)
+            #         key = '%s~%s' % (remote_label['category'], remote_label['value'])
+            #         remote_permitted_entries[key] = remote_label
+            # remote_permitted_keys = set(remote_permitted_entries.keys())
+            # local_permitted = {}
+            # for permitted in change.permitted_labels:
+            #     key = '%s~%s' % (permitted.category, permitted.value)
+            #     local_permitted[key] = permitted
+            # local_permitted_keys = set(local_permitted.keys())
 
-            for key in local_permitted_keys-remote_permitted_keys:
-                session.delete(local_permitted[key])
+            # for key in local_permitted_keys-remote_permitted_keys:
+            #     session.delete(local_permitted[key])
 
-            for key in remote_permitted_keys-local_permitted_keys:
-                remote_permitted = remote_permitted_entries[key]
-                change.createPermittedLabel(remote_permitted['category'],
-                                            remote_permitted['value'])
+            # for key in remote_permitted_keys-local_permitted_keys:
+            #     remote_permitted = remote_permitted_entries[key]
+            #     change.createPermittedLabel(remote_permitted['category'],
+            #                                 remote_permitted['value'])
 
-            if not user_voted:
-                # Only consider changing the reviewed state if we don't have a vote
-                if new_revision or new_message:
-                    if change.reviewed:
-                        change.reviewed = False
-                        result.review_flag_changed = True
-                        app.project_cache.clear(change.project)
+            # if not user_voted:
+            #     # Only consider changing the reviewed state if we don't have a vote
+            #     if new_revision or new_message:
+            #         if change.reviewed:
+            #             change.reviewed = False
+            #             result.review_flag_changed = True
+            #             app.project_cache.clear(change.project)
 
-            remote_hashtags = remote_change.get('hashtags', [])
-            change.setHashtags(remote_hashtags)
+            # remote_hashtags = remote_change.get('hashtags', [])
+            # change.setHashtags(remote_hashtags)
 
-            change.outdated = False
-        for url, refs in fetches.items():
-            self.log.debug("Fetching from %s with refs %s", url, refs)
-            try:
-                repo.fetch(url, refs)
-            except Exception:
-                # Backwards compat with GitPython before the multi-ref fetch
-                # patch.
-                # (https://github.com/gitpython-developers/GitPython/pull/170)
-                for ref in refs:
-                    self.log.debug("git fetch %s %s" % (url, ref))
-                    repo.fetch(url, ref)
+            # change.outdated = False
+        # for url, refs in fetches.items():
+            # self.log.debug("Fetching from %s with refs %s", url, refs)
+            # try:
+            #     repo.fetch(url, refs)
+            # except Exception:
+            #     # Backwards compat with GitPython before the multi-ref fetch
+            #     # patch.
+            #     # (https://github.com/gitpython-developers/GitPython/pull/170)
+            #     for ref in refs:
+            #         self.log.debug("git fetch %s %s" % (url, ref))
+            #         repo.fetch(url, ref)
 
 class CheckReposTask(Task):
     # on startup, check all projects
