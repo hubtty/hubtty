@@ -354,16 +354,10 @@ class SyncProjectTask(Task):
                     query += ' state:open'
                 queries.append(query)
         changes = sync.query(queries)
-        change_ids = [c['id'] for c in changes]
-        with app.db.getSession() as session:
-            # Winnow the list of IDs to only the ones in the local DB.
-            change_ids = session.getChangeIDs(change_ids)
 
-        # for c in changes:
-        #     # For now, just sync open changes or changes already
-        #     # in the db optionally we could sync all changes ever
-        #     if c['id'] in change_ids or (c['status'] not in CLOSED_STATUSES):
-        #         sync.submitTask(SyncChangeTask(c['id'], priority=self.priority))
+        for c in changes:
+            sync.submitTask(SyncChangeTask(c['id'], priority=self.priority))
+
         for key in self.project_keys:
             sync.submitTask(SetProjectUpdatedTask(key, now, priority=self.priority))
 
