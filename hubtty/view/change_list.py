@@ -242,8 +242,8 @@ class ChangeRow(urwid.Button, ChangeListColumns):
         self.branch.set_text(change.branch or '')
         self.topic.set_text(change.topic or '')
         self.project_name = change.project.name
-        self.commit_sha = change.revisions[-1].commit
-        self.current_revision_key = change.revisions[-1].key
+        # self.commit_sha = change.revisions[-1].commit
+        # self.current_revision_key = change.revisions[-1].key
         today = self.app.time(datetime.datetime.utcnow()).date()
         updated_time = self.app.time(change.updated)
         if today == updated_time.date():
@@ -252,11 +252,11 @@ class ChangeRow(urwid.Button, ChangeListColumns):
             self.updated.set_text(updated_time.strftime("%Y-%m-%d"))
         total_added = 0
         total_removed = 0
-        for rfile in change.revisions[-1].files:
-            if rfile.status is None:
-                continue
-            total_added += rfile.inserted or 0
-            total_removed += rfile.deleted or 0
+        # for rfile in change.revisions[-1].files:
+        #     if rfile.status is None:
+        #         continue
+        #     total_added += rfile.inserted or 0
+        #     total_removed += rfile.deleted or 0
         if self.app.config.size_column['type'] == 'number':
             total_added_removed = total_added + total_removed
             thresholds = self.app.config.size_column['thresholds']
@@ -467,10 +467,11 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             i = 0
             if self.reverse:
                 change_list.reverse()
-            if self.app.config.thread_changes:
-                change_list, prefixes = self._threadChanges(change_list)
-            else:
-                prefixes = {}
+            # if self.app.config.thread_changes:
+            #     change_list, prefixes = self._threadChanges(change_list)
+            # else:
+            #     prefixes = {}
+            prefixes = {}
             new_rows = []
             if len(self.listbox.body):
                 focus_pos = self.listbox.focus_position
