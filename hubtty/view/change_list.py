@@ -51,28 +51,6 @@ COLUMNS = [
 ]
 
 
-class ThreadStack(object):
-    def __init__(self):
-        self.stack = []
-
-    def push(self, change, children):
-        self.stack.append([change, children])
-
-    def pop(self):
-        while self.stack:
-            if self.stack[-1][1]:
-                # handle children at the tip
-                return self.stack[-1][1].pop(0)
-            else:
-                # current tip has no children, walk up
-                self.stack.pop()
-                continue
-        return None
-
-    def countChildren(self):
-        return [len(x[1]) for x in self.stack]
-
-
 class ChangeListColumns(object):
     def updateColumns(self):
         del self.columns.contents[:]
@@ -467,10 +445,6 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             i = 0
             if self.reverse:
                 change_list.reverse()
-            # if self.app.config.thread_changes:
-            #     change_list, prefixes = self._threadChanges(change_list)
-            # else:
-            #     prefixes = {}
             prefixes = {}
             new_rows = []
             if len(self.listbox.body):
@@ -483,7 +457,7 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
                 row = self.change_rows.get(change.key)
                 if not row:
                     row = ChangeRow(self.app, change,
-                                    prefixes.get(change.key),
+                                    prefixes.get(change.key, ''),
                                     self.categories,
                                     self.enabled_columns,
                                     callback=self.onSelect)
@@ -529,66 +503,6 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
         if self.project_key is not None:
             return "project:%s %s" % (self.query_desc, self.app.config.project_change_list_query)
         return self.query
-
-    def _threadChanges(self, changes):
-        ret = []
-        prefixes = {}
-        stack = ThreadStack()
-        children = {}
-        commits = {}
-        orphans = changes[:]
-        for change in changes:
-            for revision in change.revisions:
-                commits[revision.commit] = change
-        for change in changes:
-            revision = change.revisions[-1]
-            parent = commits.get(revision.parent, None)
-            if parent:
-                if parent.revisions[-1].commit != revision.parent:
-                    # Our parent is an outdated revision.  This could
-                    # cause a cycle, so skip.  This change will not
-                    # appear in the thread, but will still appear in
-                    # the list.  TODO: use color to indicate it
-                    # depends on an outdated change.
-                    continue
-                if change in orphans:
-                    orphans.remove(change)
-                v = children.get(parent, [])
-                v.append(change)
-                children[parent] = v
-        if orphans:
-            change = orphans.pop(0)
-        else:
-            change = None
-        while change:
-            prefix = ''
-            stack_children = stack.countChildren()
-            for i, nchildren in enumerate(stack_children):
-                if nchildren:
-                    if i+1 == len(stack_children):
-                        prefix += u'\u251c'
-                    else:
-                        prefix += u'\u2502'
-                else:
-                    if i+1 == len(stack_children):
-                        prefix += u'\u2514'
-                    else:
-                        prefix += u' '
-                if i+1 == len(stack_children):
-                    prefix += u'\u2500'
-                else:
-                    prefix += u' '
-            subject = '%s%s' % (prefix, change.subject)
-            change._subject = subject
-            prefixes[change.key] = prefix
-            ret.append(change)
-            if change in children:
-                stack.push(change, children[change])
-            change = stack.pop()
-            if (not change) and orphans:
-                change = orphans.pop(0)
-        assert len(ret) == len(changes)
-        return (ret, prefixes)
 
     def clearChangeList(self):
         for key, value in six.iteritems(self.change_rows):
