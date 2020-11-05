@@ -655,7 +655,7 @@ class SyncChangeTask(Task):
                 created = dateutil.parser.parse(remote_change['created_at'])
                 updated = dateutil.parser.parse(remote_change['updated_at'])
                 change = project.createChange(remote_change['id'], account, remote_change['number'],
-                                              remote_change['head']['label'], remote_change['head']['sha'],
+                                              remote_change['base']['ref'], remote_change['head']['sha'],
                                               remote_change['title'], created,
                                               updated, remote_change['state'])
                 self.log.info("Created new change %s in local DB.", change.id)
