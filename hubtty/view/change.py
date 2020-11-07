@@ -586,7 +586,6 @@ class ChangeView(urwid.WidgetWrap):
         self.last_revision_key = None
         self.hide_comments = True
         self.marked_seen = False
-        self.change_id_label = mywid.TextButton(u'', on_press=self.searchChangeId)
         self.owner_label = mywid.TextButton(u'', on_press=self.searchOwner)
         self.project_label = mywid.TextButton(u'', on_press=self.searchProject)
         self.branch_label = urwid.Text(u'', wrap='clip')
@@ -598,10 +597,7 @@ class ChangeView(urwid.WidgetWrap):
         self.permalink_label = mywid.TextButton(u'', on_press=self.openPermalink)
         change_info = []
         change_info_map={'change-data': 'focused-change-data'}
-        for l, v in [("Change-Id", urwid.Padding(urwid.AttrMap(self.change_id_label, None,
-                                                               focus_map=change_info_map),
-                                                 width='pack')),
-                     ("Owner", urwid.Padding(urwid.AttrMap(self.owner_label, None,
+        for l, v in [("Owner", urwid.Padding(urwid.AttrMap(self.owner_label, None,
                                                            focus_map=change_info_map),
                                              width='pack')),
                      ("Project", urwid.Padding(urwid.AttrMap(self.project_label, None,
@@ -715,13 +711,11 @@ class ChangeView(urwid.WidgetWrap):
             self.project_key = change.project.key
             self.project_name = change.project.name
             self.change_rest_id = change.id
-            self.change_id = change.change_id
             if change.owner:
                 self.owner_email = change.owner.email
             else:
                 self.owner_email = None
 
-            self.change_id_label.text.set_text(('change-data', change.change_id))
             if change.owner.email:
                 owner_string = '%s <%s>' % (change.owner_name,
                                             change.owner.email)
@@ -1241,9 +1235,6 @@ class ChangeView(urwid.WidgetWrap):
 
     def openPermalink(self, widget):
         self.app.openURL(self.permalink_url)
-
-    def searchChangeId(self, widget):
-        self.app.doSearch("status:open change:%s" % (self.change_id,))
 
     def searchOwner(self, widget):
         if self.owner_email:
