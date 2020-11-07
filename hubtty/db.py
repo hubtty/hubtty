@@ -66,7 +66,6 @@ change_table = Table(
     Column('number', Integer, index=True, unique=True, nullable=False),
     Column('branch', String(255), index=True, nullable=False),
     Column('change_id', String(255), index=True, nullable=False),
-    Column('topic', String(255), index=True),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
     Column('subject', Text, nullable=False),
     Column('created', DateTime, index=True, nullable=False),
@@ -77,7 +76,6 @@ change_table = Table(
     Column('starred', Boolean, index=True, nullable=False),
     Column('held', Boolean, index=True, nullable=False),
     Column('pending_rebase', Boolean, index=True, nullable=False),
-    Column('pending_topic', Boolean, index=True, nullable=False),
     Column('pending_starred', Boolean, index=True, nullable=False),
     Column('pending_status', Boolean, index=True, nullable=False),
     Column('pending_hashtags', Boolean, index=True, nullable=False),
@@ -315,9 +313,9 @@ class Topic(object):
 
 class Change(object):
     def __init__(self, project, id, owner, number, branch, change_id,
-                 subject, created, updated, status, topic=None,
+                 subject, created, updated, status,
                  hidden=False, reviewed=False, starred=False, held=False,
-                 pending_rebase=False, pending_topic=False,
+                 pending_rebase=False,
                  pending_starred=False, pending_status=False,
                  pending_status_message=None, pending_hashtags=False,
                  outdated=False):
@@ -327,7 +325,6 @@ class Change(object):
         self.number = number
         self.branch = branch
         self.change_id = change_id
-        self.topic = topic
         self.subject = subject
         self.created = created
         self.updated = updated
@@ -337,7 +334,6 @@ class Change(object):
         self.starred = starred
         self.held = held
         self.pending_rebase = pending_rebase
-        self.pending_topic = pending_topic
         self.pending_hashtags = pending_hashtags
         self.pending_starred = pending_starred
         self.pending_status = pending_status
@@ -1085,9 +1081,6 @@ class DatabaseSession(object):
 
     def getPendingMessages(self):
         return self.session().query(Message).filter_by(pending=True).all()
-
-    def getPendingTopics(self):
-        return self.session().query(Change).filter_by(pending_topic=True).all()
 
     def getPendingHashtags(self):
         return self.session().query(Change).filter_by(pending_hashtags=True).all()
