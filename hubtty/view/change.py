@@ -737,7 +737,7 @@ class ChangeView(urwid.WidgetWrap):
             self.status_label.set_text(('change-data', change.status))
             self.permalink_url = urlparse.urljoin(self.app.config.url, str(change.number))
             self.permalink_label.text.set_text(('change-data', self.permalink_url))
-            self.commit_message.set_text(change.revisions[-1].message)
+            self.commit_message.set_text(change.subject)
 
             categories = []
             approval_headers = [urwid.Text(('table-header', 'Name'))]
@@ -748,7 +748,7 @@ class ChangeView(urwid.WidgetWrap):
                 categories.append(label.category)
             votes = mywid.Table(approval_headers)
             approvals_for_account = {}
-            pending_message = change.revisions[-1].getPendingMessage()
+            # pending_message = change.revisions[-1].getPendingMessage()
             for approval in change.approvals:
                 # Don't display draft approvals unless they are pending-upload
                 if approval.draft and not pending_message:
@@ -790,7 +790,7 @@ class ChangeView(urwid.WidgetWrap):
             # gets selectable items (like clickable names).
             self.grid.contents[2] = (votes, ('given', 80))
 
-            self.refreshDependencies(session, change)
+            # self.refreshDependencies(session, change)
 
             repo = gitrepo.get_repo(change.project.name, self.app.config)
             # The listbox has both revisions and messages in it (and
@@ -854,7 +854,7 @@ class ChangeView(urwid.WidgetWrap):
                 self.listbox.body.remove(row)
                 del self.message_rows[key]
                 listbox_index -= 1
-            self._updateTestResults(change, result_systems)
+            # self._updateTestResults(change, result_systems)
 
     def _updateTestResults(self, change, result_systems):
         text = []
