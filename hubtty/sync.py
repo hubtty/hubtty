@@ -1501,8 +1501,8 @@ class Sync(object):
                 requests.exceptions.ReadTimeout
         ) as e:
             self.log.warning("Offline due to: %s" % (e,))
-            if not self.offline:
-                self.submitTask(UploadReviewsTask(HIGH_PRIORITY))
+            # if not self.offline:
+            #     self.submitTask(UploadReviewsTask(HIGH_PRIORITY))
             self.offline = True
             self.app.status.update(offline=True, refresh=False)
             os.write(pipe, six.b('refresh\n'))
