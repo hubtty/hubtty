@@ -643,14 +643,14 @@ class SyncChangeTask(Task):
                 if not project:
                     self.log.debug("Project %s unknown while syncing change" % (
                         remote_change['base']['repo']['full_name'],))
-                    # remote_project = sync.get('projects/%s' %
-                    #                           (urlparse.quote_plus(remote_change['project']),))
-                    # if remote_project:
-                    #     project = session.createProject(
-                    #         remote_project['name'],
-                    #         description=remote_project.get('description', ''))
-                    #     self.log.info("Created project %s", project.name)
-                    #     self.results.append(ProjectAddedEvent(project))
+                    remote_project = sync.get('repos/%s' %
+                                              (remote_change['base']['repo']['full_name'],))
+                    if remote_project:
+                        project = session.createProject(
+                            remote_project['full_name'],
+                            description=remote_project.get('description', ''))
+                        self.log.info("Created project %s", project.name)
+                        self.results.append(ProjectAddedEvent(project))
                     #     sync.submitTask(SyncProjectBranchesTask(project.name, self.priority))
                 created = dateutil.parser.parse(remote_change['created_at'])
                 updated = dateutil.parser.parse(remote_change['updated_at'])
