@@ -39,34 +39,6 @@ try:
 except AttributeError:
     OrderedDict = ordereddict.OrderedDict
 
-class EditTopicDialog(mywid.ButtonDialog):
-    signals = ['save', 'cancel']
-    def __init__(self, app, topic):
-        self.app = app
-        save_button = mywid.FixedButton('Save')
-        cancel_button = mywid.FixedButton('Cancel')
-        urwid.connect_signal(save_button, 'click',
-                             lambda button:self._emit('save'))
-        urwid.connect_signal(cancel_button, 'click',
-                             lambda button:self._emit('cancel'))
-        super(EditTopicDialog, self).__init__("Edit Topic",
-                                              "Edit the change topic.",
-                                              entry_prompt="Topic: ",
-                                              entry_text=topic,
-                                              buttons=[save_button,
-                                                       cancel_button],
-                                              ring=app.ring)
-
-    def keypress(self, size, key):
-        if not self.app.input_buffer:
-            key = super(EditTopicDialog, self).keypress(size, key)
-        keys = self.app.input_buffer + [key]
-        commands = self.app.config.keymap.getCommands(keys)
-        if keymap.ACTIVATE in commands:
-            self._emit('save')
-            return None
-        return key
-
 class EditHashtagsDialog(mywid.ButtonDialog):
     signals = ['save', 'cancel']
     def __init__(self, app, hashtags):
@@ -557,8 +529,6 @@ class ChangeView(urwid.WidgetWrap):
              "Restore this change"),
             (keymap.REFRESH,
              "Refresh this change"),
-            (keymap.EDIT_TOPIC,
-             "Edit the topic of this change"),
             (keymap.EDIT_HASHTAGS,
              "Edit the hashtags of this change"),
             (keymap.SUBMIT_CHANGE,
@@ -589,7 +559,6 @@ class ChangeView(urwid.WidgetWrap):
         self.owner_label = mywid.TextButton(u'', on_press=self.searchOwner)
         self.project_label = mywid.TextButton(u'', on_press=self.searchProject)
         self.branch_label = urwid.Text(u'', wrap='clip')
-        self.topic_label = mywid.TextButton(u'', on_press=self.searchTopic)
         self.hashtags_label = urwid.Text(u'', wrap='clip')
         self.created_label = urwid.Text(u'', wrap='clip')
         self.updated_label = urwid.Text(u'', wrap='clip')
@@ -604,9 +573,6 @@ class ChangeView(urwid.WidgetWrap):
                                                            focus_map=change_info_map),
                                              width='pack')),
                      ("Branch", self.branch_label),
-                     ("Topic", urwid.Padding(urwid.AttrMap(self.topic_label, None,
-                                                           focus_map=change_info_map),
-                                             width='pack')),
                      ("Hashtags", self.hashtags_label),
                      ("Created", self.created_label),
                      ("Updated", self.updated_label),
@@ -693,7 +659,6 @@ class ChangeView(urwid.WidgetWrap):
             if not self.marked_seen:
                 change.last_seen = datetime.datetime.utcnow()
                 self.marked_seen = True
-            self.topic = change.topic or ''
             self.hashtags = ', '.join([h.name for h in change.hashtags])
             self.pending_status_message = change.pending_status_message or ''
             reviewed = hidden = starred = held = ''
@@ -724,7 +689,6 @@ class ChangeView(urwid.WidgetWrap):
             self.owner_label.text.set_text(('change-data', owner_string))
             self.project_label.text.set_text(('change-data', change.project.name))
             self.branch_label.set_text(('change-data', change.branch))
-            self.topic_label.text.set_text(('change-data', self.topic))
             self.hashtags_label.set_text(('change-data', ' '.join([x.name for x in change.hashtags])))
             self.created_label.set_text(('change-data', str(self.app.time(change.created))))
             self.updated_label.set_text(('change-data', str(self.app.time(change.updated))))
@@ -1054,9 +1018,6 @@ class ChangeView(urwid.WidgetWrap):
         if keymap.SUBMIT_CHANGE in commands:
             self.doSubmitChange()
             return None
-        if keymap.EDIT_TOPIC in commands:
-            self.editTopic()
-            return None
         if keymap.EDIT_HASHTAGS in commands:
             self.editHashtags()
             return None
@@ -1191,27 +1152,6 @@ class ChangeView(urwid.WidgetWrap):
             sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
         self.refresh()
 
-    def editTopic(self):
-        dialog = EditTopicDialog(self.app, self.topic)
-        urwid.connect_signal(dialog, 'save',
-            lambda button: self.closeEditTopic(dialog, True))
-        urwid.connect_signal(dialog, 'cancel',
-            lambda button: self.closeEditTopic(dialog, False))
-        self.app.popup(dialog)
-
-    def closeEditTopic(self, dialog, save):
-        if save:
-            change_key = None
-            with self.app.db.getSession() as session:
-                change = session.getChange(self.change_key)
-                change.topic = dialog.entry.edit_text
-                change.pending_topic = True
-                change_key = change.key
-            self.app.sync.submitTask(
-                sync.SetTopicTask(change_key, sync.HIGH_PRIORITY))
-        self.app.backScreen()
-        self.refresh()
-
     def editHashtags(self):
         dialog = EditHashtagsDialog(self.app, self.hashtags)
         urwid.connect_signal(dialog, 'save',
@@ -1242,10 +1182,6 @@ class ChangeView(urwid.WidgetWrap):
 
     def searchProject(self, widget):
         self.app.doSearch("status:open project:%s" % (self.project_name,))
-
-    def searchTopic(self, widget):
-        if self.topic:
-            self.app.doSearch("status:open topic:%s" % (self.topic,))
 
     def reviewKey(self, reviewkey):
         approvals = {}

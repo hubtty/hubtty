@@ -44,7 +44,6 @@ COLUMNS = [
     ColumnInfo('Subject', 'weight',  4),
     ColumnInfo('Project', 'weight',  1),
     ColumnInfo('Branch',  'weight',  1),
-    ColumnInfo('Topic',   'weight',  1),
     ColumnInfo('Owner',   'weight',  1),
     ColumnInfo('Updated', 'given',  10),
     ColumnInfo('Size',    'given',   4),
@@ -110,7 +109,6 @@ class ChangeRow(urwid.Button, ChangeListColumns):
         self.project = mywid.SearchableText(u'', wrap='clip')
         self.owner = mywid.SearchableText(u'', wrap='clip')
         self.branch = mywid.SearchableText(u'', wrap='clip')
-        self.topic = mywid.SearchableText(u'', wrap='clip')
         self.mark = False
         self.columns = urwid.Columns([], dividechars=1)
         self.row_style = urwid.AttrMap(self.columns, '')
@@ -128,8 +126,6 @@ class ChangeRow(urwid.Button, ChangeListColumns):
         if self.branch.search(search, attribute):
             return True
         if self.owner.search(search, attribute):
-            return True
-        if self.topic.search(search, attribute):
             return True
         if self.updated.search(search, attribute):
             return True
@@ -218,7 +214,6 @@ class ChangeRow(urwid.Button, ChangeListColumns):
         self.project.set_text(change.project.name.split('/')[-1])
         self.owner.set_text(change.owner_name)
         self.branch.set_text(change.branch or '')
-        self.topic.set_text(change.topic or '')
         self.project_name = change.project.name
         # self.commit_sha = change.revisions[-1].commit
         # self.current_revision_key = change.revisions[-1].key
@@ -294,7 +289,6 @@ class ChangeListHeader(urwid.WidgetWrap, ChangeListColumns):
         self.project = urwid.Text(u'Project', wrap='clip')
         self.owner = urwid.Text(u'Owner', wrap='clip')
         self.branch = urwid.Text(u'Branch', wrap='clip')
-        self.topic = urwid.Text(u'Topic', wrap='clip')
         self.columns = urwid.Columns([], dividechars=1)
         self.category_columns = []
         super(ChangeListHeader, self).__init__(self.columns)
@@ -311,7 +305,7 @@ class ChangeListHeader(urwid.WidgetWrap, ChangeListColumns):
 class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
     required_columns = set(['Number', 'Subject', 'Updated'])
     # FIXME(masayukig): Disable 'Size' column when configured
-    optional_columns = set(['Topic', 'Branch', 'Size'])
+    optional_columns = set(['Branch', 'Size'])
 
     def getCommands(self):
         if self.project_key:
@@ -337,8 +331,6 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
              "Refine the current search query"),
             (keymap.ABANDON_CHANGE,
              "Abandon the marked changes"),
-            (keymap.EDIT_TOPIC,
-             "Set the topic of the marked changes"),
             (keymap.RESTORE_CHANGE,
              "Restore the marked changes"),
             (keymap.REFRESH,
@@ -666,9 +658,6 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
                 row.update(change, self.categories)
             self.advance()
             return True
-        if keymap.EDIT_TOPIC in commands:
-            self.editTopic()
-            return True
         if keymap.REFRESH in commands:
             if self.project_key:
                 self.app.sync.submitTask(
@@ -768,31 +757,6 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
                     sync.UploadReviewTask(message_key, sync.HIGH_PRIORITY))
         self.refresh()
         self.app.backScreen()
-
-    def editTopic(self):
-        dialog = view_change.EditTopicDialog(self.app, '')
-        urwid.connect_signal(dialog, 'save',
-            lambda button: self.closeEditTopic(dialog, True))
-        urwid.connect_signal(dialog, 'cancel',
-            lambda button: self.closeEditTopic(dialog, False))
-        self.app.popup(dialog)
-
-    def closeEditTopic(self, dialog, save):
-        if save:
-            rows = [row for row in self.change_rows.values() if row.mark]
-            if not rows:
-                pos = self.listbox.focus_position
-                rows = [self.listbox.body[pos]]
-            change_keys = [row.change_key for row in rows]
-            with self.app.db.getSession() as session:
-                for change_key in change_keys:
-                    change = session.getChange(change_key)
-                    change.topic = dialog.entry.edit_text
-                    change.pending_topic = True
-                    self.app.sync.submitTask(
-                        sync.SetTopicTask(change_key, sync.HIGH_PRIORITY))
-        self.app.backScreen()
-        self.refresh()
 
     def abandonChange(self):
         dialog = mywid.TextEditDialog(u'Abandon Change', u'Abandon message:',

@@ -58,7 +58,6 @@ RESTORE_CHANGE = 'restore change'
 REBASE_CHANGE = 'rebase change'
 CHERRY_PICK_CHANGE = 'cherry pick change'
 REFRESH = 'refresh'
-EDIT_TOPIC = 'edit topic'
 EDIT_HASHTAGS = 'edit hashtags'
 EDIT_COMMIT_MESSAGE = 'edit commit message'
 SUBMIT_CHANGE = 'submit change'
@@ -127,7 +126,6 @@ DEFAULT_KEYMAP = {
     REBASE_CHANGE: 'ctrl b',
     CHERRY_PICK_CHANGE: 'ctrl x',
     REFRESH: 'ctrl r',
-    EDIT_TOPIC: 'ctrl t',
     EDIT_HASHTAGS: '#',
     EDIT_COMMIT_MESSAGE: 'ctrl d',
     SUBMIT_CHANGE: 'ctrl u',
