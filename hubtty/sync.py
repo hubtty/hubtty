@@ -670,7 +670,6 @@ class SyncChangeTask(Task):
                 change.starred = False
             change.subject = remote_change['title']
             change.updated = dateutil.parser.parse(remote_change['updated_at'])
-            change.topic = remote_change.get('topic')
             # unseen_conflicts = [x.id for x in change.conflicts]
             # for remote_conflict in remote_conflicts:
             #     conflict_id = remote_conflict['id']
@@ -1049,8 +1048,6 @@ class UploadReviewsTask(Task):
     def run(self, sync):
         app = sync.app
         with app.db.getSession() as session:
-            for c in session.getPendingTopics():
-                sync.submitTask(SetTopicTask(c.key, self.priority))
             for c in session.getPendingHashtags():
                 sync.submitTask(SetHashtagsTask(c.key, self.priority))
             for c in session.getPendingRebases():
@@ -1065,31 +1062,6 @@ class UploadReviewsTask(Task):
                 sync.submitTask(ChangeCommitMessageTask(r.key, self.priority))
             for m in session.getPendingMessages():
                 sync.submitTask(UploadReviewTask(m.key, self.priority))
-
-class SetTopicTask(Task):
-    def __init__(self, change_key, priority=NORMAL_PRIORITY):
-        super(SetTopicTask, self).__init__(priority)
-        self.change_key = change_key
-
-    def __repr__(self):
-        return '<SetTopicTask %s>' % (self.change_key,)
-
-    def __eq__(self, other):
-        if (other.__class__ == self.__class__ and
-            other.change_key == self.change_key):
-            return True
-        return False
-
-    def run(self, sync):
-        app = sync.app
-        with app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            data = dict(topic=change.topic)
-            change.pending_topic = False
-            # Inside db session for rollback
-            sync.put('changes/%s/topic' % (change.id,),
-                     data)
-            sync.submitTask(SyncChangeTask(change.id, priority=self.priority))
 
 class SetHashtagsTask(Task):
     def __init__(self, change_key, priority=NORMAL_PRIORITY):

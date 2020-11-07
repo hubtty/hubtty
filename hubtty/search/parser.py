@@ -86,7 +86,6 @@ def SearchParser():
                 | projects_term
                 | project_key_term
                 | branch_term
-                | topic_term
                 | ref_term
                 | label_term
                 | message_term
@@ -193,14 +192,6 @@ def SearchParser():
             p[0] = func.matches(p[2], hubtty.db.change_table.c.branch)
         else:
             p[0] = hubtty.db.change_table.c.branch == p[2]
-
-    def p_topic_term(p):
-        '''topic_term : OP_TOPIC string'''
-        if p[2].startswith('^'):
-            p[0] = func.matches(p[2], hubtty.db.change_table.c.topic)
-        else:
-            p[0] = and_(hubtty.db.change_table.c.topic.isnot(None),
-                        hubtty.db.change_table.c.topic == p[2])
 
     def p_ref_term(p):
         '''ref_term : OP_REF string'''

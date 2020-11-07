@@ -28,7 +28,6 @@ operators = {
     'projects': 'OP_PROJECTS',
     '_project_key': 'OP_PROJECT_KEY',  # internal hubtty use only
     'branch': 'OP_BRANCH',
-    'topic': 'OP_TOPIC',
     'ref': 'OP_REF',
     #'tr': 'OP_TR', # needs trackingids
     #'bug': 'OP_BUG', # needs trackingids
