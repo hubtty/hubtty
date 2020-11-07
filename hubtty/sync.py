@@ -261,8 +261,6 @@ class SyncSubscribedProjectBranchesTask(Task):
             sync.submitTask(SyncProjectBranchesTask(p.name, self.priority))
 
 class SyncProjectBranchesTask(Task):
-    branch_re = re.compile(r'refs/heads/(.*)')
-
     def __init__(self, project_name, priority=NORMAL_PRIORITY):
         super(SyncProjectBranchesTask, self).__init__(priority)
         self.project_name = project_name
@@ -278,12 +276,10 @@ class SyncProjectBranchesTask(Task):
 
     def run(self, sync):
         app = sync.app
-        remote = sync.get('projects/%s/branches/' % urlparse.quote_plus(self.project_name))
+        remote = sync.get('repos/%s/branches' % self.project_name)
         remote_branches = set()
-        for x in remote:
-            m = self.branch_re.match(x['ref'])
-            if m:
-                remote_branches.add(m.group(1))
+        for b in remote:
+            remote_branches.add(b['name'])
         with app.db.getSession() as session:
             local = {}
             project = session.getProjectByName(self.project_name)
@@ -651,7 +647,7 @@ class SyncChangeTask(Task):
                             description=remote_project.get('description', ''))
                         self.log.info("Created project %s", project.name)
                         self.results.append(ProjectAddedEvent(project))
-                    #     sync.submitTask(SyncProjectBranchesTask(project.name, self.priority))
+                        sync.submitTask(SyncProjectBranchesTask(project.name, self.priority))
                 created = dateutil.parser.parse(remote_change['created_at'])
                 updated = dateutil.parser.parse(remote_change['updated_at'])
                 change = project.createChange(remote_change['id'], account, remote_change['number'],
@@ -1459,7 +1455,7 @@ class Sync(object):
             # self.submitTask(UploadReviewsTask(HIGH_PRIORITY))
             self.submitTask(SyncProjectListTask(HIGH_PRIORITY))
             # self.submitTask(SyncSubscribedProjectsTask(NORMAL_PRIORITY))
-            # self.submitTask(SyncSubscribedProjectBranchesTask(LOW_PRIORITY))
+            self.submitTask(SyncSubscribedProjectBranchesTask(LOW_PRIORITY))
             # self.submitTask(SyncOutdatedChangesTask(LOW_PRIORITY))
             # self.submitTask(PruneDatabaseTask(self.app.config.expire_age, LOW_PRIORITY))
             self.periodic_thread = threading.Thread(target=self.periodicSync)
