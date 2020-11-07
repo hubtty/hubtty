@@ -17,7 +17,7 @@ import sqlalchemy as sa
 def upgrade():
     op.create_table('server',
     sa.Column('key', sa.Integer(), nullable=False),
-    sa.Column('own_account_key', sa.Integer(), sa.ForeignKey('own_account.key'), index=True),
+    sa.Column('own_account_key', sa.Integer(), sa.ForeignKey('account.key'), index=True),
     sa.PrimaryKeyConstraint('key')
     )
 
