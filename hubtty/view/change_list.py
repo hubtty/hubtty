@@ -41,7 +41,7 @@ class ColumnInfo(object):
 
 COLUMNS = [
     ColumnInfo('Number',  'given',   6),
-    ColumnInfo('Subject', 'weight',  4),
+    ColumnInfo('Title',   'weight',  4),
     ColumnInfo('Project', 'weight',  1),
     ColumnInfo('Branch',  'weight',  1),
     ColumnInfo('Owner',   'weight',  1),
@@ -102,7 +102,7 @@ class ChangeRow(urwid.Button, ChangeListColumns):
         self.change_key = change.key
         self.prefix = prefix
         self.enabled_columns = enabled_columns
-        self.subject = mywid.SearchableText(u'', wrap='clip')
+        self.title = mywid.SearchableText(u'', wrap='clip')
         self.number = mywid.SearchableText(u'')
         self.updated = mywid.SearchableText(u'')
         self.size = mywid.SearchableText(u'', align='right')
@@ -117,7 +117,7 @@ class ChangeRow(urwid.Button, ChangeListColumns):
         self.update(change, categories)
 
     def search(self, search, attribute):
-        if self.subject.search(search, attribute):
+        if self.title.search(search, attribute):
             return True
         if self.number.search(search, attribute):
             return True
@@ -196,7 +196,7 @@ class ChangeRow(urwid.Button, ChangeListColumns):
             style = 'reviewed-change'
         else:
             style = 'unreviewed-change'
-        subject = '%s%s' % (self.prefix, change.subject)
+        title = '%s%s' % (self.prefix, change.title)
         flag = ' '
         if change.starred:
             flag = '*'
@@ -207,9 +207,9 @@ class ChangeRow(urwid.Button, ChangeListColumns):
         if self.mark:
             flag = '%'
             style = 'marked-change'
-        subject = flag + subject
+        title = flag + title
         self.row_style.set_attr_map({None: style})
-        self.subject.set_text(subject)
+        self.title.set_text(title)
         self.number.set_text(str(change.number))
         self.project.set_text(change.project.name.split('/')[-1])
         self.owner.set_text(change.owner_name)
@@ -223,13 +223,8 @@ class ChangeRow(urwid.Button, ChangeListColumns):
             self.updated.set_text(updated_time.strftime("%I:%M %p").upper())
         else:
             self.updated.set_text(updated_time.strftime("%Y-%m-%d"))
-        total_added = 0
-        total_removed = 0
-        # for rfile in change.revisions[-1].files:
-        #     if rfile.status is None:
-        #         continue
-        #     total_added += rfile.inserted or 0
-        #     total_removed += rfile.deleted or 0
+        total_added = change.additions
+        total_removed = change.deletions
         if self.app.config.size_column['type'] == 'number':
             total_added_removed = total_added + total_removed
             thresholds = self.app.config.size_column['thresholds']
@@ -282,7 +277,7 @@ class ChangeRow(urwid.Button, ChangeListColumns):
 class ChangeListHeader(urwid.WidgetWrap, ChangeListColumns):
     def __init__(self, enabled_columns):
         self.enabled_columns = enabled_columns
-        self.subject = urwid.Text(u'Subject', wrap='clip')
+        self.title = urwid.Text(u'Title', wrap='clip')
         self.number = urwid.Text(u'Number')
         self.updated = urwid.Text(u'Updated')
         self.size = urwid.Text(u'Size')
@@ -303,7 +298,7 @@ class ChangeListHeader(urwid.WidgetWrap, ChangeListColumns):
 
 @mouse_scroll_decorator.ScrollByWheel
 class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
-    required_columns = set(['Number', 'Subject', 'Updated'])
+    required_columns = set(['Number', 'Title', 'Updated'])
     # FIXME(masayukig): Disable 'Size' column when configured
     optional_columns = set(['Branch', 'Size'])
 

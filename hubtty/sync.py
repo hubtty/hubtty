@@ -639,8 +639,8 @@ class SyncChangeTask(Task):
                 if not project:
                     self.log.debug("Project %s unknown while syncing change" % (
                         remote_change['base']['repo']['full_name'],))
-                    remote_project = sync.get('repos/%s' %
-                                              (remote_change['base']['repo']['full_name'],))
+                    remote_project = sync.get('repos/%s' % (
+                        remote_change['base']['repo']['full_name'],))
                     if remote_project:
                         project = session.createProject(
                             remote_project['full_name'],
@@ -648,12 +648,21 @@ class SyncChangeTask(Task):
                         self.log.info("Created project %s", project.name)
                         self.results.append(ProjectAddedEvent(project))
                         sync.submitTask(SyncProjectBranchesTask(project.name, self.priority))
+                change_id = '/'.join([
+                    remote_change['base']['repo']['full_name'], 'pulls',
+                    str(remote_change['number'])])
                 created = dateutil.parser.parse(remote_change['created_at'])
                 updated = dateutil.parser.parse(remote_change['updated_at'])
-                change = project.createChange(remote_change['id'], account, remote_change['number'],
-                                              remote_change['base']['ref'], remote_change['head']['sha'],
-                                              remote_change['title'], created,
-                                              updated, remote_change['state'])
+                change = project.createChange(remote_change['id'], account,
+                                              remote_change['number'],
+                                              remote_change['base']['ref'],
+                                              change_id,
+                                              remote_change['title'],
+                                              remote_change['body'],
+                                              created, updated,
+                                              remote_change['state'],
+                                              remote_change['additions'],
+                                              remote_change['deletions'])
                 self.log.info("Created new change %s in local DB.", change.id)
                 result = ChangeAddedEvent(change)
             else:
@@ -668,7 +677,7 @@ class SyncChangeTask(Task):
                 change.starred = True
             else:
                 change.starred = False
-            change.subject = remote_change['title']
+            change.title = remote_change['title']
             change.updated = dateutil.parser.parse(remote_change['updated_at'])
             # unseen_conflicts = [x.id for x in change.conflicts]
             # for remote_conflict in remote_conflicts:

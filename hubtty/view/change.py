@@ -695,7 +695,7 @@ class ChangeView(urwid.WidgetWrap):
             self.status_label.set_text(('change-data', change.status))
             self.permalink_url = urlparse.urljoin(self.app.config.url, str(change.number))
             self.permalink_label.text.set_text(('change-data', self.permalink_url))
-            self.commit_message.set_text(change.subject)
+            self.commit_message.set_text(change.title)
 
             categories = []
             approval_headers = [urwid.Text(('table-header', 'Name'))]
@@ -851,10 +851,10 @@ class ChangeView(urwid.WidgetWrap):
 
         unseen_keys = set(widget_rows.keys())
         i = 1
-        for key, subject in changes.items():
+        for key, title in changes.items():
             row = widget_rows.get(key)
             if not row:
-                row = urwid.AttrMap(urwid.Padding(ChangeButton(self, key, subject), width='pack'),
+                row = urwid.AttrMap(urwid.Padding(ChangeButton(self, key, title), width='pack'),
                                     'link', focus_map={None: 'focused-link'})
                 row = (row, widget.options('pack'))
                 widget.contents.insert(i, row)
@@ -864,7 +864,7 @@ class ChangeView(urwid.WidgetWrap):
                     self.related_changes.set_focus(widget)
                 widget_rows[key] = row
             else:
-                row[0].original_widget.original_widget.set_label(subject)
+                row[0].original_widget.original_widget.set_label(title)
                 unseen_keys.remove(key)
             i += 1
         for key in unseen_keys:
@@ -879,22 +879,22 @@ class ChangeView(urwid.WidgetWrap):
         parents = {}
         parent = session.getRevisionByCommit(revision.parent)
         if parent:
-            subject = parent.change.subject
+            title = parent.change.title
             show_merged = False
             if parent != parent.change.revisions[-1]:
-                subject += ' [OUTDATED]'
+                title += ' [OUTDATED]'
                 show_merged = True
             if parent.change.status == 'ABANDONED':
-                subject += ' [ABANDONED]'
+                title += ' [ABANDONED]'
             if show_merged or parent.change.status != 'MERGED':
-                parents[parent.change.key] = subject
+                parents[parent.change.key] = title
         self._updateDependenciesWidget(parents,
                                        self.depends_on, self.depends_on_rows,
                                        header='Depends on:')
 
         # Handle needed-by
         children = {}
-        children.update((r.change.key, r.change.subject)
+        children.update((r.change.key, r.change.title)
                         for r in session.getRevisionsByParent([revision.commit for revision in change.revisions])
                         if (r.change.status != 'MERGED' and
                             r.change.status != 'ABANDONED' and
@@ -905,7 +905,7 @@ class ChangeView(urwid.WidgetWrap):
 
         # Handle conflicts_with
         conflicts = {}
-        conflicts.update((c.key, c.subject)
+        conflicts.update((c.key, c.title)
                         for c in change.conflicts
                         if (c.status != 'MERGED' and
                             c.status != 'ABANDONED'))

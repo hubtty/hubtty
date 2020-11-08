@@ -67,10 +67,13 @@ change_table = Table(
     Column('branch', String(255), index=True, nullable=False),
     Column('change_id', String(255), index=True, nullable=False),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
-    Column('subject', Text, nullable=False),
+    Column('title', Text, nullable=False),
+    Column('body', Text, nullable=False),
     Column('created', DateTime, index=True, nullable=False),
     Column('updated', DateTime, index=True, nullable=False),
     Column('status', String(16), index=True, nullable=False),
+    Column('additions', Integer, nullable=False),
+    Column('deletions', Integer, nullable=False),
     Column('hidden', Boolean, index=True, nullable=False),
     Column('reviewed', Boolean, index=True, nullable=False),
     Column('starred', Boolean, index=True, nullable=False),
@@ -313,7 +316,7 @@ class Topic(object):
 
 class Change(object):
     def __init__(self, project, id, owner, number, branch, change_id,
-                 subject, created, updated, status,
+                 title, body, created, updated, status, additions, deletions,
                  hidden=False, reviewed=False, starred=False, held=False,
                  pending_rebase=False,
                  pending_starred=False, pending_status=False,
@@ -325,10 +328,13 @@ class Change(object):
         self.number = number
         self.branch = branch
         self.change_id = change_id
-        self.subject = subject
+        self.title = title
+        self.body = body
         self.created = created
         self.updated = updated
         self.status = status
+        self.additions = additions
+        self.deletions = deletions
         self.hidden = hidden
         self.reviewed = reviewed
         self.starred = starred
