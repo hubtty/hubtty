@@ -649,7 +649,7 @@ class SyncChangeTask(Task):
                         self.results.append(ProjectAddedEvent(project))
                         sync.submitTask(SyncProjectBranchesTask(project.name, self.priority))
                 change_id = '/'.join([
-                    remote_change['base']['repo']['full_name'], 'pulls',
+                    remote_change['base']['repo']['full_name'], 'pull',
                     str(remote_change['number'])])
                 created = dateutil.parser.parse(remote_change['created_at'])
                 updated = dateutil.parser.parse(remote_change['updated_at'])

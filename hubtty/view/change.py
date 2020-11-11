@@ -693,7 +693,7 @@ class ChangeView(urwid.WidgetWrap):
             self.created_label.set_text(('change-data', str(self.app.time(change.created))))
             self.updated_label.set_text(('change-data', str(self.app.time(change.updated))))
             self.status_label.set_text(('change-data', change.status))
-            self.permalink_url = urlparse.urljoin(self.app.config.url, str(change.number))
+            self.permalink_url = urlparse.urljoin(self.app.config.git_url, str(change.change_id))
             self.permalink_label.text.set_text(('change-data', self.permalink_url))
             self.pr_description.set_text('\n'.join([change.title, '', change.body]))
 
