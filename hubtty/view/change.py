@@ -480,16 +480,16 @@ class ChangeMessageBox(mywid.HyperText):
 
         self.set_text(text+comment_text)
 
-class CommitMessageBox(mywid.HyperText):
+class PrDescriptionBox(mywid.HyperText):
     def __init__(self, app, message):
         self.app = app
-        super(CommitMessageBox, self).__init__(message)
+        super(PrDescriptionBox, self).__init__(message)
 
     def set_text(self, text):
         text = [text]
         for commentlink in self.app.config.commentlinks:
             text = commentlink.run(self.app, text)
-        super(CommitMessageBox, self).set_text(text)
+        super(PrDescriptionBox, self).set_text(text)
 
 @mouse_scroll_decorator.ScrollByWheel
 class ChangeView(urwid.WidgetWrap):
@@ -584,7 +584,7 @@ class ChangeView(urwid.WidgetWrap):
             row = urwid.Columns([(12, urwid.Text(('change-header', l), wrap='clip')), v])
             change_info.append(row)
         change_info = urwid.Pile(change_info)
-        self.commit_message = CommitMessageBox(app, u'')
+        self.pr_description = PrDescriptionBox(app, u'')
         votes = mywid.Table([])
         self.depends_on = urwid.Pile([])
         self.depends_on_rows = {}
@@ -594,7 +594,7 @@ class ChangeView(urwid.WidgetWrap):
         self.conflicts_with_rows = {}
         self.related_changes = urwid.Pile([self.depends_on, self.needed_by, self.conflicts_with])
         self.results = mywid.HyperText(u'') # because it scrolls better than a table
-        self.grid = mywid.MyGridFlow([change_info, self.commit_message, votes, self.results],
+        self.grid = mywid.MyGridFlow([change_info, self.pr_description, votes, self.results],
                                      cell_width=80, h_sep=2, v_sep=1, align='left')
         self.listbox = urwid.ListBox(urwid.SimpleFocusListWalker([]))
         self._w.contents.append((self.app.header, ('pack', 1)))
@@ -695,7 +695,7 @@ class ChangeView(urwid.WidgetWrap):
             self.status_label.set_text(('change-data', change.status))
             self.permalink_url = urlparse.urljoin(self.app.config.url, str(change.number))
             self.permalink_label.text.set_text(('change-data', self.permalink_url))
-            self.commit_message.set_text(change.title)
+            self.pr_description.set_text('\n'.join([change.title, '', change.body]))
 
             categories = []
             approval_headers = [urwid.Text(('table-header', 'Name'))]
