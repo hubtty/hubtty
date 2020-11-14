@@ -74,6 +74,7 @@ change_table = Table(
     Column('status', String(16), index=True, nullable=False),
     Column('additions', Integer, nullable=False),
     Column('deletions', Integer, nullable=False),
+    Column('html_url', String(255), nullable=False),
     Column('hidden', Boolean, index=True, nullable=False),
     Column('reviewed', Boolean, index=True, nullable=False),
     Column('starred', Boolean, index=True, nullable=False),
@@ -317,8 +318,8 @@ class Topic(object):
 class Change(object):
     def __init__(self, project, id, owner, number, branch, change_id,
                  title, body, created, updated, status, additions, deletions,
-                 hidden=False, reviewed=False, starred=False, held=False,
-                 pending_rebase=False,
+                 html_url, hidden=False, reviewed=False, starred=False,
+                 held=False, pending_rebase=False,
                  pending_starred=False, pending_status=False,
                  pending_status_message=None, pending_hashtags=False,
                  outdated=False):
@@ -335,6 +336,7 @@ class Change(object):
         self.status = status
         self.additions = additions
         self.deletions = deletions
+        self.html_url = html_url
         self.hidden = hidden
         self.reviewed = reviewed
         self.starred = starred
