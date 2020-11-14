@@ -166,8 +166,8 @@ def SearchParser():
     def p_commit_term(p):
         '''commit_term : OP_COMMIT string'''
         filters = []
-        filters.append(hubtty.db.revision_table.c.change_key == hubtty.db.change_table.c.key)
-        filters.append(hubtty.db.revision_table.c.commit == p[2])
+        filters.append(hubtty.db.commit_table.c.change_key == hubtty.db.change_table.c.key)
+        filters.append(hubtty.db.commit_table.c.commit == p[2])
         s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
         p[0] = hubtty.db.change_table.c.key.in_(s)
 
@@ -236,32 +236,32 @@ def SearchParser():
     def p_message_term(p):
         '''message_term : OP_MESSAGE string'''
         filters = []
-        filters.append(hubtty.db.revision_table.c.change_key == hubtty.db.change_table.c.key)
-        filters.append(hubtty.db.revision_table.c.message.like('%%%s%%' % p[2]))
+        filters.append(hubtty.db.commit_table.c.change_key == hubtty.db.change_table.c.key)
+        filters.append(hubtty.db.commit_table.c.message.like('%%%s%%' % p[2]))
         s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
         p[0] = hubtty.db.change_table.c.key.in_(s)
 
     def p_comment_term(p):
         '''comment_term : OP_COMMENT string'''
         filters = []
-        filters.append(hubtty.db.revision_table.c.change_key == hubtty.db.change_table.c.key)
-        filters.append(hubtty.db.revision_table.c.message == p[2])
-        revision_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+        filters.append(hubtty.db.commit_table.c.change_key == hubtty.db.change_table.c.key)
+        filters.append(hubtty.db.commit_table.c.message == p[2])
+        commit_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
         filters = []
-        filters.append(hubtty.db.revision_table.c.change_key == hubtty.db.change_table.c.key)
-        filters.append(hubtty.db.comment_table.c.revision_key == hubtty.db.revision_table.c.key)
+        filters.append(hubtty.db.commit_table.c.change_key == hubtty.db.change_table.c.key)
+        filters.append(hubtty.db.comment_table.c.commit_key == hubtty.db.commit_table.c.key)
         filters.append(hubtty.db.comment_table.c.message == p[2])
         comment_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
         p[0] = or_(hubtty.db.change_table.c.key.in_(comment_select),
-                   hubtty.db.change_table.c.key.in_(revision_select))
+                   hubtty.db.change_table.c.key.in_(commit_select))
 
     def p_has_term(p):
         '''has_term : OP_HAS string'''
         #TODO: implement star
         if p[2] == 'draft':
             filters = []
-            filters.append(hubtty.db.revision_table.c.change_key == hubtty.db.change_table.c.key)
-            filters.append(hubtty.db.message_table.c.revision_key == hubtty.db.revision_table.c.key)
+            filters.append(hubtty.db.commit_table.c.change_key == hubtty.db.change_table.c.key)
+            filters.append(hubtty.db.message_table.c.commit_key == hubtty.db.commit_table.c.key)
             filters.append(hubtty.db.message_table.c.draft == True)
             s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
             p[0] = hubtty.db.change_table.c.key.in_(s)

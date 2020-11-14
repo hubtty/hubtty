@@ -80,7 +80,7 @@ class CherryPickDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                           ('pack', cancel_button)]
         button_columns = urwid.Columns(button_widgets, dividechars=2)
         rows = []
-        self.entry = mywid.MyEdit(edit_text=change.revisions[-1].message,
+        self.entry = mywid.MyEdit(edit_text=change.commits[-1].message,
                                   multiline=True, ring=app.ring)
         self.branch_buttons = []
         rows.append(urwid.Text(u"Branch:"))
@@ -100,8 +100,8 @@ class CherryPickDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
 
 class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
     signals = ['submit', 'save', 'cancel']
-    def __init__(self, app, revision_key, message=''):
-        self.revision_key = revision_key
+    def __init__(self, app, commit_key, message=''):
+        self.commit_key = commit_key
         self.app = app
         save_button = mywid.FixedButton(u'Save')
         submit_button = mywid.FixedButton(u'Save and Submit')
@@ -119,14 +119,14 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         descriptions = {}
         self.button_groups = {}
         with self.app.db.getSession() as session:
-            revision = session.getRevision(self.revision_key)
-            change = revision.change
+            commit = session.getCommit(self.commit_key)
+            change = commit.change
             buttons = [('pack', save_button)]
-            if revision.can_submit:
+            if commit.can_submit:
                 buttons.append(('pack', submit_button))
             buttons.append(('pack', cancel_button))
             buttons = urwid.Columns(buttons, dividechars=2)
-            if revision == change.revisions[-1]:
+            if commit == change.commits[-1]:
                 for label in change.labels:
                     d = descriptions.setdefault(label.category, {})
                     d[label.value] = label.description
@@ -182,9 +182,9 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                                 b = urwid.AttrMap(b, 'negative-label')
                         rows.append(b)
                     rows.append(urwid.Divider())
-            m = revision.getPendingMessage()
+            m = commit.getPendingMessage()
             if not m:
-                m = revision.getDraftMessage()
+                m = commit.getDraftMessage()
             if m:
                 message = m.message
         self.message = mywid.MyEdit(u"Message: \n", edit_text=message,
@@ -216,16 +216,16 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         return key
 
 class ReviewButton(mywid.FixedButton):
-    def __init__(self, revision_row):
+    def __init__(self, commit_row):
         super(ReviewButton, self).__init__(('revision-button', u'Review'))
-        self.revision_row = revision_row
-        self.change_view = revision_row.change_view
+        self.commit_row = commit_row
+        self.change_view = commit_row.change_view
         urwid.connect_signal(self, 'click',
             lambda button: self.openReview())
 
     def openReview(self, message=''):
         self.dialog = ReviewDialog(self.change_view.app,
-                                   self.revision_row.revision_key,
+                                   self.commit_row.commit_key,
                                    message=message)
         urwid.connect_signal(self.dialog, 'save',
             lambda button: self.closeReview(True, False))
@@ -239,31 +239,31 @@ class ReviewButton(mywid.FixedButton):
 
     def closeReview(self, upload, submit):
         approvals, message = self.dialog.getValues()
-        self.change_view.saveReview(self.revision_row.revision_key, approvals,
+        self.change_view.saveReview(self.commit_row.commit_key, approvals,
                                     message, upload, submit)
         self.change_view.app.backScreen()
 
-class RevisionRow(urwid.WidgetWrap):
-    revision_focus_map = {
+class CommitRow(urwid.WidgetWrap):
+    commit_focus_map = {
                           'revision-name': 'focused-revision-name',
                           'revision-commit': 'focused-revision-commit',
                           'revision-comments': 'focused-revision-comments',
                           'revision-drafts': 'focused-revision-drafts',
                           }
 
-    def __init__(self, app, change_view, repo, revision, expanded=False):
-        super(RevisionRow, self).__init__(urwid.Pile([]))
+    def __init__(self, app, change_view, repo, commit, expanded=False):
+        super(CommitRow, self).__init__(urwid.Pile([]))
         self.app = app
         self.change_view = change_view
-        self.revision_key = revision.key
-        self.project_name = revision.change.project.name
-        self.commit_sha = revision.commit
-        self.can_submit = revision.can_submit
+        self.commit_key = commit.key
+        self.project_name = commit.change.project.name
+        self.commit_sha = commit.sha
+        self.can_submit = commit.can_submit
         self.title = mywid.TextButton(u'', on_press = self.expandContract)
         table = mywid.Table(columns=3)
         total_added = 0
         total_removed = 0
-        for rfile in revision.files:
+        for rfile in commit.files:
             if rfile.status is None:
                 continue
             added = rfile.inserted or 0
@@ -299,22 +299,22 @@ class RevisionRow(urwid.WidgetWrap):
         self.more = urwid.Pile([table, buttons])
         padded_title = urwid.Padding(self.title, width='pack')
         self.pile = urwid.Pile([padded_title])
-        self._w = urwid.AttrMap(self.pile, None, focus_map=self.revision_focus_map)
+        self._w = urwid.AttrMap(self.pile, None, focus_map=self.commit_focus_map)
         self.expanded = False
-        self.update(revision)
+        self.update(commit)
         if expanded:
             self.expandContract(None)
 
-    def update(self, revision):
-        line = [('revision-name', 'Patch Set %s ' % revision.number),
-                ('revision-commit', revision.commit)]
-        num_drafts = sum([len(f.draft_comments) for f in revision.files])
+    def update(self, commit):
+        line = [('revision-name', 'Patch Set %s ' % commit.number),
+                ('revision-commit', commit.sha)]
+        num_drafts = sum([len(f.draft_comments) for f in commit.files])
         if num_drafts:
-            pending_message = revision.getPendingMessage()
+            pending_message = commit.getPendingMessage()
             if not pending_message:
                 line.append(('revision-drafts', ' (%s draft%s)' % (
                             num_drafts, num_drafts>1 and 's' or '')))
-        num_comments = sum([len(f.comments) for f in revision.files]) - num_drafts
+        num_comments = sum([len(f.comments) for f in commit.files]) - num_drafts
         if num_comments:
             line.append(('revision-comments', ' (%s inline comment%s)' % (
                         num_comments, num_comments>1 and 's' or '')))
@@ -329,7 +329,7 @@ class RevisionRow(urwid.WidgetWrap):
             self.expanded = True
 
     def diff(self, button):
-        self.change_view.diff(self.revision_key)
+        self.change_view.diff(self.commit_key)
 
     def checkout(self, button):
         self.app.localCheckoutCommit(self.project_name, self.commit_sha)
@@ -399,11 +399,11 @@ class ChangeMessageBox(mywid.HyperText):
         reply_text = self.formatReply()
         if reply_text:
             reply_text = self.message_author + ' wrote:\n\n' + reply_text + '\n'
-        row = self.change_view.revision_rows[self.revision_key]
+        row = self.change_view.commit_rows[self.commit_key]
         row.review_button.openReview(reply_text)
 
     def refresh(self, change, message):
-        self.revision_key = message.revision.key
+        self.commit_key = message.commit.key
         self.message_created = message.created
         self.message_author = message.author_name
         self.message_text = message.message
@@ -411,7 +411,7 @@ class ChangeMessageBox(mywid.HyperText):
         lines = message.message.split('\n')
         if message.draft:
             lines.insert(0, '')
-            lines.insert(0, 'Patch Set %s:' % (message.revision.number,))
+            lines.insert(0, 'Patch Set %s:' % (message.commit.number,))
         if self.app.isOwnAccount(message.author):
             name_style = 'change-message-own-name'
             header_style = 'change-message-own-header'
@@ -448,8 +448,8 @@ class ChangeMessageBox(mywid.HyperText):
             comment_text = commentlink.run(self.app, comment_text)
 
         inline_comments = {}
-        for revno, revision in enumerate(change.revisions):
-            for file in revision.files:
+        for revno, commit in enumerate(change.commits):
+            for file in commit.files:
                 comments = [c for c in file.comments
                             if c.author.id == message.author.id
                             and c.created == message.created]
@@ -457,7 +457,7 @@ class ChangeMessageBox(mywid.HyperText):
                     path = comment.file.path
                     inline_comments.setdefault(path, [])
                     comment_ps = revno + 1
-                    if comment_ps == message.revision.number:
+                    if comment_ps == message.commit.number:
                         comment_ps = None
                     inline_comments[path].append((comment_ps or 0, comment.line or 0, comment.message))
         for v in inline_comments.values():
@@ -551,9 +551,9 @@ class ChangeView(urwid.WidgetWrap):
         self.log = logging.getLogger('hubtty.view.change')
         self.app = app
         self.change_key = change_key
-        self.revision_rows = {}
+        self.commit_rows = {}
         self.message_rows = {}
-        self.last_revision_key = None
+        self.last_commit_key = None
         self.hide_comments = True
         self.marked_seen = False
         self.owner_label = mywid.TextButton(u'', on_press=self.searchOwner)
@@ -612,7 +612,7 @@ class ChangeView(urwid.WidgetWrap):
         self.grid.set_focus(1)
 
     def checkGitRepo(self):
-        missing_revisions = set()
+        missing_commits = set()
         change_number = None
         change_id = None
         shas = set()
@@ -621,16 +621,16 @@ class ChangeView(urwid.WidgetWrap):
             change_project_name = change.project.name
             change_number = change.number
             change_id = change.id
-            for revision in change.revisions:
-                shas.add(revision.parent)
-                shas.add(revision.commit)
+            for commit in change.commits:
+                shas.add(commit.parent)
+                shas.add(commit.sha)
         repo = gitrepo.get_repo(change_project_name, self.app.config)
-        missing_revisions = repo.checkCommits(shas)
-        if missing_revisions:
+        missing_commits = repo.checkCommits(shas)
+        if missing_commits:
             if self.app.sync.offline:
                 raise hubtty.view.DisplayError("Git commits not present in local repository")
             self.app.log.warning("Missing some commits for change %s %s",
-                change_number, missing_revisions)
+                change_number, missing_commits)
             task = sync.SyncChangeTask(change_id, force_fetch=True,
                                        priority=sync.HIGH_PRIORITY)
             self.app.sync.submitTask(task)
@@ -704,7 +704,7 @@ class ChangeView(urwid.WidgetWrap):
                 categories.append(label.category)
             votes = mywid.Table(approval_headers)
             approvals_for_account = {}
-            # pending_message = change.revisions[-1].getPendingMessage()
+            # pending_message = change.commits[-1].getPendingMessage()
             for approval in change.approvals:
                 # Don't display draft approvals unless they are pending-upload
                 if approval.draft and not pending_message:
@@ -749,19 +749,19 @@ class ChangeView(urwid.WidgetWrap):
             # self.refreshDependencies(session, change)
 
             repo = gitrepo.get_repo(change.project.name, self.app.config)
-            # The listbox has both revisions and messages in it (and
+            # The listbox has both commits and messages in it (and
             # may later contain the vote table and change header), so
             # keep track of the index separate from the loop.
             listbox_index = self.listbox_patchset_start
-            for revno, revision in enumerate(change.revisions):
-                self.last_revision_key = revision.key
-                row = self.revision_rows.get(revision.key)
+            for revno, commit in enumerate(change.commits):
+                self.last_commit_key = commit.key
+                row = self.commit_rows.get(commit.key)
                 if not row:
-                    row = RevisionRow(self.app, self, repo, revision,
-                                      expanded=(revno==len(change.revisions)-1))
+                    row = CommitRow(self.app, self, repo, commit,
+                                      expanded=(revno==len(change.commits)-1))
                     self.listbox.body.insert(listbox_index, row)
-                    self.revision_rows[revision.key] = row
-                row.update(revision)
+                    self.commit_rows[commit.key] = row
+                row.update(commit)
                 # Revisions are extremely unlikely to be deleted, skip
                 # that case.
                 listbox_index += 1
@@ -772,7 +772,7 @@ class ChangeView(urwid.WidgetWrap):
             display_messages = []
             result_systems = {}
             for message in change.messages:
-                if (message.revision == change.revisions[-1] and
+                if (message.commit == change.commits[-1] and
                     message.author and message.author.name):
                     for commentlink in self.app.config.commentlinks:
                         results = commentlink.getTestResults(self.app, message.message)
@@ -819,8 +819,8 @@ class ChangeView(urwid.WidgetWrap):
                 text.append(result)
 
         # Add check results
-        revision = change.revisions[-1]
-        for check in revision.checks:
+        commit = change.commits[-1]
+        for check in commit.checks:
             # link checker name/url, color result, in time
             link = mywid.Link('{:<42}'.format(check.checker.name), 'link', 'focused-link')
             urwid.connect_signal(link, 'selected', lambda link:self.app.openURL(check.url))
@@ -871,15 +871,15 @@ class ChangeView(urwid.WidgetWrap):
             del widget_rows[key]
 
     def refreshDependencies(self, session, change):
-        revision = change.revisions[-1]
+        commit = change.commits[-1]
 
         # Handle depends-on
         parents = {}
-        parent = session.getRevisionByCommit(revision.parent)
+        parent = session.getCommitBySha(commit.parent)
         if parent:
             title = parent.change.title
             show_merged = False
-            if parent != parent.change.revisions[-1]:
+            if parent != parent.change.commits[-1]:
                 title += ' [OUTDATED]'
                 show_merged = True
             if parent.change.status == 'ABANDONED':
@@ -893,10 +893,10 @@ class ChangeView(urwid.WidgetWrap):
         # Handle needed-by
         children = {}
         children.update((r.change.key, r.change.title)
-                        for r in session.getRevisionsByParent([revision.commit for revision in change.revisions])
+                        for r in session.getCommitsByParent([commit.sha for commit in change.commits])
                         if (r.change.status != 'MERGED' and
                             r.change.status != 'ABANDONED' and
-                            r == r.change.revisions[-1]))
+                            r == r.change.commits[-1]))
         self._updateDependenciesWidget(children,
                                        self.needed_by, self.needed_by_rows,
                                        header='Needed by:')
@@ -947,19 +947,19 @@ class ChangeView(urwid.WidgetWrap):
             self.refresh()
             return None
         if keymap.REVIEW in commands:
-            row = self.revision_rows[self.last_revision_key]
+            row = self.commit_rows[self.last_commit_key]
             row.review_button.openReview()
             return None
         if keymap.DIFF in commands:
-            row = self.revision_rows[self.last_revision_key]
+            row = self.commit_rows[self.last_commit_key]
             row.diff(None)
             return None
         if keymap.LOCAL_CHECKOUT in commands:
-            row = self.revision_rows[self.last_revision_key]
+            row = self.commit_rows[self.last_commit_key]
             row.checkout(None)
             return None
         if keymap.LOCAL_CHERRY_PICK in commands:
-            row = self.revision_rows[self.last_revision_key]
+            row = self.commit_rows[self.last_commit_key]
             row.cherryPick(None)
             return None
         if keymap.SEARCH_RESULTS in commands:
@@ -1017,11 +1017,11 @@ class ChangeView(urwid.WidgetWrap):
             return None
         return key
 
-    def diff(self, revision_key):
+    def diff(self, commit_key):
         if self.app.config.diff_view == 'unified':
-            screen = view_unified_diff.UnifiedDiffView(self.app, revision_key)
+            screen = view_unified_diff.UnifiedDiffView(self.app, commit_key)
         else:
-            screen = view_side_diff.SideDiffView(self.app, revision_key)
+            screen = view_side_diff.SideDiffView(self.app, commit_key)
         self.app.changeScreen(screen)
 
     def abandonChange(self):
@@ -1059,7 +1059,7 @@ class ChangeView(urwid.WidgetWrap):
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
             dialog = mywid.TextEditDialog(u'Edit Commit Message', u'Commit message:',
-                                          u'Save', change.revisions[-1].message)
+                                          u'Save', change.commits[-1].message)
         urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
         urwid.connect_signal(dialog, 'save', lambda button:
                                  self.doEditCommitMessage(dialog))
@@ -1068,15 +1068,15 @@ class ChangeView(urwid.WidgetWrap):
                        min_width=60, min_height=20)
 
     def doEditCommitMessage(self, dialog):
-        revision_key = None
+        commit_key = None
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
-            revision = change.revisions[-1]
-            revision.message = dialog.entry.edit_text
-            revision.pending_message = True
-            revision_key = revision.key
+            commit = change.commits[-1]
+            commit.message = dialog.entry.edit_text
+            commit.pending_message = True
+            commit_key = commit.key
         self.app.sync.submitTask(
-            sync.ChangeCommitMessageTask(revision_key, sync.HIGH_PRIORITY))
+            sync.ChangeCommitMessageTask(commit_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
@@ -1120,8 +1120,8 @@ class ChangeView(urwid.WidgetWrap):
                     branch = button.get_label()
             message = dialog.entry.edit_text
             self.app.log.debug("Creating pending cherry-pick of %s to %s" %
-                               (change.revisions[-1].commit, branch))
-            cp = change.revisions[-1].createPendingCherryPick(branch, message)
+                               (change.commits[-1].sha, branch))
+            cp = change.commits[-1].createPendingCherryPick(branch, message)
             cp_key = cp.key
         self.app.sync.submitTask(
             sync.SendCherryPickTask(cp_key, sync.HIGH_PRIORITY))
@@ -1177,13 +1177,13 @@ class ChangeView(urwid.WidgetWrap):
             approvals[a['category']] = a['value']
         self.app.log.debug("Reviewkey %s with approvals %s" %
                            (reviewkey['key'], approvals))
-        row = self.revision_rows[self.last_revision_key]
+        row = self.commit_rows[self.last_commit_key]
         message = reviewkey.get('message', '')
         submit = reviewkey.get('submit', False)
-        self.saveReview(row.revision_key, approvals, message, True, submit)
+        self.saveReview(row.commit_key, approvals, message, True, submit)
 
-    def saveReview(self, revision_key, approvals, message, upload, submit):
-        message_keys = self.app.saveReviews([revision_key], approvals,
+    def saveReview(self, commit_key, approvals, message, upload, submit):
+        message_keys = self.app.saveReviews([commit_key], approvals,
                                             message, upload, submit)
         if upload:
             for message_key in message_keys:

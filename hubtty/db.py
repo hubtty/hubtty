@@ -93,13 +93,13 @@ hashtag_table = Table(
     Column('change_key', Integer, ForeignKey("change.key"), index=True),
     Column('name', String(length=255), index=True, nullable=False),
     )
-revision_table = Table(
-    'revision', metadata,
+commit_table = Table(
+    'commit', metadata,
     Column('key', Integer, primary_key=True),
     Column('change_key', Integer, ForeignKey("change.key"), index=True),
     Column('number', Integer, index=True, nullable=False),
     Column('message', Text, nullable=False),
-    Column('commit', String(255), index=True, nullable=False),
+    Column('sha', String(255), index=True, nullable=False),
     Column('parent', String(255), index=True, nullable=False),
     # TODO: fetch_ref, fetch_auth are unused; remove
     Column('fetch_auth', Boolean, nullable=False),
@@ -110,7 +110,7 @@ revision_table = Table(
 message_table = Table(
     'message', metadata,
     Column('key', Integer, primary_key=True),
-    Column('revision_key', Integer, ForeignKey("revision.key"), index=True),
+    Column('commit_key', Integer, ForeignKey("commit.key"), index=True),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
     Column('id', String(255), index=True), #, unique=True, nullable=False),
     Column('created', DateTime, index=True, nullable=False),
@@ -169,7 +169,7 @@ account_table = Table(
 pending_cherry_pick_table = Table(
     'pending_cherry_pick', metadata,
     Column('key', Integer, primary_key=True),
-    Column('revision_key', Integer, ForeignKey("revision.key"), index=True),
+    Column('commit_key', Integer, ForeignKey("commit.key"), index=True),
     # Branch is a str here to avoid FK complications if the branch
     # entry is removed.
     Column('branch', String(255), nullable=False),
@@ -184,7 +184,7 @@ sync_query_table = Table(
 file_table = Table(
     'file', metadata,
     Column('key', Integer, primary_key=True),
-    Column('revision_key', Integer, ForeignKey("revision.key"), index=True),
+    Column('commit_key', Integer, ForeignKey("commit.key"), index=True),
     Column('path', Text, nullable=False, index=True),
     Column('old_path', Text, index=True),
     Column('inserted', Integer),
@@ -208,7 +208,7 @@ checker_table = Table(
 check_table = Table(
     'check', metadata,
     Column('key', Integer, primary_key=True),
-    Column('revision_key', Integer, ForeignKey("revision.key"), index=True),
+    Column('commit_key', Integer, ForeignKey("commit.key"), index=True),
     Column('checker_key', Integer, ForeignKey("checker.key"), index=True),
     Column('state', String(255), nullable=False),
     Column('url', Text),
@@ -369,11 +369,11 @@ class Change(object):
                 cache[label.category][0] = label.value
         self._permitted_cache = cache
 
-    def createRevision(self, *args, **kw):
+    def createCommit(self, *args, **kw):
         session = Session.object_session(self)
         args = [self] + list(args)
-        r = Revision(*args, **kw)
-        self.revisions.append(r)
+        r = Commit(*args, **kw)
+        self.commits.append(r)
         session.add(r)
         session.flush()
         return r
@@ -436,14 +436,14 @@ class Change(object):
                 owner_name = self.owner.email
         return owner_name
 
-class Revision(object):
-    def __init__(self, change, number, message, commit, parent,
+class Commit(object):
+    def __init__(self, change, number, message, sha, parent,
                  fetch_auth, fetch_ref, pending_message=False,
                  can_submit=False):
         self.change_key = change.key
         self.number = number
         self.message = message
-        self.commit = commit
+        self.sha = sha
         self.parent = parent
         self.fetch_auth = fetch_auth
         self.fetch_ref = fetch_ref
@@ -509,8 +509,8 @@ class Revision(object):
 
 
 class Message(object):
-    def __init__(self, revision, id, author, created, message, draft=False, pending=False):
-        self.revision_key = revision.key
+    def __init__(self, commit, id, author, created, message, draft=False, pending=False):
+        self.commit_key = commit.key
         self.account_key = author.key
         self.id = id
         self.created = created
@@ -580,8 +580,8 @@ class Approval(object):
         return reviewer_name
 
 class PendingCherryPick(object):
-    def __init__(self, revision, branch, message):
-        self.revision_key = revision.key
+    def __init__(self, commit, branch, message):
+        self.commit_key = commit.key
         self.branch = branch
         self.message = message
 
@@ -597,9 +597,9 @@ class File(object):
     STATUS_REWRITTEN = 'W'
     STATUS_MODIFIED = 'M'
 
-    def __init__(self, revision, path, status, old_path=None,
+    def __init__(self, commit, path, status, old_path=None,
                  inserted=None, deleted=None):
-        self.revision_key = revision.key
+        self.commit_key = commit.key
         self.path = path
         self.status = status
         self.old_path = old_path
@@ -652,8 +652,8 @@ class Checker(object):
         self.status = status
 
 class Check(object):
-    def __init__(self, revision, checker, state, created, updated):
-        self.revision_key = revision.key
+    def __init__(self, commit, checker, state, created, updated):
+        self.commit_key = commit.key
         self.checker_key = checker.key
         self.state = state
         self.created = created
@@ -699,11 +699,11 @@ mapper(Change, change_table, properties=dict(
         owner=relationship(Account),
         hashtags=relationship(Hashtag, backref='change',
                                cascade='all, delete-orphan'),
-        revisions=relationship(Revision, backref='change',
-                               order_by=revision_table.c.number,
-                               cascade='all, delete-orphan'),
+        commits=relationship(Commit, backref='change',
+                             order_by=commit_table.c.number,
+                             cascade='all, delete-orphan'),
         messages=relationship(Message,
-                              secondary=revision_table,
+                              secondary=commit_table,
                               order_by=message_table.c.created,
                               viewonly=True),
         labels=relationship(Label, backref='change',
@@ -723,14 +723,14 @@ mapper(Change, change_table, properties=dict(
                                      order_by=(approval_table.c.category,
                                                approval_table.c.value))
         ))
-mapper(Revision, revision_table, properties=dict(
-        messages=relationship(Message, backref='revision',
+mapper(Commit, commit_table, properties=dict(
+        messages=relationship(Message, backref='commit',
                               cascade='all, delete-orphan'),
-        files=relationship(File, backref='revision',
+        files=relationship(File, backref='commit',
                            cascade='all, delete-orphan'),
-        pending_cherry_picks=relationship(PendingCherryPick, backref='revision',
+        pending_cherry_picks=relationship(PendingCherryPick, backref='commit',
                                           cascade='all, delete-orphan'),
-        checks=relationship(Check, backref='revision',
+        checks=relationship(Check, backref='commit',
                             cascade='all, delete-orphan'),
 
         ))
@@ -903,7 +903,7 @@ class DatabaseSession(object):
     def getChange(self, key, lazy=True):
         query = self.session().query(Change).filter_by(key=key)
         if not lazy:
-            query = query.options(joinedload(Change.revisions).joinedload(Revision.files).joinedload(File.comments))
+            query = query.options(joinedload(Change.commits).joinedload(Commit.files).joinedload(File.comments))
         try:
             return query.one()
         except sqlalchemy.orm.exc.NoResultFound:
@@ -965,29 +965,29 @@ class DatabaseSession(object):
         except sqlalchemy.orm.exc.NoResultFound:
             return []
 
-    def getRevision(self, key):
+    def getCommit(self, key):
         try:
-            return self.session().query(Revision).filter_by(key=key).one()
+            return self.session().query(Commit).filter_by(key=key).one()
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
-    def getRevisionByCommit(self, commit):
+    def getCommitBySha(self, sha):
         try:
-            return self.session().query(Revision).filter_by(commit=commit).one()
+            return self.session().query(Commit).filter_by(sha=sha).one()
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
-    def getRevisionsByParent(self, parent):
+    def getCommitsByParent(self, parent):
         if isinstance(parent, six.string_types):
             parent = (parent,)
         try:
-            return self.session().query(Revision).filter(Revision.parent.in_(parent)).all()
+            return self.session().query(Commit).filter(Commit.parent.in_(parent)).all()
         except sqlalchemy.orm.exc.NoResultFound:
             return []
 
-    def getRevisionByNumber(self, change, number):
+    def getCommitByNumber(self, change, number):
         try:
-            return self.session().query(Revision).filter_by(change_key=change.key, number=number).one()
+            return self.session().query(Commit).filter_by(change_key=change.key, number=number).one()
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
@@ -1046,7 +1046,7 @@ class DatabaseSession(object):
         return self.session().query(PendingCherryPick).all()
 
     def getPendingCommitMessages(self):
-        return self.session().query(Revision).filter_by(pending_message=True).all()
+        return self.session().query(Commit).filter_by(pending_message=True).all()
 
     def getAccountByID(self, id, name=None, username=None, email=None):
         try:

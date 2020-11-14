@@ -123,10 +123,10 @@ class UpdateEvent(object):
         related_change_keys = set()
         related_change_keys.add(change.key)
         for revision in change.revisions:
-            parent = session.getRevisionByCommit(revision.parent)
+            parent = session.getCommitBySha(revision.parent)
             if parent:
                 related_change_keys.add(parent.change.key)
-            for child in session.getRevisionsByParent(revision.commit):
+            for child in session.getCommitsByParent(revision.commit):
                 related_change_keys.add(child.change.key)
         self.related_change_keys = related_change_keys
 
@@ -605,7 +605,11 @@ class SyncChangeTask(Task):
 
     def _syncChange(self, sync):
         app = sync.app
+        self.log.info("Blah change_id %s", self.change_id)
         remote_change = sync.get('repos/%s' % self.change_id)
+        remote_commits = sync.get('repos/%s/commits' % self.change_id)
+        # remote_pr_comments = sync.get('repos/%s/comments' % self.change_id)
+
         # Perform subqueries this task will need outside of the db session
         # for remote_commit, remote_revision in remote_change.get('revisions', {}).items():
         #     remote_comments_data = sync.get('changes/%s/revisions/%s/comments' % (self.change_id, remote_commit))
@@ -625,6 +629,7 @@ class SyncChangeTask(Task):
         parent_commits = set()
         with app.db.getSession() as session:
             change = session.getChangeByID(self.change_id)
+            self.log.info("Blah project %s", remote_change)
             account = session.getAccountByID(remote_change['user']['id'],
                                              username=remote_change['user'].get('login'))
             if not change:
@@ -657,7 +662,7 @@ class SyncChangeTask(Task):
                                               remote_change['additions'],
                                               remote_change['deletions'],
                                               remote_change['html_url'])
-                self.log.info("Created new change %s in local DB.", change.id)
+                self.log.info("Created new change %s in local DB.", change.change_id)
                 result = ChangeAddedEvent(change)
             else:
                 result = ChangeUpdatedEvent(change)
@@ -673,60 +678,36 @@ class SyncChangeTask(Task):
                 change.starred = False
             change.title = remote_change['title']
             change.updated = dateutil.parser.parse(remote_change['updated_at'])
-            # repo = gitrepo.get_repo(change.project.name, app.config)
-            # new_revision = False
-            # for remote_commit, remote_revision in remote_change.get('revisions', {}).items():
-            #     revision = session.getRevisionByCommit(remote_commit)
-            #     # TODO: handle multiple parents
-            #     url = sync.app.config.git_url + change.project.name
-            #     if 'anonymous http' in remote_revision['fetch']:
-            #         ref = remote_revision['fetch']['anonymous http']['ref']
-            #         url = remote_revision['fetch']['anonymous http']['url']
-            #         auth = False
-            #     elif 'http' in remote_revision['fetch']:
-            #         auth = True
-            #         ref = remote_revision['fetch']['http']['ref']
-            #         url = list(urlparse.urlsplit(sync.app.config.url + change.project.name))
-            #         url[1] = '%s:%s@%s' % (
-            #             urlparse.quote_plus(sync.app.config.username),
-            #             urlparse.quote_plus(sync.app.config.token), url[1])
-            #         url = urlparse.urlunsplit(url)
-            #     elif 'ssh' in remote_revision['fetch']:
-            #         ref = remote_revision['fetch']['ssh']['ref']
-            #         url = remote_revision['fetch']['ssh']['url']
-            #         auth = False
-            #     elif 'git' in remote_revision['fetch']:
-            #         ref = remote_revision['fetch']['git']['ref']
-            #         url = remote_revision['fetch']['git']['url']
-            #         auth = False
-            #     else:
-            #         if len(remote_revision['fetch']):
-            #             errMessage = "No supported fetch method found.  Server offers: %s" % (
-            #                 ', '.join(remote_revision['fetch'].keys()))
-            #         else:
-            #             errMessage = "The server is missing the download-commands plugin."
-            #         raise Exception(errMessage)
+
+
+            repo = gitrepo.get_repo(change.project.name, app.config)
+            new_commit = False
+            for remote_commit in remote_commits:
+                commit = session.getCommitBySha(remote_commit['sha'])
+                # TODO: handle multiple parents
+                # url = sync.app.config.git_url + change.project.name
             #     if (not revision) or self.force_fetch:
             #         fetches[url].append('+%(ref)s:%(ref)s' % dict(ref=ref))
-            #     if not revision:
-            #         revision = change.createRevision(remote_revision['_number'],
-            #                                          remote_revision['commit']['message'], remote_commit,
-            #                                          remote_revision['commit']['parents'][0]['commit'],
-            #                                          auth, ref)
-            #         self.log.info("Created new revision %s for change %s revision %s in local DB.",
-            #                       revision.key, self.change_id, remote_revision['_number'])
-            #         new_revision = True
-            #     revision.message = remote_revision['commit']['message']
+                if not commit:
+                    # FIXME(mandre) remove revision number, fetch_auth and fetch_ref
+                    commit = change.createCommit(0,
+                                                 remote_commit['commit']['message'],
+                                                 remote_commit['sha'],
+                                                 remote_commit['parents'][0]['sha'],
+                                                 False, 'fetch_ref')
+                    self.log.info("Created new commit %s for change %s in local DB.",
+                                  commit.key, self.change_id)
+                    new_commit = True
             #     actions = remote_revision.get('actions', {})
-            #     revision.can_submit = 'submit' in actions
+            #     commit.can_submit = 'submit' in actions
             #     # TODO: handle multiple parents
-            #     if revision.parent not in parent_commits:
-            #         parent_revision = session.getRevisionByCommit(revision.parent)
-            #         if not parent_revision and change.status not in CLOSED_STATUSES:
-            #             sync._syncChangeByCommit(revision.parent, self.priority)
-            #             self.log.debug("Change %s revision %s needs parent commit %s synced" %
-            #                            (change.id, remote_revision['_number'], revision.parent))
-            #         parent_commits.add(revision.parent)
+            #     if commit.parent not in parent_commits:
+            #         parent_commit = session.getCommitBySha(commit.parent)
+            #         if not parent_commit and change.status not in CLOSED_STATUSES:
+            #             sync._syncChangeByCommit(commit.parent, self.priority)
+            #             self.log.debug("Change %s needs parent commit %s synced" %
+            #                            (change.change_id, commit.parent))
+            #         parent_commits.add(commit.parent)
             #     result.updateRelatedChanges(session, change)
 
             #     f = revision.getFile('/COMMIT_MSG')
@@ -792,7 +773,7 @@ class SyncChangeTask(Task):
             #         account = session.getSystemAccount()
             #     message = session.getMessageByID(remote_message['id'])
             #     if not message:
-            #         revision = session.getRevisionByNumber(change, remote_message.get('_revision_number', 1))
+            #         revision = session.getCommitByNumber(change, remote_message.get('_revision_number', 1))
             #         if revision:
             #             # Normalize date -> created
             #             created = dateutil.parser.parse(remote_message['date'])
@@ -829,7 +810,7 @@ class SyncChangeTask(Task):
             # local_labels = {}
             # user_votes = {}
             # for approval in change.approvals:
-            #     if approval.draft and not new_revision:
+            #     if approval.draft and not new_commit:
             #         # If we have a new revision, we need to delete
             #         # draft local approvals because they can no longer
             #         # be uploaded.  Otherwise, keep them because we
@@ -871,7 +852,7 @@ class SyncChangeTask(Task):
             #     change.createApproval(account,
             #                           remote_approval['category'],
             #                           remote_approval['value'])
-            #     self.log.info("Created approval for change %s in local DB.", change.id)
+            #     self.log.info("Created approval for change %s in local DB.", change.change_id)
             #     user_value = user_votes.get(remote_approval['category'], 0)
             #     if user_value > 0 and remote_approval['value'] < 0:
             #         # Someone left a negative vote after the local
@@ -881,7 +862,7 @@ class SyncChangeTask(Task):
             #         if not change.held:
             #             change.held = True
             #             result.held_changed = True
-            #             self.log.info("Setting change %s to held due to negative review after positive", change.id)
+            #             self.log.info("Setting change %s to held due to negative review after positive", change.change_id)
 
             # for key in remote_label_keys-local_label_keys:
             #     remote_label = remote_label_entries[key]
@@ -923,7 +904,7 @@ class SyncChangeTask(Task):
 
             # if not user_voted:
             #     # Only consider changing the reviewed state if we don't have a vote
-            #     if new_revision or new_message:
+            #     if new_commit or new_message:
             #         if change.reviewed:
             #             change.reviewed = False
             #             result.review_flag_changed = True
@@ -1215,7 +1196,7 @@ class ChangeCommitMessageTask(Task):
     def run(self, sync):
         app = sync.app
         with app.db.getSession() as session:
-            revision = session.getRevision(self.revision_key)
+            revision = session.getCommit(self.revision_key)
             revision.pending_message = False
             data = dict(message=revision.message)
             # Inside db session for rollback

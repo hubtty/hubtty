@@ -775,7 +775,7 @@ class App(object):
             change.held = not change.held
             ret = change.held
             if not change.held:
-                for r in change.revisions:
+                for c in change.commits:
                     for m in change.messages:
                         if m.pending:
                             self.sync.submitTask(
@@ -809,22 +809,22 @@ class App(object):
             lambda button: self.backScreen())
         self.popup(dialog, min_height=min_height)
 
-    def saveReviews(self, revision_keys, approvals, message, upload, submit):
+    def saveReviews(self, commit_keys, approvals, message, upload, submit):
         message_keys = []
         with self.db.getSession() as session:
             account = session.getOwnAccount()
-            for revision_key in revision_keys:
-                k = self._saveReview(session, account, revision_key,
+            for commit_key in commit_keys:
+                k = self._saveReview(session, account, commit_key,
                                      approvals, message, upload, submit)
                 if k:
                     message_keys.append(k)
         return message_keys
 
-    def _saveReview(self, session, account, revision_key,
+    def _saveReview(self, session, account, commit_key,
                     approvals, message, upload, submit):
         message_key = None
-        revision = session.getRevision(revision_key)
-        change = revision.change
+        commit = session.getCommit(commit_key)
+        change = commit.change
         draft_approvals = {}
         for approval in change.draft_approvals:
             draft_approvals[approval.category] = approval
@@ -839,14 +839,14 @@ class App(object):
                 approval = change.createApproval(account, category, 0, draft=True)
                 draft_approvals[category] = approval
             approval.value = value
-        draft_message = revision.getPendingMessage()
+        draft_message = commit.getPendingMessage()
         if not draft_message:
-            draft_message = revision.getDraftMessage()
+            draft_message = commit.getDraftMessage()
         if not draft_message:
             if message or upload:
-                draft_message = revision.createMessage(None, account,
-                                                       datetime.datetime.utcnow(),
-                                                       '', draft=True)
+                draft_message = commit.createMessage(None, account,
+                                                     datetime.datetime.utcnow(),
+                                                     '', draft=True)
         if draft_message:
             draft_message.created = datetime.datetime.utcnow()
             draft_message.message = message
