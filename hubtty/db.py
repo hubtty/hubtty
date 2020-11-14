@@ -87,12 +87,6 @@ change_table = Table(
     Column('last_seen', DateTime, index=True),
     Column('outdated', Boolean, index=True, nullable=False),
     )
-change_conflict_table = Table(
-    'change_conflict', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('change1_key', Integer, ForeignKey("change.key"), index=True),
-    Column('change2_key', Integer, ForeignKey("change.key"), index=True),
-    )
 hashtag_table = Table(
     'hashtag', metadata,
     Column('key', Integer, primary_key=True),
@@ -238,25 +232,6 @@ class Project(object):
         self.name = name
         self.subscribed = subscribed
         self.description = description
-
-    def delete(self):
-        # This unusual delete method is to accomodate the
-        # self-referential many-to-many relationship from
-        # change_conflict.  With the default cascade configuration,
-        # the entry from the association table is deleted regardless
-        # of whether the change being deleted is change1 or change2.
-        # However, when both changes are deleted at once (only likely
-        # to happen when the entire project is deleted), SQLAlchemy
-        # cascades through both relationships and attempts to delete
-        # the entry twice.  Since we rarely delete projects, we add a
-        # special case here to delete a project's changes one at a
-        # time to avoid this situation.
-        session = Session.object_session(self)
-        for c in self.changes:
-            session.delete(c)
-            session.flush()
-            session.expire_all()
-        session.delete(self)
 
     def createChange(self, *args, **kw):
         session = Session.object_session(self)
@@ -460,31 +435,6 @@ class Change(object):
             elif self.owner.email:
                 owner_name = self.owner.email
         return owner_name
-
-    @property
-    def conflicts(self):
-        return tuple(set(self.conflicts1 + self.conflicts2))
-
-    def addConflict(self, other):
-        session = Session.object_session(self)
-        if other in self.conflicts1 or other in self.conflicts2:
-            return
-        if self in other.conflicts1 or self in other.conflicts2:
-            return
-        self.conflicts1.append(other)
-        session.flush()
-        session.expire(other, attribute_names=['conflicts2'])
-
-    def delConflict(self, other):
-        session = Session.object_session(self)
-        if other in self.conflicts1:
-            self.conflicts1.remove(other)
-            session.flush()
-            session.expire(other, attribute_names=['conflicts2'])
-        if self in other.conflicts1:
-            other.conflicts1.remove(self)
-            session.flush()
-            session.expire(self, attribute_names=['conflicts2'])
 
 class Revision(object):
     def __init__(self, change, number, message, commit, parent,
@@ -747,16 +697,6 @@ mapper(Topic, topic_table, properties=dict(
 mapper(ProjectTopic, project_topic_table)
 mapper(Change, change_table, properties=dict(
         owner=relationship(Account),
-        conflicts1=relationship(Change,
-                                secondary=change_conflict_table,
-                                primaryjoin=change_table.c.key==change_conflict_table.c.change1_key,
-                                secondaryjoin=change_table.c.key==change_conflict_table.c.change2_key,
-                                ),
-        conflicts2=relationship(Change,
-                                secondary=change_conflict_table,
-                                primaryjoin=change_table.c.key==change_conflict_table.c.change2_key,
-                                secondaryjoin=change_table.c.key==change_conflict_table.c.change1_key,
-                                ),
         hashtags=relationship(Hashtag, backref='change',
                                cascade='all, delete-orphan'),
         revisions=relationship(Revision, backref='change',

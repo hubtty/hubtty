@@ -620,13 +620,6 @@ class SyncChangeTask(Task):
         #             sync.checks_plugin = False
         #         else:
         #             remote_revision['_hubtty_remote_checks_data'] = remote_checks_data
-        # try:
-        #     remote_conflicts = sync.query(['q=status:open+is:mergeable+conflicts:%s' %
-        #                                    remote_change['_number']])
-        # except Exception:
-        #     # Conflicts are now optional
-        #     self.log.debug("Unable to sync conflicts for change %s" % self.change_id)
-        #     remote_conflicts = []
 
         fetches = collections.defaultdict(list)
         parent_commits = set()
@@ -680,28 +673,6 @@ class SyncChangeTask(Task):
                 change.starred = False
             change.title = remote_change['title']
             change.updated = dateutil.parser.parse(remote_change['updated_at'])
-            # unseen_conflicts = [x.id for x in change.conflicts]
-            # for remote_conflict in remote_conflicts:
-            #     conflict_id = remote_conflict['id']
-            #     conflict = session.getChangeByID(conflict_id)
-            #     if not conflict:
-            #         self.log.info("Need to sync conflicting change %s for change %s.",
-            #                       conflict_id, change.number)
-            #         sync.submitTask(SyncChangeTask(conflict_id, priority=self.priority))
-            #     else:
-            #         if conflict not in change.conflicts:
-            #             self.log.info("Added conflict %s for change %s in local DB.",
-            #                           conflict.number, change.number)
-            #             change.addConflict(conflict)
-            #             self.results.append(ChangeUpdatedEvent(conflict))
-            #     if conflict_id in unseen_conflicts:
-            #         unseen_conflicts.remove(conflict_id)
-            # for conflict_id in unseen_conflicts:
-            #     conflict = session.getChangeByID(conflict_id)
-            #     self.log.info("Deleted conflict %s for change %s in local DB.",
-            #                   conflict.number, change.number)
-            #     change.delConflict(conflict)
-            #     self.results.append(ChangeUpdatedEvent(conflict))
             # repo = gitrepo.get_repo(change.project.name, app.config)
             # new_revision = False
             # for remote_commit, remote_revision in remote_change.get('revisions', {}).items():
