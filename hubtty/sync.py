@@ -914,17 +914,17 @@ class SyncChangeTask(Task):
             # change.setHashtags(remote_hashtags)
 
             # change.outdated = False
-        # for url, refs in fetches.items():
-            # self.log.debug("Fetching from %s with refs %s", url, refs)
-            # try:
-            #     repo.fetch(url, refs)
-            # except Exception:
-            #     # Backwards compat with GitPython before the multi-ref fetch
-            #     # patch.
-            #     # (https://github.com/gitpython-developers/GitPython/pull/170)
-            #     for ref in refs:
-            #         self.log.debug("git fetch %s %s" % (url, ref))
-            #         repo.fetch(url, ref)
+        for url, refs in fetches.items():
+            self.log.debug("Fetching from %s with refs %s", url, refs)
+            try:
+                repo.fetch(url, refs)
+            except Exception:
+                # Backwards compat with GitPython before the multi-ref fetch
+                # patch.
+                # (https://github.com/gitpython-developers/GitPython/pull/170)
+                for ref in refs:
+                    self.log.debug("git fetch %s %s" % (url, ref))
+                    repo.fetch(url, ref)
 
 class CheckReposTask(Task):
     # on startup, check all projects

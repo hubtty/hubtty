@@ -606,7 +606,7 @@ class ChangeView(urwid.WidgetWrap):
         self.listbox.body.append(urwid.Divider())
         self.listbox_patchset_start = len(self.listbox.body)
 
-        self.checkGitRepo()
+        # self.checkGitRepo()
         self.refresh()
         self.listbox.set_focus(0)
         self.grid.set_focus(1)
@@ -620,7 +620,7 @@ class ChangeView(urwid.WidgetWrap):
             change = session.getChange(self.change_key)
             change_project_name = change.project.name
             change_number = change.number
-            change_id = change.id
+            change_id = change.change_id
             for commit in change.commits:
                 shas.add(commit.parent)
                 shas.add(commit.sha)
