@@ -281,9 +281,8 @@ class CommitRow(urwid.WidgetWrap):
         table = urwid.Padding(table, width='pack')
 
         focus_map={'revision-button': 'focused-revision-button'}
-        self.review_button = ReviewButton(self)
-        buttons = [self.review_button,
-                   mywid.FixedButton(('revision-button', "Diff"),
+        # self.review_button = ReviewButton(self)
+        buttons = [mywid.FixedButton(('revision-button', "Diff"),
                                      on_press=self.diff),
                    mywid.FixedButton(('revision-button', "Local Checkout"),
                                      on_press=self.checkout),
@@ -306,8 +305,8 @@ class CommitRow(urwid.WidgetWrap):
             self.expandContract(None)
 
     def update(self, commit):
-        line = [('revision-name', 'Patch Set %s ' % commit.number),
-                ('revision-commit', commit.sha)]
+        line = [('revision-commit', commit.sha[0:7]),
+                ('revision-name', ' %s' % commit.message.split('\n')[0])]
         num_drafts = sum([len(f.draft_comments) for f in commit.files])
         if num_drafts:
             pending_message = commit.getPendingMessage()
@@ -757,8 +756,7 @@ class ChangeView(urwid.WidgetWrap):
                 self.last_commit_key = commit.key
                 row = self.commit_rows.get(commit.key)
                 if not row:
-                    row = CommitRow(self.app, self, repo, commit,
-                                      expanded=(revno==len(change.commits)-1))
+                    row = CommitRow(self.app, self, repo, commit)
                     self.listbox.body.insert(listbox_index, row)
                     self.commit_rows[commit.key] = row
                 row.update(commit)
