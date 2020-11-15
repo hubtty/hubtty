@@ -532,8 +532,8 @@ class SyncOutdatedChangesTask(Task):
     def run(self, sync):
         with sync.app.db.getSession() as session:
             for change in session.getOutdated():
-                self.log.debug("Sync outdated change %s" % (change.id,))
-                sync.submitTask(SyncChangeTask(change.id, priority=self.priority))
+                self.log.debug("Sync outdated change %s" % (change.change_id,))
+                sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
 
 class SyncChangeTask(Task):
     def __init__(self, change_id, force_fetch=False, priority=NORMAL_PRIORITY):
@@ -1038,9 +1038,9 @@ class CheckRevisionsTask(Task):
                 if repo:
                     for revision in change.revisions:
                         if repo.checkCommits([revision.parent, revision.commit]):
-                            to_sync.add(change.id)
+                            to_sync.add(change.change_id)
                 else:
-                    to_sync.add(change.id)
+                    to_sync.add(change.change_id)
         for change_id in to_sync:
             sync.submitTask(SyncChangeTask(change_id,
                                            force_fetch=self.force_fetch,
