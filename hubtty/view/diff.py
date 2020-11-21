@@ -199,7 +199,6 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             if self.old_commit_key is not None:
                 old_commit = session.getCommit(self.old_commit_key)
                 self.old_commit_num = old_commit.number
-                old_str = 'patchset %s' % self.old_commit_num
                 self.base_sha = old_commit.sha
                 for f in old_commit.files:
                     old_comments += f.comments
@@ -208,7 +207,6 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             else:
                 old_commit = None
                 self.old_commit_num = None
-                old_str = 'base'
                 self.base_sha = new_commit.parent
                 show_old_commit = False
                 # The old files are the same as the new files since we
@@ -219,11 +217,13 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                         self.old_file_keys[f.old_path] = f.key
                     else:
                         self.old_file_keys[f.path] = f.key
-            self.title = u'Diff of %s change %s from %s to patchset %s' % (
+            self.title = u'Diff of %s #%s from %s to %s' % (
                 new_commit.change.project.name,
                 new_commit.change.number,
-                old_str, new_commit.number)
-            self.short_title = u'Diff of %s' % (new_commit.change.number,)
+                new_commit.parent[0:7],
+                new_commit.sha[0:7])
+            self.short_title = u'Diff of %s/%s' % (new_commit.change.number,
+                                                   new_commit.sha[0:7])
             self.new_commit_num = new_commit.number
             self.change_key = new_commit.change.key
             self.project_name = new_commit.change.project.name
