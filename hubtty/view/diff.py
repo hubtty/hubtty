@@ -179,56 +179,56 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             ret.append(('', keymap.formatKey(k['key']), action))
         return ret
 
-    def __init__(self, app, new_revision_key):
+    def __init__(self, app, new_commit_key):
         super(BaseDiffView, self).__init__(urwid.Pile([]))
         self.log = logging.getLogger('hubtty.view.diff')
         self.app = app
-        self.old_revision_key = None  # Base
-        self.new_revision_key = new_revision_key
+        self.old_commit_key = None  # Base
+        self.new_commit_key = new_commit_key
         self._init()
 
     def _init(self):
         del self._w.contents[:]
         self.searchInit()
         with self.app.db.getSession() as session:
-            new_revision = session.getRevision(self.new_revision_key)
+            new_commit = session.getCommit(self.new_commit_key)
             old_comments = []
             new_comments = []
             self.old_file_keys = {}
             self.new_file_keys = {}
-            if self.old_revision_key is not None:
-                old_revision = session.getRevision(self.old_revision_key)
-                self.old_revision_num = old_revision.number
-                old_str = 'patchset %s' % self.old_revision_num
-                self.base_commit = old_revision.commit
-                for f in old_revision.files:
+            if self.old_commit_key is not None:
+                old_commit = session.getCommit(self.old_commit_key)
+                self.old_commit_num = old_commit.number
+                old_str = 'patchset %s' % self.old_commit_num
+                self.base_sha = old_commit.sha
+                for f in old_commit.files:
                     old_comments += f.comments
                     self.old_file_keys[f.path] = f.key
                 show_old_commit = True
             else:
-                old_revision = None
-                self.old_revision_num = None
+                old_commit = None
+                self.old_commit_num = None
                 old_str = 'base'
-                self.base_commit = new_revision.parent
+                self.base_sha = new_commit.parent
                 show_old_commit = False
                 # The old files are the same as the new files since we
                 # are diffing from base -> change, however, we should
                 # use the old file names for file lookup.
-                for f in new_revision.files:
+                for f in new_commit.files:
                     if f.old_path:
                         self.old_file_keys[f.old_path] = f.key
                     else:
                         self.old_file_keys[f.path] = f.key
             self.title = u'Diff of %s change %s from %s to patchset %s' % (
-                new_revision.change.project.name,
-                new_revision.change.number,
-                old_str, new_revision.number)
-            self.short_title = u'Diff of %s' % (new_revision.change.number,)
-            self.new_revision_num = new_revision.number
-            self.change_key = new_revision.change.key
-            self.project_name = new_revision.change.project.name
-            self.commit = new_revision.commit
-            for f in new_revision.files:
+                new_commit.change.project.name,
+                new_commit.change.number,
+                old_str, new_commit.number)
+            self.short_title = u'Diff of %s' % (new_commit.change.number,)
+            self.new_commit_num = new_commit.number
+            self.change_key = new_commit.change.key
+            self.project_name = new_commit.change.project.name
+            self.sha = new_commit.sha
+            for f in new_commit.files:
                 new_comments += f.comments
                 self.new_file_keys[f.path] = f.key
             comment_lists = {}
@@ -236,7 +236,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             for comment in new_comments:
                 path = comment.file.path
                 if comment.parent:
-                    if old_revision:  # we're not looking at the base
+                    if old_commit:  # we're not looking at the base
                         continue
                     key = 'old'
                     if comment.file.old_path:
@@ -281,7 +281,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         lines = []  # The initial set of lines to display
         self.file_diffs = [{}, {}]  # Mapping of fn -> DiffFile object (old, new)
         # this is a list of files:
-        diffs = repo.diff(self.base_commit, self.commit,
+        diffs = repo.diff(self.base_sha, self.sha,
                           show_old_commit=show_old_commit)
         for diff in diffs:
             comment_filenames.discard(diff.oldname)
@@ -290,11 +290,11 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         # appear in the diff so we should create fake diff objects
         # that contain the full text.
         for filename in comment_filenames:
-            diff = repo.getFile(self.base_commit, self.commit, filename)
+            diff = repo.getFile(self.base_sha, self.sha, filename)
             if diff:
                 diffs.append(diff)
             else:
-                self.log.debug("Unable to find file %s in commit %s" % (filename, self.commit))
+                self.log.debug("Unable to find file %s in commit %s" % (filename, self.sha))
         for i, diff in enumerate(diffs):
             if i > 0:
                 lines.append(urwid.Text(''))
@@ -515,7 +515,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             session.delete(comment)
 
     def saveComment(self, context, text, new=True):
-        if (not new) and (not self.old_revision_num):
+        if (not new) and (not self.old_commit_num):
             parent = True
         else:
             parent = False
@@ -544,14 +544,14 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         self.app.backScreen()
 
     def openPatchsetDialog(self):
-        revisions = []
+        commits = []
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
-            for r in change.revisions:
-                revisions.append((r.key, r.number))
-        dialog = PatchsetDialog(revisions,
-                                self.old_revision_key,
-                                self.new_revision_key)
+            for r in change.commits:
+                commits.append((r.key, r.number))
+        dialog = PatchsetDialog(commits,
+                                self.old_commit_key,
+                                self.new_commit_key)
         urwid.connect_signal(dialog, 'cancel',
             lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'ok',
@@ -560,26 +560,26 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
 
     def _openPatchsetDialog(self, dialog):
         self.app.backScreen()
-        self.old_revision_key, self.new_revision_key = dialog.getSelected()
+        self.old_commit_key, self.new_commit_key = dialog.getSelected()
         self._init()
 
     def movePatchset(self, offset):
-        revisions = []
+        commits = []
         new = None
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
-            for r in change.revisions:
-                revisions.append((r.key, r.number))
-        for i, (key, num) in enumerate(revisions):
-            if key == self.new_revision_key:
+            for r in change.commits:
+                commits.append((r.key, r.number))
+        for i, (key, num) in enumerate(commits):
+            if key == self.new_commit_key:
                 new = i
-        if self.old_revision_key is not None:
+        if self.old_commit_key is not None:
             new = new + offset
         old = new - 1
-        if new >= len(revisions):
+        if new >= len(commits):
             return
         if old < 0:
             return
-        self.old_revision_key = revisions[old][0]
-        self.new_revision_key = revisions[new][0]
+        self.old_commit_key = commits[old][0]
+        self.new_commit_key = commits[new][0]
         self._init()
