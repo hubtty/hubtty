@@ -605,7 +605,6 @@ class SyncChangeTask(Task):
 
     def _syncChange(self, sync):
         app = sync.app
-        self.log.info("Blah change_id %s", self.change_id)
         remote_change = sync.get('repos/%s' % self.change_id)
         remote_commits = sync.get('repos/%s/commits' % self.change_id)
         # remote_pr_comments = sync.get('repos/%s/comments' % self.change_id)
@@ -629,7 +628,6 @@ class SyncChangeTask(Task):
         parent_commits = set()
         with app.db.getSession() as session:
             change = session.getChangeByID(self.change_id)
-            self.log.info("Blah project %s", remote_change)
             account = session.getAccountByID(remote_change['user']['id'],
                                              username=remote_change['user'].get('login'))
             if not change:
@@ -715,17 +713,21 @@ class SyncChangeTask(Task):
             #     if f is None:
             #         f = revision.createFile('/COMMIT_MSG', None,
             #                                 None, None, None)
-            #     for remote_path, remote_file in remote_revision['files'].items():
-            #         f = revision.getFile(remote_path)
-            #         if f is None:
-            #             if remote_file.get('binary'):
-            #                 inserted = deleted = None
-            #             else:
-            #                 inserted = remote_file.get('lines_inserted', 0)
-            #                 deleted = remote_file.get('lines_deleted', 0)
-            #             f = revision.createFile(remote_path, remote_file.get('status', 'M'),
-            #                                     remote_file.get('old_path'),
-            #                                     inserted, deleted)
+
+                remote_commit_details = sync.get('repos/%s/commits/%s'
+                                                 % (change.project.name,
+                                                    remote_commit['sha']))
+                for file in remote_commit_details['files']:
+                    f = commit.getFile(file['filename'])
+                    if f is None:
+                        if file.get('patch') == None:
+                            inserted = deleted = None
+                        else:
+                            inserted = file.get('additions', 0)
+                            deleted = file.get('deletions', 0)
+                        f = commit.createFile(file['filename'], file['status'],
+                                                file.get('previous_filename'),
+                                                inserted, deleted)
 
             #     remote_comments_items = list(remote_revision['_hubtty_remote_comments_data'].items())
             #     remote_robot_comments_items = list(remote_revision.get('_hubtty_remote_robot_comments_data', {}).items())
