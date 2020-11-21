@@ -605,7 +605,7 @@ class ChangeView(urwid.WidgetWrap):
         self.listbox.body.append(urwid.Divider())
         self.listbox_patchset_start = len(self.listbox.body)
 
-        # self.checkGitRepo()
+        self.checkGitRepo()
         self.refresh()
         self.listbox.set_focus(0)
         self.grid.set_focus(1)

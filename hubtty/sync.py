@@ -685,9 +685,10 @@ class SyncChangeTask(Task):
             for remote_commit in remote_commits:
                 commit = session.getCommitBySha(remote_commit['sha'])
                 # TODO: handle multiple parents
-                # url = sync.app.config.git_url + change.project.name
-            #     if (not revision) or self.force_fetch:
-            #         fetches[url].append('+%(ref)s:%(ref)s' % dict(ref=ref))
+                url = sync.app.config.git_url + change.project.name
+                ref = "pull/%s/head" % (change.number,)
+                if (not commit) or self.force_fetch:
+                    fetches[url].append('+%(ref)s:%(ref)s' % dict(ref=ref))
                 if not commit:
                     # FIXME(mandre) remove revision number, fetch_auth and fetch_ref
                     commit = change.createCommit(0,
