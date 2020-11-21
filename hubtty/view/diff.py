@@ -162,10 +162,10 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
              "Add an inline comment"),
             # (keymap.SELECT_PATCHSETS,
             #  "Select old/new patchsets to diff"),
-            (keymap.NEXT_PATCHSET,
-             "Diff the next pair of patchsets"),
-            (keymap.PREV_PATCHSET,
-             "Diff the previous pair of patchsets"),
+            (keymap.NEXT_COMMIT,
+             "Diff the next commit"),
+            (keymap.PREV_COMMIT,
+             "Diff the previous commit"),
             (keymap.INTERACTIVE_SEARCH,
              "Interactive search"),
             ]
@@ -475,11 +475,11 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         # if keymap.SELECT_PATCHSETS in commands:
         #     self.openPatchsetDialog()
         #     return None
-        if keymap.NEXT_PATCHSET in commands:
-            self.movePatchset(1)
+        if keymap.NEXT_COMMIT in commands:
+            self.moveCommit(1)
             return None
-        if keymap.PREV_PATCHSET in commands:
-            self.movePatchset(-1)
+        if keymap.PREV_COMMIT in commands:
+            self.moveCommit(-1)
             return None
         if keymap.INTERACTIVE_SEARCH in commands:
             self.searchStart()
@@ -563,23 +563,21 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
     #     self.old_commit_key, self.new_commit_key = dialog.getSelected()
     #     self._init()
 
-    def movePatchset(self, offset):
+    def moveCommit(self, offset):
         commits = []
-        new = None
+        commit_idx = None
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
-            for r in change.commits:
-                commits.append((r.key, r.number))
-        for i, (key, num) in enumerate(commits):
+            for c in change.commits:
+                commits.append(c.key)
+
+        for i, key in enumerate(commits):
             if key == self.new_commit_key:
-                new = i
-        if self.old_commit_key is not None:
-            new = new + offset
-        old = new - 1
-        if new >= len(commits):
+                commit_idx = i + offset
+                break
+        if commit_idx >= len(commits):
             return
-        if old < 0:
+        if commit_idx < 0:
             return
-        self.old_commit_key = commits[old][0]
-        self.new_commit_key = commits[new][0]
+        self.new_commit_key = commits[commit_idx]
         self._init()

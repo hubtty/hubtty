@@ -79,8 +79,8 @@ RENAME_PROJECT_TOPIC = 'rename project topic'
 # SELECT_PATCHSETS = 'select patchsets'
 NEXT_SELECTABLE = 'next selectable'
 PREV_SELECTABLE = 'prev selectable'
-NEXT_PATCHSET = 'next patchset'
-PREV_PATCHSET = 'prev patchset'
+NEXT_COMMIT = 'next commit'
+PREV_COMMIT = 'prev commit'
 INTERACTIVE_SEARCH = 'interactive search'
 # Special:
 FURTHER_INPUT = 'further input'
@@ -147,8 +147,8 @@ DEFAULT_KEYMAP = {
     # SELECT_PATCHSETS: 'p',
     NEXT_SELECTABLE: 'tab',
     PREV_SELECTABLE: 'shift tab',
-    NEXT_PATCHSET: '>',
-    PREV_PATCHSET: '<',
+    NEXT_COMMIT: '>',
+    PREV_COMMIT: '<',
     INTERACTIVE_SEARCH: 'ctrl s',
 }
 
