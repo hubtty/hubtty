@@ -23,65 +23,65 @@ from hubtty import mywid
 from hubtty import sync
 from hubtty.view import mouse_scroll_decorator
 
-class PatchsetDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
-    signals = ['ok', 'cancel']
+# class PatchsetDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
+#     signals = ['ok', 'cancel']
 
-    def __init__(self, patchsets, old, new):
-        button_widgets = []
-        ok_button = mywid.FixedButton('OK')
-        cancel_button = mywid.FixedButton('Cancel')
-        urwid.connect_signal(ok_button, 'click',
-                             lambda button:self._emit('ok'))
-        urwid.connect_signal(cancel_button, 'click',
-                             lambda button:self._emit('cancel'))
-        button_widgets.append(('pack', ok_button))
-        button_widgets.append(('pack', cancel_button))
-        button_columns = urwid.Columns(button_widgets, dividechars=2)
+#     def __init__(self, patchsets, old, new):
+#         button_widgets = []
+#         ok_button = mywid.FixedButton('OK')
+#         cancel_button = mywid.FixedButton('Cancel')
+#         urwid.connect_signal(ok_button, 'click',
+#                              lambda button:self._emit('ok'))
+#         urwid.connect_signal(cancel_button, 'click',
+#                              lambda button:self._emit('cancel'))
+#         button_widgets.append(('pack', ok_button))
+#         button_widgets.append(('pack', cancel_button))
+#         button_columns = urwid.Columns(button_widgets, dividechars=2)
 
-        left = []
-        right = []
-        left.append(urwid.Text('Old'))
-        right.append(urwid.Text('New'))
-        self.old_buttons = []
-        self.new_buttons = []
-        self.patchset_keys = {}
-        oldb = mywid.FixedRadioButton(self.old_buttons, 'Base',
-                                      state=(old==None))
-        left.append(oldb)
-        right.append(urwid.Text(''))
-        self.patchset_keys[oldb] = None
-        for key, num in patchsets:
-            oldb = mywid.FixedRadioButton(self.old_buttons, 'Patchset %d' % num,
-                                          state=(old==key))
-            newb = mywid.FixedRadioButton(self.new_buttons, 'Patchset %d' % num,
-                                          state=(new==key))
-            left.append(oldb)
-            right.append(newb)
-            self.patchset_keys[oldb] = key
-            self.patchset_keys[newb] = key
-        left = urwid.Pile(left)
-        right = urwid.Pile(right)
-        table  = urwid.Columns([left, right])
-        rows = []
-        rows.append(table)
-        rows.append(urwid.Divider())
-        rows.append(button_columns)
-        pile = urwid.Pile(rows)
-        fill = urwid.Filler(pile, valign='top')
-        title = 'Patchsets'
-        super(PatchsetDialog, self).__init__(urwid.LineBox(fill, title))
+#         left = []
+#         right = []
+#         left.append(urwid.Text('Old'))
+#         right.append(urwid.Text('New'))
+#         self.old_buttons = []
+#         self.new_buttons = []
+#         self.patchset_keys = {}
+#         oldb = mywid.FixedRadioButton(self.old_buttons, 'Base',
+#                                       state=(old==None))
+#         left.append(oldb)
+#         right.append(urwid.Text(''))
+#         self.patchset_keys[oldb] = None
+#         for key, num in patchsets:
+#             oldb = mywid.FixedRadioButton(self.old_buttons, 'Patchset %d' % num,
+#                                           state=(old==key))
+#             newb = mywid.FixedRadioButton(self.new_buttons, 'Patchset %d' % num,
+#                                           state=(new==key))
+#             left.append(oldb)
+#             right.append(newb)
+#             self.patchset_keys[oldb] = key
+#             self.patchset_keys[newb] = key
+#         left = urwid.Pile(left)
+#         right = urwid.Pile(right)
+#         table  = urwid.Columns([left, right])
+#         rows = []
+#         rows.append(table)
+#         rows.append(urwid.Divider())
+#         rows.append(button_columns)
+#         pile = urwid.Pile(rows)
+#         fill = urwid.Filler(pile, valign='top')
+#         title = 'Patchsets'
+#         super(PatchsetDialog, self).__init__(urwid.LineBox(fill, title))
 
-    def getSelected(self):
-        old = new = None
-        for b in self.old_buttons:
-            if b.state:
-                old = self.patchset_keys[b]
-                break
-        for b in self.new_buttons:
-            if b.state:
-                new = self.patchset_keys[b]
-                break
-        return old, new
+#     def getSelected(self):
+#         old = new = None
+#         for b in self.old_buttons:
+#             if b.state:
+#                 old = self.patchset_keys[b]
+#                 break
+#         for b in self.new_buttons:
+#             if b.state:
+#                 new = self.patchset_keys[b]
+#                 break
+#         return old, new
 
 class LineContext(object):
     def __init__(self, old_file_key, new_file_key,
@@ -160,8 +160,8 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         return [
             (keymap.ACTIVATE,
              "Add an inline comment"),
-            (keymap.SELECT_PATCHSETS,
-             "Select old/new patchsets to diff"),
+            # (keymap.SELECT_PATCHSETS,
+            #  "Select old/new patchsets to diff"),
             (keymap.NEXT_PATCHSET,
              "Diff the next pair of patchsets"),
             (keymap.PREV_PATCHSET,
@@ -472,9 +472,9 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         if (isinstance(old_focus, BaseDiffCommentEdit) and
             (old_focus != new_focus or (keymap.PREV_SCREEN in commands))):
             self.cleanupEdit(old_focus)
-        if keymap.SELECT_PATCHSETS in commands:
-            self.openPatchsetDialog()
-            return None
+        # if keymap.SELECT_PATCHSETS in commands:
+        #     self.openPatchsetDialog()
+        #     return None
         if keymap.NEXT_PATCHSET in commands:
             self.movePatchset(1)
             return None
@@ -543,25 +543,25 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             change_view.reviewKey(reviewkey)
         self.app.backScreen()
 
-    def openPatchsetDialog(self):
-        commits = []
-        with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            for r in change.commits:
-                commits.append((r.key, r.number))
-        dialog = PatchsetDialog(commits,
-                                self.old_commit_key,
-                                self.new_commit_key)
-        urwid.connect_signal(dialog, 'cancel',
-            lambda button: self.app.backScreen())
-        urwid.connect_signal(dialog, 'ok',
-            lambda button: self._openPatchsetDialog(dialog))
-        self.app.popup(dialog, min_width=30, min_height=8)
+    # def openPatchsetDialog(self):
+    #     commits = []
+    #     with self.app.db.getSession() as session:
+    #         change = session.getChange(self.change_key)
+    #         for r in change.commits:
+    #             commits.append((r.key, r.number))
+    #     dialog = PatchsetDialog(commits,
+    #                             self.old_commit_key,
+    #                             self.new_commit_key)
+    #     urwid.connect_signal(dialog, 'cancel',
+    #         lambda button: self.app.backScreen())
+    #     urwid.connect_signal(dialog, 'ok',
+    #         lambda button: self._openPatchsetDialog(dialog))
+    #     self.app.popup(dialog, min_width=30, min_height=8)
 
-    def _openPatchsetDialog(self, dialog):
-        self.app.backScreen()
-        self.old_commit_key, self.new_commit_key = dialog.getSelected()
-        self._init()
+    # def _openPatchsetDialog(self, dialog):
+    #     self.app.backScreen()
+    #     self.old_commit_key, self.new_commit_key = dialog.getSelected()
+    #     self._init()
 
     def movePatchset(self, offset):
         commits = []

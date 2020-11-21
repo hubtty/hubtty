@@ -76,7 +76,7 @@ COPY_PROJECT_TOPIC = 'copy to project topic'
 REMOVE_PROJECT_TOPIC = 'remove from project topic'
 RENAME_PROJECT_TOPIC = 'rename project topic'
 # Diff screens:
-SELECT_PATCHSETS = 'select patchsets'
+# SELECT_PATCHSETS = 'select patchsets'
 NEXT_SELECTABLE = 'next selectable'
 PREV_SELECTABLE = 'prev selectable'
 NEXT_PATCHSET = 'next patchset'
@@ -144,7 +144,7 @@ DEFAULT_KEYMAP = {
     REMOVE_PROJECT_TOPIC: [['T', 'D']],
     RENAME_PROJECT_TOPIC: [['T', 'r']],
 
-    SELECT_PATCHSETS: 'p',
+    # SELECT_PATCHSETS: 'p',
     NEXT_SELECTABLE: 'tab',
     PREV_SELECTABLE: 'shift tab',
     NEXT_PATCHSET: '>',
