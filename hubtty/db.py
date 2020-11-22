@@ -92,6 +92,11 @@ hashtag_table = Table(
     Column('key', Integer, primary_key=True),
     Column('change_key', Integer, ForeignKey("change.key"), index=True),
     Column('name', String(length=255), index=True, nullable=False),
+    Column('node_id', String(length=255), index=True, nullable=False),
+    Column('url', String(length=255), index=True, nullable=False),
+    Column('color', String(length=255), index=True, nullable=False),
+    Column('default', Boolean, index=True, nullable=False),
+    Column('description', String(length=255), index=True, nullable=False),
     )
 commit_table = Table(
     'commit', metadata,
@@ -252,9 +257,15 @@ class Project(object):
         return b
 
 class Hashtag(object):
-    def __init__(self, change, name):
+    def __init__(self, change, hashtag, node_id='', url='', color='', default=False,
+                 description=''):
         self.change_key = change.key
-        self.name = name
+        self.name = hashtag['name']
+        self.node_id = hashtag['node_id']
+        self.url = hashtag['url']
+        self.color = hashtag['color']
+        self.default = hashtag['default']
+        self.description = hashtag['description']
 
 class Branch(object):
     def __init__(self, project, name):

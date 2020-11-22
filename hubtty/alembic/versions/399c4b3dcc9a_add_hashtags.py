@@ -23,6 +23,11 @@ def upgrade():
     sa.Column('key', sa.Integer(), nullable=False),
     sa.Column('change_key', sa.Integer(), sa.ForeignKey('change.key'), index=True),
     sa.Column('name', sa.String(length=255), index=True, nullable=False),
+    sa.Column('description', sa.String(length=255), index=True, nullable=False),
+    sa.Column('url', sa.String(length=255), index=True, nullable=False),
+    sa.Column('node_id', sa.String(length=255), index=True, nullable=False),
+    sa.Column('color', sa.String(length=255), index=True, nullable=False),
+    sa.Column('default', sa.Boolean, index=True, nullable=False),
     sa.PrimaryKeyConstraint('key')
     )
 
