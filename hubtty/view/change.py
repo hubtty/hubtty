@@ -808,7 +808,12 @@ class ChangeView(urwid.WidgetWrap):
                 self.listbox.body.remove(row)
                 del self.message_rows[key]
                 listbox_index -= 1
-            # self._updateTestResults(change, result_systems)
+            self._updateTestResults(change, result_systems)
+
+    def _add_link(self, name, url):
+        link = mywid.Link('{:<42}'.format(name), 'link', 'focused-link')
+        urwid.connect_signal(link, 'selected', lambda link:self.app.openURL(url))
+        return link
 
     def _updateTestResults(self, change, result_systems):
         text = []
@@ -820,11 +825,9 @@ class ChangeView(urwid.WidgetWrap):
         commit = change.commits[-1]
         for check in commit.checks:
             # link checker name/url, color result, in time
-            link = mywid.Link('{:<42}'.format(check.checker.name), 'link', 'focused-link')
-            urwid.connect_signal(link, 'selected', lambda link:self.app.openURL(check.url))
             color = 'check-%s' % check.state
-            result = (color, check.state)
-            line = [link, result]
+            result = (color, check.message)
+            line = [self._add_link(check.checker.name, check.url), result]
             if check.finished and check.started:
                 line.append(' in %s' % (check.finished-check.started))
             line.append('\n')
