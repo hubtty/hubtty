@@ -551,39 +551,38 @@ class SyncChangeTask(Task):
             return True
         return False
 
-    def _updateChecks(self, session, change, revision, remote_checks_data):
+    def _updateChecks(self, session, commit, remote_checks_data):
         # Called from run inside of db transaction
-        local_checks = {c.checker.uuid: c for c in revision.checks}
-        for checks_data in remote_checks_data:
-            uuid = checks_data['checker_uuid']
-            name = checks_data['checker_name']
-            status = checks_data['checker_status']
+        local_checks = {c.checker.uuid: c for c in commit.checks}
+        for checks_data in remote_checks_data['statuses']:
+            uuid = checks_data['id']
+            name = checks_data['context']
+            state = checks_data['state']
             checker = session.getCheckerByUUID(uuid)
             if checker is None:
                 self.log.info("Creating checker %s", uuid)
-                checker = session.createChecker(uuid, name, status)
+                checker = session.createChecker(uuid, name, state)
             checker.name = name
-            checker.status = status
-            checker.blocking = ' '.join(checks_data['blocking'])
+            checker.status = state
+            # TODO(mandre) how do we get this from GH API?
+            # checker.blocking = ' '.join(checks_data['blocking'])
             check = local_checks.get(uuid)
-            updated = dateutil.parser.parse(checks_data['updated'])
-            state = checks_data['state']
+            updated = dateutil.parser.parse(checks_data['updated_at'])
             if check is None:
-                created = dateutil.parser.parse(checks_data['created'])
-                self.log.info("Creating check %s on revision %s", uuid, revision.key)
-                check = revision.createCheck(checker,
-                                             state,
-                                             created, updated)
+                created = dateutil.parser.parse(checks_data['created_at'])
+                self.log.info("Creating check %s on commit %s", uuid, commit.key)
+                check = commit.createCheck(checker, state, created, updated)
             check.updated = updated
             check.state = state
-            check.url = checks_data.get('url')
-            check.message = checks_data.get('message')
-            started = checks_data.get('started')
-            if started:
-                check.started = dateutil.parser.parse(started)
-            finished = checks_data.get('finished')
-            if finished:
-                check.finished = dateutil.parser.parse(finished)
+            check.url = checks_data.get('target_url')
+            check.message = checks_data.get('description')
+            # TODO(mandre) Github API doesn't expose this information
+            # started = checks_data.get('started')
+            # if started:
+            #     check.started = dateutil.parser.parse(started)
+            # finished = checks_data.get('finished')
+            # if finished:
+            #     check.finished = dateutil.parser.parse(finished)
 
     def run(self, sync):
         start_time = time.time()
@@ -617,12 +616,10 @@ class SyncChangeTask(Task):
         #         self.change_id, remote_commit))
         #     remote_revision['_hubtty_remote_robot_comments_data'] = remote_robot_comments_data
 
-        #     if sync.checks_plugin:
-        #         remote_checks_data = sync.get('changes/%s/revisions/%s/checks' % (self.change_id, remote_commit))
-        #         if remote_checks_data is None:
-        #             sync.checks_plugin = False
-        #         else:
-        #             remote_revision['_hubtty_remote_checks_data'] = remote_checks_data
+        project_name = remote_change['base']['repo']['full_name']
+
+        remote_checks_data = sync.get('repos/%s/status/%s' % (project_name, remote_commits[-1]['sha']))
+        remote_commits[-1]['_hubtty_remote_checks_data'] = remote_checks_data
 
         fetches = collections.defaultdict(list)
         parent_commits = set()
@@ -631,12 +628,10 @@ class SyncChangeTask(Task):
             account = session.getAccountByID(remote_change['user']['id'],
                                              username=remote_change['user'].get('login'))
             if not change:
-                project = session.getProjectByName(remote_change['base']['repo']['full_name'])
+                project = session.getProjectByName(project_name)
                 if not project:
-                    self.log.debug("Project %s unknown while syncing change" % (
-                        remote_change['base']['repo']['full_name'],))
-                    remote_project = sync.get('repos/%s' % (
-                        remote_change['base']['repo']['full_name'],))
+                    self.log.debug("Project %s unknown while syncing change" % (project_name,))
+                    remote_project = sync.get('repos/%s' % (project_name,))
                     if remote_project:
                         project = session.createProject(
                             remote_project['full_name'],
@@ -644,9 +639,7 @@ class SyncChangeTask(Task):
                         self.log.info("Created project %s", project.name)
                         self.results.append(ProjectAddedEvent(project))
                         sync.submitTask(SyncProjectBranchesTask(project.name, self.priority))
-                change_id = '/'.join([
-                    remote_change['base']['repo']['full_name'], 'pulls',
-                    str(remote_change['number'])])
+                change_id = '/'.join([project_name, 'pulls', str(remote_change['number'])])
                 created = dateutil.parser.parse(remote_change['created_at'])
                 updated = dateutil.parser.parse(remote_change['updated_at'])
                 change = project.createChange(remote_change['id'], account,
@@ -760,8 +753,8 @@ class SyncChangeTask(Task):
             #             else:
             #                 if comment.author != account:
             #                     comment.author = account
-            #     if remote_revision.get('_hubtty_remote_checks_data'):
-            #         self._updateChecks(session, change, revision, remote_revision['_hubtty_remote_checks_data'])
+                if remote_commit.get('_hubtty_remote_checks_data'):
+                    self._updateChecks(session, commit, remote_commit['_hubtty_remote_checks_data'])
             # # End revisions
             # new_message = False
             # for remote_message in remote_change.get('messages', []):
@@ -1379,7 +1372,6 @@ class Sync(object):
                                             requests.utils.default_user_agent())
         self.offline = False
         self.account_id = None
-        self.checks_plugin = True
         self.app = app
         self.log = logging.getLogger('hubtty.sync')
         self.queue = MultiQueue([HIGH_PRIORITY, NORMAL_PRIORITY, LOW_PRIORITY])
