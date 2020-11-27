@@ -607,11 +607,14 @@ class SyncChangeTask(Task):
         remote_change = sync.get('repos/%s' % self.change_id)
         remote_commits = sync.get('repos/%s/commits' % self.change_id)
         remote_pr_comments = sync.get('repos/%s/comments' % self.change_id)
+        remote_pr_reviews = sync.get('repos/%s/reviews' % self.change_id)
 
         # Perform subqueries this task will need outside of the db session
         for remote_commit in remote_commits:
             remote_comments_data = [comment for comment in remote_pr_comments if comment['original_commit_id'] == remote_commit['sha']]
             remote_commit['_hubtty_remote_comments_data'] = remote_comments_data
+            remote_reviews_data = [review for review in remote_pr_reviews if review['commit_id'] == remote_commit['sha']]
+            remote_commit['_hubtty_remote_reviews_data'] = remote_reviews_data
             # remote_robot_comments_data = sync.get('changes/%s/revisions/%s/robotcomments' % (
             #     self.change_id, remote_commit))
             # remote_revision['_hubtty_remote_robot_comments_data'] = remote_robot_comments_data
@@ -752,34 +755,35 @@ class SyncChangeTask(Task):
                         if comment.author != account:
                             comment.author = account
 
-            if remote_commit.get('_hubtty_remote_checks_data'):
-                self._updateChecks(session, commit, remote_commit['_hubtty_remote_checks_data'])
-            # # End revisions
-            # new_message = False
-            # for remote_message in remote_change.get('messages', []):
-            #     if 'author' in remote_message:
-            #         account = session.getAccountByID(remote_message['author']['_account_id'],
-            #                                          name=remote_message['author'].get('name'),
-            #                                          username=remote_message['author'].get('username'),
-            #                                          email=remote_message['author'].get('email'))
-            #         if account.username != app.config.username:
-            #             new_message = True
-            #     else:
-            #         account = session.getSystemAccount()
-            #     message = session.getMessageByID(remote_message['id'])
-            #     if not message:
-            #         revision = session.getCommitByNumber(change, remote_message.get('_revision_number', 1))
-            #         if revision:
-            #             # Normalize date -> created
-            #             created = dateutil.parser.parse(remote_message['date'])
-            #             message = revision.createMessage(remote_message['id'], account, created,
-            #                                          remote_message['message'])
-            #             self.log.info("Created new review message %s for revision %s in local DB.", message.key, revision.key)
-            #         else:
-            #             self.log.info("Unable to create new review message for revision %s because it is not in local DB (draft?).", remote_message.get('_revision_number'))
-            #     else:
-            #         if message.author != account:
-            #             message.author = account
+                # Commit checks
+                if remote_commit.get('_hubtty_remote_checks_data'):
+                    self._updateChecks(session, commit, remote_commit['_hubtty_remote_checks_data'])
+
+                # Commit reviews
+                new_message = False
+                for remote_review in remote_commit.get('_hubtty_remote_reviews_data', []):
+                    self.log.info("New review comment %s", remote_review)
+                    if 'user' in remote_review:
+                        account = session.getAccountByID(remote_review['user']['id'],
+                                                        username=remote_review['user'].get('login'))
+                        if account.username != app.config.username:
+                            new_message = True
+                    else:
+                        account = session.getSystemAccount()
+                    message = session.getMessageByID(remote_review['id'])
+                    if not message:
+                        commit = session.getCommitBySha(remote_review['commit_id'])
+                        if commit:
+                            # Normalize date -> created
+                            created = dateutil.parser.parse(remote_review['submitted_at'])
+                            message = commit.createMessage(remote_review['id'], account, created,
+                                                        remote_review['body'])
+                            self.log.info("Created new review message %s for commit %s in local DB.", message.key, commit.key)
+                        else:
+                            self.log.info("Unable to create new review message for commit %s because it is not in local DB (draft?).", remote_review.get('_revision_number'))
+                    else:
+                        if message.author != account:
+                            message.author = account
             # remote_approval_entries = {}
             # remote_label_entries = {}
             # user_voted = False
