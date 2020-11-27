@@ -606,15 +606,15 @@ class SyncChangeTask(Task):
         app = sync.app
         remote_change = sync.get('repos/%s' % self.change_id)
         remote_commits = sync.get('repos/%s/commits' % self.change_id)
-        # remote_pr_comments = sync.get('repos/%s/comments' % self.change_id)
+        remote_pr_comments = sync.get('repos/%s/comments' % self.change_id)
 
         # Perform subqueries this task will need outside of the db session
-        # for remote_commit, remote_revision in remote_change.get('revisions', {}).items():
-        #     remote_comments_data = sync.get('changes/%s/revisions/%s/comments' % (self.change_id, remote_commit))
-        #     remote_revision['_hubtty_remote_comments_data'] = remote_comments_data
-        #     remote_robot_comments_data = sync.get('changes/%s/revisions/%s/robotcomments' % (
-        #         self.change_id, remote_commit))
-        #     remote_revision['_hubtty_remote_robot_comments_data'] = remote_robot_comments_data
+        for remote_commit in remote_commits:
+            remote_comments_data = [comment for comment in remote_pr_comments if comment['original_commit_id'] == remote_commit['sha']]
+            remote_commit['_hubtty_remote_comments_data'] = remote_comments_data
+            # remote_robot_comments_data = sync.get('changes/%s/revisions/%s/robotcomments' % (
+            #     self.change_id, remote_commit))
+            # remote_revision['_hubtty_remote_robot_comments_data'] = remote_robot_comments_data
 
         project_name = remote_change['base']['repo']['full_name']
 
@@ -721,39 +721,39 @@ class SyncChangeTask(Task):
                                                 file.get('previous_filename'),
                                                 inserted, deleted)
 
-            #     remote_comments_items = list(remote_revision['_hubtty_remote_comments_data'].items())
-            #     remote_robot_comments_items = list(remote_revision.get('_hubtty_remote_robot_comments_data', {}).items())
-            #     for remote_file, remote_comments in itertools.chain(remote_comments_items, remote_robot_comments_items):
-            #         for remote_comment in remote_comments:
-            #             account = session.getAccountByID(remote_comment['author']['_account_id'],
-            #                                              name=remote_comment['author'].get('name'),
-            #                                              username=remote_comment['author'].get('username'),
-            #                                              email=remote_comment['author'].get('email'))
-            #             comment = session.getCommentByID(remote_comment['id'])
-            #             if not comment:
-            #                 # Normalize updated -> created
-            #                 created = dateutil.parser.parse(remote_comment['updated'])
-            #                 parent = False
-            #                 if remote_comment.get('side', '') == 'PARENT':
-            #                     parent = True
-            #                 fileobj = revision.getFile(remote_file)
-            #                 if fileobj is None:
-            #                     fileobj = revision.createFile(remote_file, 'M')
-            #                 comment = fileobj.createComment(remote_comment['id'], account,
-            #                                                 remote_comment.get('in_reply_to'),
-            #                                                 created,
-            #                                                 parent, remote_comment.get('line'),
-            #                                                 remote_comment['message'],
-            #                                                 robot_id = remote_comment.get('robot_id'),
-            #                                                 robot_run_id = remote_comment.get('robot_run_id'),
-            #                                                 url = remote_comment.get('url'))
-            #                 self.log.info("Created new comment %s for revision %s in local DB.",
-            #                               comment.key, revision.key)
-            #             else:
-            #                 if comment.author != account:
-            #                     comment.author = account
-                if remote_commit.get('_hubtty_remote_checks_data'):
-                    self._updateChecks(session, commit, remote_commit['_hubtty_remote_checks_data'])
+                remote_comments_items = remote_commit['_hubtty_remote_comments_data']
+                # remote_robot_comments_items = list(remote_commit.get('_hubtty_remote_robot_comments_data', {}).items())
+                # for remote_file, remote_comments in itertools.chain(remote_comments_items, remote_robot_comments_items):
+
+                for remote_comment in remote_comments_items:
+                    account = session.getAccountByID(remote_comment['user']['id'],
+                                                        username=remote_comment['user'].get('login'))
+                    comment = session.getCommentByID(remote_comment['id'])
+                    if not comment:
+                        # Normalize updated -> created
+                        created = dateutil.parser.parse(remote_comment['updated_at'])
+                        parent = False
+                        if remote_comment.get('side', '') == 'PARENT':
+                            parent = True
+                        fileobj = commit.getFile(remote_comment['path'])
+                        if fileobj is None:
+                            fileobj = commit.createFile(remote_comment['path'], 'M')
+                        comment = fileobj.createComment(remote_comment['id'], account,
+                                                        remote_comment.get('in_reply_to_id'),
+                                                        created,
+                                                        parent, remote_comment.get('line'),
+                                                        remote_comment['body'],
+                                                        robot_id = remote_comment.get('robot_id'),
+                                                        robot_run_id = remote_comment.get('robot_run_id'),
+                                                        url = remote_comment.get('html_url'))
+                        self.log.info("Created new comment %s for revision %s in local DB.",
+                                      comment.key, commit.key)
+                    else:
+                        if comment.author != account:
+                            comment.author = account
+
+            if remote_commit.get('_hubtty_remote_checks_data'):
+                self._updateChecks(session, commit, remote_commit['_hubtty_remote_checks_data'])
             # # End revisions
             # new_message = False
             # for remote_message in remote_change.get('messages', []):
