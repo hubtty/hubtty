@@ -911,7 +911,7 @@ class DatabaseSession(object):
 
     def getChangeByID(self, id):
         try:
-            return self.session().query(Change).filter_by(id=id).one()
+            return self.session().query(Change).filter_by(change_id=id).one()
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 

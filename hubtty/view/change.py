@@ -672,7 +672,7 @@ class ChangeView(urwid.WidgetWrap):
             self.app.status.update(title=self.title)
             self.project_key = change.project.key
             self.project_name = change.project.name
-            self.change_rest_id = change.id
+            self.change_rest_id = change.change_id
             if change.owner:
                 self.owner_email = change.owner.email
             else:
