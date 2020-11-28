@@ -239,8 +239,9 @@ class ReviewButton(mywid.FixedButton):
 
     def closeReview(self, upload, submit):
         approvals, message = self.dialog.getValues()
-        self.change_view.saveReview(self.commit_row.commit_key, approvals,
-                                    message, upload, submit)
+        # TODO(mandre) uncomment once implemented
+        # self.change_view.saveReview(self.commit_row.commit_key, approvals,
+        #                             message, upload, submit)
         self.change_view.app.backScreen()
 
 class CommitRow(urwid.WidgetWrap):
@@ -281,7 +282,7 @@ class CommitRow(urwid.WidgetWrap):
         table = urwid.Padding(table, width='pack')
 
         focus_map={'revision-button': 'focused-revision-button'}
-        # self.review_button = ReviewButton(self)
+        self.review_button = ReviewButton(self)
         buttons = [mywid.FixedButton(('revision-button', "Diff"),
                                      on_press=self.diff),
                    mywid.FixedButton(('revision-button', "Local Checkout"),
@@ -1181,7 +1182,8 @@ class ChangeView(urwid.WidgetWrap):
         row = self.commit_rows[self.last_commit_key]
         message = reviewkey.get('message', '')
         submit = reviewkey.get('submit', False)
-        self.saveReview(row.commit_key, approvals, message, True, submit)
+        # TODO(mandre) uncomment once implemented
+        # self.saveReview(row.commit_key, approvals, message, True, submit)
 
     def saveReview(self, commit_key, approvals, message, upload, submit):
         message_keys = self.app.saveReviews([commit_key], approvals,
