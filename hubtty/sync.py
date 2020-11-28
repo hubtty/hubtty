@@ -608,6 +608,9 @@ class SyncChangeTask(Task):
         remote_commits = sync.get('repos/%s/commits' % self.change_id)
         remote_pr_comments = sync.get('repos/%s/comments' % self.change_id)
         remote_pr_reviews = sync.get('repos/%s/reviews' % self.change_id)
+        remote_issue_comments = sync.get(('repos/%s/comments'
+                                          % self.change_id).replace('/pulls/',
+                                                                    '/issues/'))
 
         # Perform subqueries this task will need outside of the db session
         for remote_commit in remote_commits:
@@ -618,6 +621,9 @@ class SyncChangeTask(Task):
             # remote_robot_comments_data = sync.get('changes/%s/revisions/%s/robotcomments' % (
             #     self.change_id, remote_commit))
             # remote_revision['_hubtty_remote_robot_comments_data'] = remote_robot_comments_data
+
+        # Attach issue comments to the last known commit of the PR
+        remote_commits[-1]['_hubtty_remote_reviews_data'].extend(remote_issue_comments)
 
         project_name = remote_change['base']['repo']['full_name']
 
@@ -772,16 +778,13 @@ class SyncChangeTask(Task):
                         account = session.getSystemAccount()
                     message = session.getMessageByID(remote_review['id'])
                     if not message:
-                        commit = session.getCommitBySha(remote_review['commit_id'])
-                        if commit:
-                            # Normalize date -> created
-                            created = dateutil.parser.parse(remote_review['submitted_at'])
-                            message = commit.createMessage(remote_review['id'], account, created,
-                                                        remote_review['body'])
-                            self.log.info("Created new review message %s for commit %s in local DB.", message.key, commit.key)
-                        else:
-                            self.log.info("Unable to create new review message for commit %s because it is not in local DB (draft?).", remote_review.get('_revision_number'))
+                        # Normalize date -> created
+                        created = dateutil.parser.parse(remote_review.get('submitted_at', remote_review.get('created_at')))
+                        message = commit.createMessage(remote_review['id'], account, created,
+                                                    remote_review['body'])
+                        self.log.info("Created new review message %s for commit %s in local DB.", message.key, commit.key)
                     else:
+                        # TODO(mandre) update message if it has changed on github
                         if message.author != account:
                             message.author = account
             # remote_approval_entries = {}
