@@ -448,7 +448,7 @@ class ChangeMessageBox(mywid.HyperText):
             comment_text = commentlink.run(self.app, comment_text)
 
         inline_comments = {}
-        for revno, commit in enumerate(change.commits):
+        for commit in change.commits:
             for file in commit.files:
                 comments = [c for c in file.comments
                             if c.author.id == message.author.id
@@ -456,10 +456,7 @@ class ChangeMessageBox(mywid.HyperText):
                 for comment in comments:
                     path = comment.file.path
                     inline_comments.setdefault(path, [])
-                    comment_ps = revno + 1
-                    if comment_ps == message.commit.number:
-                        comment_ps = None
-                    inline_comments[path].append((comment_ps or 0, comment.line or 0, comment.message))
+                    inline_comments[path].append((message.commit.sha[0:7], comment.line or 0, comment.message))
         for v in inline_comments.values():
             v.sort()
 
@@ -467,10 +464,10 @@ class ChangeMessageBox(mywid.HyperText):
             comment_text.append(u'\n')
         for key, value in inline_comments.items():
             comment_text.append(('filename-inline-comment', u'%s' % key))
-            for patchset, line, comment in value:
+            for sha, line, comment in value:
                 location_str = ''
-                if patchset:
-                    location_str += "PS%i" % patchset
+                if sha:
+                    location_str += sha
                     if line: location_str += ", "
                 if line:
                     location_str += str(line)
@@ -753,7 +750,7 @@ class ChangeView(urwid.WidgetWrap):
             # may later contain the vote table and change header), so
             # keep track of the index separate from the loop.
             listbox_index = self.listbox_patchset_start
-            for revno, commit in enumerate(change.commits):
+            for commit in change.commits:
                 self.last_commit_key = commit.key
                 row = self.commit_rows.get(commit.key)
                 if not row:
