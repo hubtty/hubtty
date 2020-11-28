@@ -244,7 +244,7 @@ class SyncProjectListTask(Task):
             remote = sync.get('user/repos?page=%d&per_page=100' % page)
             for r in remote:
                 remote_keys.add(r['full_name'])
-                remote_desc[r['full_name']] = r.get('description', '')
+                remote_desc[r['full_name']] = (r.get('description', '') or '').replace('\r','')
             page = page + 1
 
         with app.db.getSession() as session:
@@ -674,7 +674,7 @@ class SyncChangeTask(Task):
                                               remote_change['base']['ref'],
                                               self.change_id,
                                               remote_change['title'],
-                                              remote_change['body'],
+                                              remote_change.get('body','').replace('\r',''),
                                               created, updated,
                                               remote_change['state'],
                                               remote_change['additions'],
@@ -710,7 +710,7 @@ class SyncChangeTask(Task):
                 if not commit:
                     # FIXME(mandre) remove revision number, fetch_auth and fetch_ref
                     commit = change.createCommit(0,
-                                                 remote_commit['commit']['message'],
+                                                 remote_commit['commit']['message'].replace('\r',''),
                                                  remote_commit['sha'],
                                                  remote_commit['parents'][0]['sha'],
                                                  False, 'fetch_ref')
@@ -770,7 +770,7 @@ class SyncChangeTask(Task):
                                                         remote_comment.get('in_reply_to_id'),
                                                         created,
                                                         parent, remote_comment.get('line'),
-                                                        remote_comment['body'],
+                                                        remote_comment.get('body','').replace('\r',''),
                                                         robot_id = remote_comment.get('robot_id'),
                                                         robot_run_id = remote_comment.get('robot_run_id'),
                                                         url = remote_comment.get('html_url'))
@@ -800,7 +800,7 @@ class SyncChangeTask(Task):
                         # Normalize date -> created
                         created = dateutil.parser.parse(remote_review.get('submitted_at', remote_review.get('created_at')))
                         message = commit.createMessage(remote_review['id'], account, created,
-                                                    remote_review['body'])
+                                                    remote_review.get('body','').replace('\r',''))
                         self.log.info("Created new review message %s for commit %s in local DB.", message.key, commit.key)
                     else:
                         # TODO(mandre) update message if it has changed on github
