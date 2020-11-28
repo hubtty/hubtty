@@ -426,7 +426,6 @@ class ChangeMessageBox(mywid.HyperText):
                 reviewer_string = message.author_name
 
         text = [(name_style, reviewer_string),
-                (header_style, ': '+lines.pop(0)),
                 (header_style,
                  created.strftime(' (%Y-%m-%d %H:%M:%S%z)'))]
         if message.draft and not message.pending:
@@ -441,6 +440,7 @@ class ChangeMessageBox(mywid.HyperText):
             text.append(link)
 
         if lines and lines[-1]:
+            lines.insert(0, '')
             lines.append('')
         comment_text = ['\n'.join(lines)]
         for commentlink in self.app.config.commentlinks:
