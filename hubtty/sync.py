@@ -205,6 +205,25 @@ class SyncOwnAccountTask(Task):
             session.setOwnAccount(account)
         app.own_account_id = remote['id']
 
+class SyncAccountsTask(Task):
+    def __repr__(self):
+        return '<SyncAccountsTask>'
+
+    def __eq__(self, other):
+        if other.__class__ == self.__class__:
+            return True
+        return False
+
+    def run(self, sync):
+        app = sync.app
+        with app.db.getSession() as session:
+            for a in session.getAccounts():
+                remote = sync.get('users/' + a.username)
+                account = session.getAccountByID(remote['id'],
+                                                 remote.get('name'),
+                                                 remote.get('login'),
+                                                 remote.get('email'))
+
 class SyncProjectListTask(Task):
     def __repr__(self):
         return '<SyncProjectListTask>'
@@ -1390,6 +1409,7 @@ class Sync(object):
             # self.submitTask(UploadReviewsTask(HIGH_PRIORITY))
             self.submitTask(SyncProjectListTask(HIGH_PRIORITY))
             self.submitTask(SyncSubscribedProjectsTask(NORMAL_PRIORITY))
+            self.submitTask(SyncAccountsTask(NORMAL_PRIORITY))
             self.submitTask(SyncSubscribedProjectBranchesTask(LOW_PRIORITY))
             self.submitTask(SyncOutdatedChangesTask(LOW_PRIORITY))
             # self.submitTask(PruneDatabaseTask(self.app.config.expire_age, LOW_PRIORITY))

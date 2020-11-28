@@ -1048,6 +1048,9 @@ class DatabaseSession(object):
     def getPendingCommitMessages(self):
         return self.session().query(Commit).filter_by(pending_message=True).all()
 
+    def getAccounts(self):
+        return self.session().query(Account).all()
+
     def getAccountByID(self, id, name=None, username=None, email=None):
         try:
             account = self.session().query(Account).filter_by(id=id).one()
