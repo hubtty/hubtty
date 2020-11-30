@@ -6,3 +6,4 @@ doc/build
 AUTHORS
 ChangeLog
 build
+/venv
