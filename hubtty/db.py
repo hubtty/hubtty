@@ -63,7 +63,7 @@ change_table = Table(
     Column('key', Integer, primary_key=True),
     Column('project_key', Integer, ForeignKey("project.key"), index=True),
     Column('id', String(255), index=True, unique=True, nullable=False),
-    Column('number', Integer, index=True, unique=True, nullable=False),
+    Column('number', Integer, index=True, nullable=False),
     Column('branch', String(255), index=True, nullable=False),
     Column('change_id', String(255), index=True, nullable=False),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
@@ -929,12 +929,6 @@ class DatabaseSession(object):
     def getChangesByChangeID(self, change_id):
         try:
             return self.session().query(Change).filter_by(change_id=change_id)
-        except sqlalchemy.orm.exc.NoResultFound:
-            return None
-
-    def getChangeByNumber(self, number):
-        try:
-            return self.session().query(Change).filter_by(number=number).one()
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 

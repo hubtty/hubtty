@@ -545,9 +545,7 @@ class App(object):
         if not (number or changeid):
             return
         with self.db.getSession() as session:
-            if number:
-                changes = [session.getChangeByNumber(number)]
-            elif changeid:
+            if changeid:
                 changes = session.getChangesByChangeID(changeid)
             change_keys = [c.key for c in changes if c]
             restids = [c.id for c in changes if c]
@@ -571,9 +569,7 @@ class App(object):
                 # Remove "syncing..." popup
                 self.backScreen()
             with self.db.getSession() as session:
-                if number:
-                    changes = [session.getChangeByNumber(number)]
-                elif changeid:
+                if changeid:
                     changes = session.getChangesByChangeID(changeid)
                 change_keys = [c.key for c in changes if c]
         elif restids:
