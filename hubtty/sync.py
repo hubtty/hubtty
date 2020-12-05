@@ -255,7 +255,7 @@ class SyncProjectListTask(Task):
 
             for name in local_keys-remote_keys:
                 self.log.info("Deleted project %s", name)
-                local[name].delete()
+                session.delete(local[name])
 
             for name in remote_keys-local_keys:
                 project = session.createProject(name,
