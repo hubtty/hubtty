@@ -941,7 +941,7 @@ class SyncChangeTask(Task):
             # remote_hashtags = remote_change.get('hashtags', [])
             # change.setHashtags(remote_hashtags)
 
-            # change.outdated = False
+            change.outdated = False
         for url, refs in fetches.items():
             self.log.debug("Fetching from %s with refs %s", url, refs)
             try:
