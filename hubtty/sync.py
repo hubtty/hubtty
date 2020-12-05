@@ -698,8 +698,12 @@ class SyncChangeTask(Task):
             else:
                 change.starred = False
             change.title = remote_change['title']
+            change.body = remote_change.get('body','').replace('\r','')
             change.updated = dateutil.parser.parse(remote_change['updated_at'])
-
+            change.additions = remote_change['additions']
+            change.deletions = remote_change['deletions']
+            change.merged = remote_change['merged']
+            change.mergeable = remote_change.get('mergeable') or True
 
             repo = gitrepo.get_repo(change.project.name, app.config)
             new_commit = False
