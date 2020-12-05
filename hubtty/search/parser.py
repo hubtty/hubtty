@@ -279,15 +279,16 @@ def SearchParser():
             s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
             p[0] = hubtty.db.change_table.c.key.in_(s)
         elif p[2] == 'open':
-            p[0] = hubtty.db.change_table.c.status.notin_(['MERGED', 'ABANDONED'])
+            p[0] = hubtty.db.change_table.c.status == 'open'
         elif p[2] == 'closed':
-            p[0] = hubtty.db.change_table.c.status.in_(['MERGED', 'ABANDONED'])
+            p[0] = hubtty.db.change_table.c.status == 'closed'
         elif p[2] == 'submitted':
             p[0] = hubtty.db.change_table.c.status == 'SUBMITTED'
         elif p[2] == 'merged':
-            p[0] = hubtty.db.change_table.c.status == 'MERGED'
+            p[0] = hubtty.db.change_table.c.merged == True
         elif p[2] == 'abandoned':
-            p[0] = hubtty.db.change_table.c.status == 'ABANDONED'
+            p[0] = (hubtty.db.change_table.c.status == 'closed' and
+                    hubtty.db.change_table.c.merged == False)
         elif p[2] == 'owner':
             p[0] = hubtty.db.account_table.c.id == account_id
         elif p[2] == 'starred':
@@ -332,12 +333,13 @@ def SearchParser():
 
     def p_status_term(p):
         '''status_term : OP_STATUS string'''
-        if p[2] == 'open':
-            p[0] = hubtty.db.change_table.c.status.notin_(['MERGED', 'ABANDONED'])
-        elif p[2] == 'closed':
-            p[0] = hubtty.db.change_table.c.status.in_(['MERGED', 'ABANDONED'])
+        if p[2] == 'merged':
+            p[0] = hubtty.db.change_table.c.merged == True
+        elif p[2] == 'abandoned':
+            p[0] = (hubtty.db.change_table.c.status == 'closed'
+                    and hubtty.db.change_table.c.merged == False)
         else:
-            p[0] = hubtty.db.change_table.c.status == p[2].upper()
+            p[0] = hubtty.db.change_table.c.status == p[2]
 
     def p_limit_term(p):
         '''limit_term : OP_LIMIT NUMBER'''

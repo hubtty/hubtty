@@ -881,9 +881,9 @@ class ChangeView(urwid.WidgetWrap):
             if parent != parent.change.commits[-1]:
                 title += ' [OUTDATED]'
                 show_merged = True
-            if parent.change.status == 'ABANDONED':
+            if parent.change.status == 'closed' and not parent.change.merged:
                 title += ' [ABANDONED]'
-            if show_merged or parent.change.status != 'MERGED':
+            if show_merged or parent.change.merged:
                 parents[parent.change.key] = title
         self._updateDependenciesWidget(parents,
                                        self.depends_on, self.depends_on_rows,
@@ -893,9 +893,7 @@ class ChangeView(urwid.WidgetWrap):
         children = {}
         children.update((r.change.key, r.change.title)
                         for r in session.getCommitsByParent([commit.sha for commit in change.commits])
-                        if (r.change.status != 'MERGED' and
-                            r.change.status != 'ABANDONED' and
-                            r == r.change.commits[-1]))
+                        if (r.change.status == 'open' and r == r.change.commits[-1]))
         self._updateDependenciesWidget(children,
                                        self.needed_by, self.needed_by_rows,
                                        header='Needed by:')

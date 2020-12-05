@@ -45,8 +45,6 @@ LOW_PRIORITY=2
 
 TIMEOUT=30
 
-CLOSED_STATUSES = ['MERGED', 'ABANDONED']
-
 class OfflineError(Exception):
     pass
 
@@ -455,7 +453,7 @@ class SyncQueriedChangesTask(Task):
         for c in changes:
             # For now, just sync open changes or changes already
             # in the db optionally we could sync all changes ever
-            if c['id'] in change_ids or (c['status'] not in CLOSED_STATUSES):
+            if c['id'] in change_ids or (c['status'] != 'closed'):
                 sync.submitTask(SyncChangeTask(c['id'], priority=self.priority))
         sync.submitTask(SetSyncQueryUpdatedTask(self.query_name, now, priority=self.priority))
 
@@ -729,7 +727,7 @@ class SyncChangeTask(Task):
             #     # TODO: handle multiple parents
             #     if commit.parent not in parent_commits:
             #         parent_commit = session.getCommitBySha(commit.parent)
-            #         if not parent_commit and change.status not in CLOSED_STATUSES:
+            #         if not parent_commit and change.status != 'closed':
             #             sync._syncChangeByCommit(commit.parent, self.priority)
             #             self.log.debug("Change %s needs parent commit %s synced" %
             #                            (change.change_id, commit.parent))
