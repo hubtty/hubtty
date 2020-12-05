@@ -339,7 +339,7 @@ Example:
 
    dashboards:
      - name: "My changes"
-       query: "owner:self status:open"
+       query: "author:self status:open"
        key: "f2"
 
 Reviewkeys

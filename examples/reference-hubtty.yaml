@@ -204,7 +204,7 @@ commentlinks:
 # where you were.
 dashboards:
   - name: "My changes"
-    query: "owner:self status:open"
+    query: "author:self status:open"
     key: "f2"
   - name: "Incoming reviews"
     query: "is:open is:reviewer"
