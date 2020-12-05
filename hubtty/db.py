@@ -71,7 +71,7 @@ change_table = Table(
     Column('body', Text, nullable=False),
     Column('created', DateTime, index=True, nullable=False),
     Column('updated', DateTime, index=True, nullable=False),
-    Column('status', String(16), index=True, nullable=False),
+    Column('state', String(16), index=True, nullable=False),
     Column('additions', Integer, nullable=False),
     Column('deletions', Integer, nullable=False),
     Column('html_url', String(255), nullable=False),
@@ -294,7 +294,7 @@ class Topic(object):
 
 class Change(object):
     def __init__(self, project, id, owner, number, branch, change_id,
-                 title, body, created, updated, status, additions, deletions,
+                 title, body, created, updated, state, additions, deletions,
                  html_url, merged, mergeable, hidden=False, reviewed=False,
                  starred=False, held=False, pending_rebase=False,
                  pending_starred=False, pending_status=False,
@@ -310,7 +310,7 @@ class Change(object):
         self.body = body
         self.created = created
         self.updated = updated
-        self.status = status
+        self.state = state
         self.additions = additions
         self.deletions = deletions
         self.html_url = html_url
@@ -678,13 +678,13 @@ mapper(Project, project_table, properties=dict(
     unreviewed_changes=relationship(Change,
                                     primaryjoin=and_(project_table.c.key==change_table.c.project_key,
                                                      change_table.c.hidden==False,
-                                                     change_table.c.status=='open',
+                                                     change_table.c.state=='open',
                                                      change_table.c.reviewed==False),
                                     order_by=change_table.c.number,
                                 ),
     open_changes=relationship(Change,
                               primaryjoin=and_(project_table.c.key==change_table.c.project_key,
-                                               change_table.c.status=='open'),
+                                               change_table.c.state=='open'),
                               order_by=change_table.c.number,
                           ),
 ))

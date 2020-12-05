@@ -146,20 +146,20 @@ class ChangeAddedEvent(UpdateEvent):
         self.change_key = change.key
         self.related_change_keys = set()
         self.review_flag_changed = True
-        self.status_changed = True
+        self.state_changed = True
         self.held_changed = False
 
 class ChangeUpdatedEvent(UpdateEvent):
     def __repr__(self):
-        return '<ChangeUpdatedEvent project_key:%s change_key:%s review_flag_changed:%s status_changed:%s>' % (
-            self.project_key, self.change_key, self.review_flag_changed, self.status_changed)
+        return '<ChangeUpdatedEvent project_key:%s change_key:%s review_flag_changed:%s state_changed:%s>' % (
+            self.project_key, self.change_key, self.review_flag_changed, self.state_changed)
 
     def __init__(self, change):
         self.project_key = change.project.key
         self.change_key = change.key
         self.related_change_keys = set()
         self.review_flag_changed = False
-        self.status_changed = False
+        self.state_changed = False
         self.held_changed = False
 
 class Task(object):
@@ -453,7 +453,7 @@ class SyncQueriedChangesTask(Task):
         for c in changes:
             # For now, just sync open changes or changes already
             # in the db optionally we could sync all changes ever
-            if c['id'] in change_ids or (c['status'] != 'closed'):
+            if c['id'] in change_ids or (c['state'] != 'closed'):
                 sync.submitTask(SyncChangeTask(c['id'], priority=self.priority))
         sync.submitTask(SetSyncQueryUpdatedTask(self.query_name, now, priority=self.priority))
 
@@ -688,9 +688,9 @@ class SyncChangeTask(Task):
             app.project_cache.clear(change.project)
             self.results.append(result)
             change.owner = account
-            if change.status != remote_change['state']:
-                change.status = remote_change['state']
-                result.status_changed = True
+            if change.state != remote_change['state']:
+                change.state = remote_change['state']
+                result.state_changed = True
             if remote_change.get('starred'):
                 change.starred = True
             else:
@@ -727,7 +727,7 @@ class SyncChangeTask(Task):
             #     # TODO: handle multiple parents
             #     if commit.parent not in parent_commits:
             #         parent_commit = session.getCommitBySha(commit.parent)
-            #         if not parent_commit and change.status != 'closed':
+            #         if not parent_commit and change.state != 'closed':
             #             sync._syncChangeByCommit(commit.parent, self.priority)
             #             self.log.debug("Change %s needs parent commit %s synced" %
             #                            (change.change_id, commit.parent))
@@ -1167,13 +1167,13 @@ class ChangeStatusTask(Task):
             change.pending_status = False
             change.pending_status_message = None
             # Inside db session for rollback
-            if change.status == 'ABANDONED':
+            if change.state == 'ABANDONED':
                 sync.post('changes/%s/abandon' % (change.id,),
                           data)
-            elif change.status == 'NEW':
+            elif change.state == 'NEW':
                 sync.post('changes/%s/restore' % (change.id,),
                           data)
-            elif change.status == 'SUBMITTED':
+            elif change.state == 'SUBMITTED':
                 sync.post('changes/%s/submit' % (change.id,), {})
             sync.submitTask(SyncChangeTask(change.id, priority=self.priority))
 
@@ -1260,7 +1260,7 @@ class UploadReviewTask(Task):
                     self.message_key))
                 return
             change = message.revision.change
-            if change.pending_status and change.status == 'SUBMITTED':
+            if change.pending_status and change.state == 'SUBMITTED':
                 submit = True
         if not change.held:
             self.log.debug("Syncing %s to find out if it should be held" % (change.id,))

@@ -19,6 +19,8 @@ from hubtty.dbsupport import sqlite_alter_columns
 
 
 def upgrade():
+    op.alter_column('change', 'status', new_column_name='state')
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         op.add_column('change', sa.Column('merged', sa.Boolean()))

@@ -687,7 +687,7 @@ class ChangeView(urwid.WidgetWrap):
             self.hashtags_label.set_text(('change-data', ' '.join([x.name for x in change.hashtags])))
             self.created_label.set_text(('change-data', str(self.app.time(change.created))))
             self.updated_label.set_text(('change-data', str(self.app.time(change.updated))))
-            self.status_label.set_text(('change-data', change.status))
+            self.status_label.set_text(('change-data', change.state))
             self.permalink_url = str(change.html_url)
             self.permalink_label.text.set_text(('change-data', self.permalink_url))
             self.pr_description.set_text('\n'.join([change.title, '', change.body]))
@@ -881,7 +881,7 @@ class ChangeView(urwid.WidgetWrap):
             if parent != parent.change.commits[-1]:
                 title += ' [OUTDATED]'
                 show_merged = True
-            if parent.change.status == 'closed' and not parent.change.merged:
+            if parent.change.state == 'closed' and not parent.change.merged:
                 title += ' [ABANDONED]'
             if show_merged or parent.change.merged:
                 parents[parent.change.key] = title
@@ -893,7 +893,7 @@ class ChangeView(urwid.WidgetWrap):
         children = {}
         children.update((r.change.key, r.change.title)
                         for r in session.getCommitsByParent([commit.sha for commit in change.commits])
-                        if (r.change.status == 'open' and r == r.change.commits[-1]))
+                        if (r.change.state == 'open' and r == r.change.commits[-1]))
         self._updateDependenciesWidget(children,
                                        self.needed_by, self.needed_by_rows,
                                        header='Needed by:')
@@ -1043,7 +1043,7 @@ class ChangeView(urwid.WidgetWrap):
         change_key = None
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
-            change.status = state
+            change.state = state
             change.pending_status = True
             change.pending_status_message = dialog.entry.edit_text
             change_key = change.key
@@ -1129,7 +1129,7 @@ class ChangeView(urwid.WidgetWrap):
         change_key = None
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
-            change.status = 'SUBMITTED'
+            change.state = 'SUBMITTED'
             change.pending_status = True
             change.pending_status_message = None
             change_key = change.key

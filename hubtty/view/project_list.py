@@ -260,7 +260,7 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
                 isinstance(event, sync.ChangeAddedEvent)
                 or
                 (isinstance(event, sync.ChangeUpdatedEvent) and
-                 (event.status_changed or event.review_flag_changed))):
+                 (event.state_changed or event.review_flag_changed))):
             self.log.debug("Ignoring refresh project list due to event %s" % (event,))
             return False
         self.log.debug("Refreshing project list due to event %s" % (event,))
