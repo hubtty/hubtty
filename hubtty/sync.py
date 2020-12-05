@@ -679,7 +679,10 @@ class SyncChangeTask(Task):
                                               remote_change['state'],
                                               remote_change['additions'],
                                               remote_change['deletions'],
-                                              remote_change['html_url'])
+                                              remote_change['html_url'],
+                                              remote_change['merged'],
+                                              (remote_change['mergeable'] or True),
+                                              )
                 self.log.info("Created new change %s in local DB.", change.change_id)
                 result = ChangeAddedEvent(change)
             else:

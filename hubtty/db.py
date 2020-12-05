@@ -86,6 +86,8 @@ change_table = Table(
     Column('pending_status_message', Text),
     Column('last_seen', DateTime, index=True),
     Column('outdated', Boolean, index=True, nullable=False),
+    Column('merged', Boolean, index=True, nullable=False),
+    Column('mergeable', Boolean, index=True, nullable=False),
     )
 hashtag_table = Table(
     'hashtag', metadata,
@@ -293,8 +295,8 @@ class Topic(object):
 class Change(object):
     def __init__(self, project, id, owner, number, branch, change_id,
                  title, body, created, updated, status, additions, deletions,
-                 html_url, hidden=False, reviewed=False, starred=False,
-                 held=False, pending_rebase=False,
+                 html_url, merged, mergeable, hidden=False, reviewed=False,
+                 starred=False, held=False, pending_rebase=False,
                  pending_starred=False, pending_status=False,
                  pending_status_message=None, pending_hashtags=False,
                  outdated=False):
@@ -322,6 +324,8 @@ class Change(object):
         self.pending_status = pending_status
         self.pending_status_message = pending_status_message
         self.outdated = outdated
+        self.merged = merged
+        self.mergeable = mergeable
 
     def getCategories(self):
         categories = set([label.category for label in self.labels])
