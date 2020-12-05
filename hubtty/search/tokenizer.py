@@ -16,7 +16,7 @@ import ply.lex as lex
 import six
 
 operators = {
-    'age': 'OP_AGE',
+    'age': 'OP_AGE', # Hubtty extension
     'recentlyseen': 'OP_RECENTLYSEEN', # Hubtty extension
     'change': 'OP_CHANGE',
     'owner': 'OP_OWNER',

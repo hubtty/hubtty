@@ -1361,15 +1361,9 @@ class PruneChangeTask(Task):
             if not change:
                 return
             repo = gitrepo.get_repo(change.project.name, app.config)
-            self.log.info("Pruning %s change %s status:%s updated:%s" % (
-                change.project.name, change.number, change.status, change.updated))
-            change_ref = None
-            for revision in change.revisions:
-                if change_ref is None:
-                    change_ref = '/'.join(revision.fetch_ref.split('/')[:-1])
-                self.log.info("Deleting %s ref %s" % (
-                    change.project.name, revision.fetch_ref))
-                repo.deleteRef(revision.fetch_ref)
+            self.log.info("Pruning %s change %s state:%s updated:%s" % (
+                change.project.name, change.number, change.state, change.updated))
+            change_ref = "pull/%s/head" % (change.number,)
             self.log.info("Deleting %s ref %s" % (
                 change.project.name, change_ref))
             try:
@@ -1417,7 +1411,7 @@ class Sync(object):
             self.submitTask(SyncAccountsTask(NORMAL_PRIORITY))
             self.submitTask(SyncSubscribedProjectBranchesTask(LOW_PRIORITY))
             self.submitTask(SyncOutdatedChangesTask(LOW_PRIORITY))
-            # self.submitTask(PruneDatabaseTask(self.app.config.expire_age, LOW_PRIORITY))
+            self.submitTask(PruneDatabaseTask(self.app.config.expire_age, LOW_PRIORITY))
             self.periodic_thread = threading.Thread(target=self.periodicSync)
             self.periodic_thread.daemon = True
             self.periodic_thread.start()
