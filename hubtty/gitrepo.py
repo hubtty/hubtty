@@ -307,7 +307,8 @@ class Repo(object):
 
     def deleteRef(self, ref):
         repo = git.Repo(self.path)
-        git.Reference.delete(repo, ref)
+        # Use force to delete even unmerged refs
+        git.Reference.delete(repo, ref, force=True)
 
     def checkout(self, ref):
         repo = git.Repo(self.path)
