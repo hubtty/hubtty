@@ -19,8 +19,7 @@ operators = {
     'age': 'OP_AGE', # Hubtty extension
     'recentlyseen': 'OP_RECENTLYSEEN', # Hubtty extension
     'change': 'OP_CHANGE',
-    'owner': 'OP_OWNER',
-    #'OP_OWNERIN', # needs local group membership
+    'author': 'OP_AUTHOR',
     'reviewer': 'OP_REVIEWER',
     #'OP_REVIEWERIN', # needs local group membership
     'commit': 'OP_COMMIT',

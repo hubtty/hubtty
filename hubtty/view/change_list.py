@@ -44,7 +44,7 @@ COLUMNS = [
     ColumnInfo('Title',   'weight',  4),
     ColumnInfo('Project', 'weight',  1),
     ColumnInfo('Branch',  'weight',  1),
-    ColumnInfo('Owner',   'weight',  1),
+    ColumnInfo('Author',  'weight',  1),
     ColumnInfo('Updated', 'given',  10),
     ColumnInfo('Size',    'given',   4),
 ]
@@ -107,7 +107,7 @@ class ChangeRow(urwid.Button, ChangeListColumns):
         self.updated = mywid.SearchableText(u'')
         self.size = mywid.SearchableText(u'', align='right')
         self.project = mywid.SearchableText(u'', wrap='clip')
-        self.owner = mywid.SearchableText(u'', wrap='clip')
+        self.author = mywid.SearchableText(u'', wrap='clip')
         self.branch = mywid.SearchableText(u'', wrap='clip')
         self.mark = False
         self.columns = urwid.Columns([], dividechars=1)
@@ -125,7 +125,7 @@ class ChangeRow(urwid.Button, ChangeListColumns):
             return True
         if self.branch.search(search, attribute):
             return True
-        if self.owner.search(search, attribute):
+        if self.author.search(search, attribute):
             return True
         if self.updated.search(search, attribute):
             return True
@@ -212,7 +212,7 @@ class ChangeRow(urwid.Button, ChangeListColumns):
         self.title.set_text(title)
         self.number.set_text(str(change.number))
         self.project.set_text(change.project.name.split('/')[-1])
-        self.owner.set_text(change.owner_name)
+        self.author.set_text(change.author_name)
         self.branch.set_text(change.branch or '')
         self.project_name = change.project.name
         # self.commit_sha = change.revisions[-1].commit
@@ -282,7 +282,7 @@ class ChangeListHeader(urwid.WidgetWrap, ChangeListColumns):
         self.updated = urwid.Text(u'Updated')
         self.size = urwid.Text(u'Size')
         self.project = urwid.Text(u'Project', wrap='clip')
-        self.owner = urwid.Text(u'Owner', wrap='clip')
+        self.author = urwid.Text(u'Author', wrap='clip')
         self.branch = urwid.Text(u'Branch', wrap='clip')
         self.columns = urwid.Columns([], dividechars=1)
         self.category_columns = []
@@ -370,11 +370,11 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
         if 'Project' not in self.required_columns and project_key is not None:
             self.enabled_columns.discard('Project')
             self.disabled_columns.add('Project')
-        if 'Owner' not in self.required_columns and 'owner:' in query:
+        if 'Author' not in self.required_columns and 'author:' in query:
             # This could be or'd with something else, but probably
             # not.
-            self.enabled_columns.discard('Owner')
-            self.disabled_columns.add('Owner')
+            self.enabled_columns.discard('Author')
+            self.disabled_columns.add('Author')
         if app.config.size_column['type'] == 'disabled':
             self.enabled_columns.discard('Size')
             self.disabled_columns.add('Size')

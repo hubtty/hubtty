@@ -79,7 +79,7 @@ def SearchParser():
         '''term : age_term
                 | recentlyseen_term
                 | change_term
-                | owner_term
+                | author_term
                 | reviewer_term
                 | commit_term
                 | project_term
@@ -131,8 +131,8 @@ def SearchParser():
         else:
             p[0] = hubtty.db.change_table.c.change_id == p[2]
 
-    def p_owner_term(p):
-        '''owner_term : OP_OWNER string'''
+    def p_author_term(p):
+        '''author_term : OP_AUTHOR string'''
         if p[2] == 'self':
             account_id = p.parser.account_id
             p[0] = hubtty.db.account_table.c.id == account_id
@@ -289,7 +289,7 @@ def SearchParser():
         elif p[2] == 'abandoned':
             p[0] = (hubtty.db.change_table.c.state == 'closed' and
                     hubtty.db.change_table.c.merged == False)
-        elif p[2] == 'owner':
+        elif p[2] == 'author':
             p[0] = hubtty.db.account_table.c.id == account_id
         elif p[2] == 'starred':
             p[0] = hubtty.db.change_table.c.starred == True

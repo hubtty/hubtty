@@ -13,6 +13,8 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+# TODO(mandre) rename revision to commits
+
 import collections
 import errno
 import logging
@@ -329,7 +331,7 @@ class SyncSubscribedProjectsTask(Task):
             t = SyncProjectTask(keys[i:i+10], self.priority)
             self.tasks.append(t)
             sync.submitTask(t)
-        # t = SyncQueriedChangesTask('owner', 'is:owner', self.priority)
+        # t = SyncQueriedChangesTask('author', 'is:author', self.priority)
         # self.tasks.append(t)
         # sync.submitTask(t)
         # t = SyncQueriedChangesTask('starred', 'is:starred', self.priority)
@@ -687,7 +689,7 @@ class SyncChangeTask(Task):
                 result = ChangeUpdatedEvent(change)
             app.project_cache.clear(change.project)
             self.results.append(result)
-            change.owner = account
+            change.author = account
             if change.state != remote_change['state']:
                 change.state = remote_change['state']
                 result.state_changed = True

@@ -553,7 +553,7 @@ class ChangeView(urwid.WidgetWrap):
         self.last_commit_key = None
         self.hide_comments = True
         self.marked_seen = False
-        self.owner_label = mywid.TextButton(u'', on_press=self.searchOwner)
+        self.author_label = mywid.TextButton(u'', on_press=self.searchAuthor)
         self.project_label = mywid.TextButton(u'', on_press=self.searchProject)
         self.branch_label = urwid.Text(u'', wrap='clip')
         self.hashtags_label = urwid.Text(u'', wrap='clip')
@@ -563,7 +563,7 @@ class ChangeView(urwid.WidgetWrap):
         self.permalink_label = mywid.TextButton(u'', on_press=self.openPermalink)
         change_info = []
         change_info_map={'change-data': 'focused-change-data'}
-        for l, v in [("Owner", urwid.Padding(urwid.AttrMap(self.owner_label, None,
+        for l, v in [("Author", urwid.Padding(urwid.AttrMap(self.author_label, None,
                                                            focus_map=change_info_map),
                                              width='pack')),
                      ("Project", urwid.Padding(urwid.AttrMap(self.project_label, None,
@@ -671,17 +671,17 @@ class ChangeView(urwid.WidgetWrap):
             self.project_key = change.project.key
             self.project_name = change.project.name
             self.change_rest_id = change.change_id
-            if change.owner:
-                self.owner_email = change.owner.email
+            if change.author:
+                self.author_login = change.author.username
             else:
-                self.owner_email = None
+                self.author_login = None
 
-            if change.owner.email:
-                owner_string = '%s <%s>' % (change.owner_name,
-                                            change.owner.email)
+            if change.author.email:
+                author_string = '%s <%s>' % (change.author_name,
+                                            change.author.email)
             else:
-                owner_string = change.owner_name
-            self.owner_label.text.set_text(('change-data', owner_string))
+                author_string = change.author_name
+            self.author_label.text.set_text(('change-data', author_string))
             self.project_label.text.set_text(('change-data', change.project.name))
             self.branch_label.set_text(('change-data', change.branch))
             self.hashtags_label.set_text(('change-data', ' '.join([x.name for x in change.hashtags])))
@@ -1161,9 +1161,9 @@ class ChangeView(urwid.WidgetWrap):
     def openPermalink(self, widget):
         self.app.openURL(self.permalink_url)
 
-    def searchOwner(self, widget):
-        if self.owner_email:
-            self.app.doSearch("status:open owner:%s" % (self.owner_email,))
+    def searchAuthor(self, widget):
+        if self.author_login:
+            self.app.doSearch("status:open author:%s" % (self.author_login,))
 
     def searchProject(self, widget):
         self.app.doSearch("status:open project:%s" % (self.project_name,))

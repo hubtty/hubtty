@@ -293,7 +293,7 @@ class Topic(object):
         session.flush()
 
 class Change(object):
-    def __init__(self, project, id, owner, number, branch, change_id,
+    def __init__(self, project, id, author, number, branch, change_id,
                  title, body, created, updated, state, additions, deletions,
                  html_url, merged, mergeable, hidden=False, reviewed=False,
                  starred=False, held=False, pending_rebase=False,
@@ -301,7 +301,7 @@ class Change(object):
                  pending_status_message=None, pending_hashtags=False,
                  outdated=False):
         self.project_key = project.key
-        self.account_key = owner.key
+        self.account_key = author.key
         self.id = id
         self.number = number
         self.branch = branch
@@ -429,16 +429,16 @@ class Change(object):
                 self.createHashtag(hashtag)
 
     @property
-    def owner_name(self):
-        owner_name = 'Anonymous Coward'
-        if self.owner:
-            if self.owner.name:
-                owner_name = self.owner.name
-            elif self.owner.username:
-                owner_name = self.owner.username
-            elif self.owner.email:
-                owner_name = self.owner.email
-        return owner_name
+    def author_name(self):
+        author_name = 'Anonymous Coward'
+        if self.author:
+            if self.author.name:
+                author_name = self.author.name
+            elif self.author.username:
+                author_name = self.author.username
+            elif self.author.email:
+                author_name = self.author.email
+        return author_name
 
 class Commit(object):
     def __init__(self, change, number, message, sha, parent,
@@ -698,7 +698,7 @@ mapper(Topic, topic_table, properties=dict(
 ))
 mapper(ProjectTopic, project_topic_table)
 mapper(Change, change_table, properties=dict(
-        owner=relationship(Account),
+        author=relationship(Account),
         hashtags=relationship(Hashtag, backref='change',
                                cascade='all, delete-orphan'),
         commits=relationship(Commit, backref='change',
