@@ -633,10 +633,10 @@ class SyncChangeTask(Task):
 
         # Perform subqueries this task will need outside of the db session
         for remote_commit in remote_commits:
-            remote_comments_data = [comment for comment in remote_pr_comments if comment['original_commit_id'] == remote_commit['sha']]
-            remote_commit['_hubtty_remote_comments_data'] = remote_comments_data
-            remote_reviews_data = [review for review in remote_pr_reviews if review['commit_id'] == remote_commit['sha']]
-            remote_commit['_hubtty_remote_reviews_data'] = remote_reviews_data
+            remote_commit['_hubtty_remote_comments_data'] = [comment for comment in remote_pr_comments
+                                                             if comment['original_commit_id'] == remote_commit['sha']]
+            remote_commit['_hubtty_remote_reviews_data'] = [review for review in remote_pr_reviews
+                                                            if review['commit_id'] == remote_commit['sha']]
             # remote_robot_comments_data = sync.get('changes/%s/revisions/%s/robotcomments' % (
             #     self.change_id, remote_commit))
             # remote_revision['_hubtty_remote_robot_comments_data'] = remote_robot_comments_data
@@ -813,6 +813,15 @@ class SyncChangeTask(Task):
                         # TODO(mandre) update message if it has changed on github
                         if message.author != account:
                             message.author = account
+
+                    review_status = remote_review.get('state')
+                    if review_status:
+                        # TODO(mandre) Add commit id to approvals
+                        change.createApproval(account,
+                                              review_status,
+                                              '')
+                        self.log.info("Created new approval for %s from %s commit %s.", change.change_id, account.username, commit.sha)
+
             # remote_approval_entries = {}
             # remote_label_entries = {}
             # user_voted = False

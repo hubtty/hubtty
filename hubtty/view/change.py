@@ -692,16 +692,13 @@ class ChangeView(urwid.WidgetWrap):
             self.permalink_label.text.set_text(('change-data', self.permalink_url))
             self.pr_description.set_text('\n'.join([change.title, '', change.body]))
 
-            categories = []
+            categories = ['Changes Requested', 'Comment', 'Approved']
             approval_headers = [urwid.Text(('table-header', 'Name'))]
-            for label in change.labels:
-                if label.category in categories:
-                    continue
-                approval_headers.append(urwid.Text(('table-header', label.category)))
-                categories.append(label.category)
+            for category in categories:
+                approval_headers.append(urwid.Text(('table-header', category)))
             votes = mywid.Table(approval_headers)
             approvals_for_account = {}
-            # pending_message = change.commits[-1].getPendingMessage()
+            pending_message = change.commits[-1].getPendingMessage()
             for approval in change.approvals:
                 # Don't display draft approvals unless they are pending-upload
                 if approval.draft and not pending_message:
@@ -721,21 +718,12 @@ class ChangeView(urwid.WidgetWrap):
                         row.append(w)
                     approvals_for_account[approval.reviewer.id] = approvals
                     votes.addRow(row)
-                if str(approval.value) != '0':
-                    cat_min, cat_max = change.getMinMaxPermittedForCategory(approval.category)
-                    if approval.value > 0:
-                        val = '+%i' % approval.value
-                        if approval.value == cat_max:
-                            val = ('max-label', val)
-                        else:
-                            val = ('positive-label', val)
-                    else:
-                        val = '%i' % approval.value
-                        if approval.value == cat_min:
-                            val = ('min-label', val)
-                        else:
-                            val = ('negative-label', val)
-                    approvals[approval.category].set_text(val)
+                if approval.category == 'APPROVED':
+                    approvals['Approved'].set_text(('positive-label', '✓'))
+                elif approval.category == 'CHANGES_REQUESTED':
+                    approvals['Changes Requested'].set_text(('negative-label', '✗'))
+                else:
+                    approvals['Comment'].set_text('💬')
             votes = urwid.Padding(votes, width='pack')
 
             # TODO: update the existing table rather than replacing it
