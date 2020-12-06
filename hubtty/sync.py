@@ -786,6 +786,8 @@ class SyncChangeTask(Task):
                     else:
                         if comment.author != account:
                             comment.author = account
+                        comment.body = remote_comment.get('body','').replace('\r','')
+                        # TODO(mandre) Add `updated` column to comment table
 
                 # Commit checks
                 if remote_commit.get('_hubtty_remote_checks_data'):
@@ -810,9 +812,10 @@ class SyncChangeTask(Task):
                                                     remote_review.get('body','').replace('\r',''))
                         self.log.info("Created new review message %s for commit %s in local DB.", message.key, commit.key)
                     else:
-                        # TODO(mandre) update message if it has changed on github
                         if message.author != account:
                             message.author = account
+                        message.body = remote_review.get('body','').replace('\r','')
+                        # TODO(mandre) Add `updated` column to message table
 
                     review_status = remote_review.get('state')
                     if review_status:
