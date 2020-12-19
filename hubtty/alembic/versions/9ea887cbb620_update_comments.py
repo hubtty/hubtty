@@ -22,6 +22,9 @@ def upgrade():
     op.add_column('comment', sa.Column('original_commit_id', sa.String(length=255), nullable=False))
     op.add_column('comment', sa.Column('original_line', sa.Integer(), nullable=False))
 
+    # TODO(mandre) add a foreign key contraint for change_key
+    op.add_column('message', sa.Column('change_key', sa.Integer(), nullable=False, index=True))
+
 
 def downgrade():
     pass

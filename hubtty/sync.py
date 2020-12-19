@@ -628,21 +628,7 @@ class SyncChangeTask(Task):
         remote_pr_comments = sync.get('repos/%s/comments' % self.change_id)
         remote_pr_reviews = sync.get('repos/%s/reviews' % self.change_id)
         remote_issue_comments = sync.get(('repos/%s/comments'
-                                          % self.change_id).replace('/pulls/',
-                                                                    '/issues/'))
-        # TODO(mandre)
-        # Save all comments to DB, then attach them to commits
-
-        # Perform subqueries this task will need outside of the db session
-        for remote_commit in remote_commits:
-            remote_commit['_hubtty_remote_reviews_data'] = [review for review in remote_pr_reviews
-                                                            if review['commit_id'] == remote_commit['sha']]
-            # remote_robot_comments_data = sync.get('changes/%s/revisions/%s/robotcomments' % (
-            #     self.change_id, remote_commit))
-            # remote_revision['_hubtty_remote_robot_comments_data'] = remote_robot_comments_data
-
-        # Attach issue comments to the last known commit of the PR
-        remote_commits[-1]['_hubtty_remote_reviews_data'].extend(remote_issue_comments)
+                                          % self.change_id).replace('/pulls/', '/issues/'))
 
         project_name = remote_change['base']['repo']['full_name']
 
@@ -760,37 +746,6 @@ class SyncChangeTask(Task):
                 if remote_commit.get('_hubtty_remote_checks_data'):
                     self._updateChecks(session, commit, remote_commit['_hubtty_remote_checks_data'])
 
-                # Commit reviews
-                new_message = False
-                for remote_review in remote_commit.get('_hubtty_remote_reviews_data', []):
-                    self.log.info("New review comment %s", remote_review)
-                    if 'user' in remote_review:
-                        account = session.getAccountByID(remote_review['user']['id'],
-                                                        username=remote_review['user'].get('login'))
-                        if account.username != app.config.username:
-                            new_message = True
-                    else:
-                        account = session.getSystemAccount()
-                    message = session.getMessageByID(remote_review['id'])
-                    if not message:
-                        # Normalize date -> created
-                        created = dateutil.parser.parse(remote_review.get('submitted_at', remote_review.get('created_at')))
-                        message = commit.createMessage(remote_review['id'], account, created,
-                                                    remote_review.get('body','').replace('\r',''))
-                        self.log.info("Created new review message %s for commit %s in local DB.", message.key, commit.key)
-                    else:
-                        if message.author != account:
-                            message.author = account
-                        message.body = remote_review.get('body','').replace('\r','')
-                        # TODO(mandre) Add `updated` column to message table
-
-                    review_status = remote_review.get('state')
-                    if review_status:
-                        # TODO(mandre) Add commit id to approvals
-                        change.createApproval(account,
-                                              review_status,
-                                              '')
-                        self.log.info("Created new approval for %s from %s commit %s.", change.change_id, account.username, commit.sha)
 
             # remote_approval_entries = {}
             # remote_label_entries = {}
@@ -926,11 +881,11 @@ class SyncChangeTask(Task):
                 comment = session.getCommentByID(remote_comment['id'])
 
                 file_id = None
-                commit = session.getCommitBySha(remote_comment['commit_id'])
-                if commit:
-                    fileobj = commit.getFile(remote_comment['path'])
+                associated_commit = session.getCommitBySha(remote_comment['commit_id'])
+                if associated_commit:
+                    fileobj = associated_commit.getFile(remote_comment['path'])
                     if fileobj is None:
-                        fileobj = commit.createFile(remote_comment['path'], 'M')
+                        fileobj = associated_commit.createFile(remote_comment['path'], 'M')
                     file_id = fileobj.key
 
                 if not comment:
@@ -965,6 +920,46 @@ class SyncChangeTask(Task):
                     if comment.file_id != file_id:
                         comment.file_id = file_id
                     comment.body = remote_comment.get('body','').replace('\r','')
+
+            # Commit reviews
+            new_message = False
+            remote_pr_reviews.extend(remote_issue_comments)
+            for remote_review in remote_pr_reviews:
+                self.log.info("New review comment %s", remote_review)
+                if 'user' in remote_review:
+                    account = session.getAccountByID(remote_review['user']['id'],
+                                                    username=remote_review['user'].get('login'))
+                    if account.username != app.config.username:
+                        new_message = True
+                else:
+                    account = session.getSystemAccount()
+
+                associated_commit_id = None
+                if remote_review.get('commit_id'):
+                    associated_commit = session.getCommitBySha(remote_review['commit_id'])
+                    if associated_commit:
+                        associated_commit_id = associated_commit.key
+
+                message = session.getMessageByID(remote_review['id'])
+                if not message:
+                    # Normalize date -> created
+                    created = dateutil.parser.parse(remote_review.get('submitted_at', remote_review.get('created_at')))
+                    message = change.createMessage(associated_commit_id, remote_review['id'], account, created,
+                                                   remote_review.get('body','').replace('\r',''))
+                    self.log.info("Created new review message %s for change %s in local DB.", message.key, change.change_id)
+                else:
+                    if message.author != account:
+                        message.author = account
+                    message.body = remote_review.get('body','').replace('\r','')
+
+                review_status = remote_review.get('state')
+                if review_status:
+                    # TODO(mandre)
+                    # - Add commit id to approvals
+                    # - Remove value from approval
+                    # - Rename approval.category to approval.status
+                    change.createApproval(account, review_status, '')
+                    self.log.info("Created new approval for %s from %s change %s.", change.change_id, account.username, associated_commit_id)
 
             change.outdated = False
         for url, refs in fetches.items():

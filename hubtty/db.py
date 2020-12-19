@@ -112,6 +112,7 @@ commit_table = Table(
 message_table = Table(
     'message', metadata,
     Column('key', Integer, primary_key=True),
+    Column('change_key', Integer, ForeignKey("change.key"), index=True),
     Column('commit_key', Integer, ForeignKey("commit.key"), index=True),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
     Column('id', String(255), index=True), #, unique=True, nullable=False),
@@ -396,6 +397,15 @@ class Change(object):
         session.flush()
         return l
 
+    def createMessage(self, *args, **kw):
+        session = Session.object_session(self)
+        args = [self] + list(args)
+        m = Message(*args, **kw)
+        self.messages.append(m)
+        session.add(m)
+        session.flush()
+        return m
+
     def createApproval(self, *args, **kw):
         session = Session.object_session(self)
         args = [self] + list(args)
@@ -468,15 +478,6 @@ class Commit(object):
         self.pending_message = pending_message
         self.can_submit = can_submit
 
-    def createMessage(self, *args, **kw):
-        session = Session.object_session(self)
-        args = [self] + list(args)
-        m = Message(*args, **kw)
-        self.messages.append(m)
-        session.add(m)
-        session.flush()
-        return m
-
     def createPendingCherryPick(self, *args, **kw):
         session = Session.object_session(self)
         args = [self] + list(args)
@@ -527,8 +528,9 @@ class Commit(object):
 
 
 class Message(object):
-    def __init__(self, commit, id, author, created, message, draft=False, pending=False):
-        self.commit_key = commit.key
+    def __init__(self, change, commit_id, id, author, created, message, draft=False, pending=False):
+        self.change_key = change.key
+        self.commit_key = commit_id
         self.account_key = author.key
         self.id = id
         self.created = created
