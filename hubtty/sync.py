@@ -630,11 +630,11 @@ class SyncChangeTask(Task):
         remote_issue_comments = sync.get(('repos/%s/comments'
                                           % self.change_id).replace('/pulls/',
                                                                     '/issues/'))
+        # TODO(mandre)
+        # Save all comments to DB, then attach them to commits
 
         # Perform subqueries this task will need outside of the db session
         for remote_commit in remote_commits:
-            remote_commit['_hubtty_remote_comments_data'] = [comment for comment in remote_pr_comments
-                                                             if comment['original_commit_id'] == remote_commit['sha']]
             remote_commit['_hubtty_remote_reviews_data'] = [review for review in remote_pr_reviews
                                                             if review['commit_id'] == remote_commit['sha']]
             # remote_robot_comments_data = sync.get('changes/%s/revisions/%s/robotcomments' % (
@@ -755,39 +755,6 @@ class SyncChangeTask(Task):
                         f = commit.createFile(file['filename'], file['status'],
                                                 file.get('previous_filename'),
                                                 inserted, deleted)
-
-                remote_comments_items = remote_commit['_hubtty_remote_comments_data']
-                # remote_robot_comments_items = list(remote_commit.get('_hubtty_remote_robot_comments_data', {}).items())
-                # for remote_file, remote_comments in itertools.chain(remote_comments_items, remote_robot_comments_items):
-
-                for remote_comment in remote_comments_items:
-                    account = session.getAccountByID(remote_comment['user']['id'],
-                                                        username=remote_comment['user'].get('login'))
-                    comment = session.getCommentByID(remote_comment['id'])
-                    if not comment:
-                        # Normalize updated -> created
-                        created = dateutil.parser.parse(remote_comment['updated_at'])
-                        parent = False
-                        if remote_comment.get('side', '') == 'PARENT':
-                            parent = True
-                        fileobj = commit.getFile(remote_comment['path'])
-                        if fileobj is None:
-                            fileobj = commit.createFile(remote_comment['path'], 'M')
-                        comment = fileobj.createComment(remote_comment['id'], account,
-                                                        remote_comment.get('in_reply_to_id'),
-                                                        created,
-                                                        parent, remote_comment.get('line'),
-                                                        remote_comment.get('body','').replace('\r',''),
-                                                        robot_id = remote_comment.get('robot_id'),
-                                                        robot_run_id = remote_comment.get('robot_run_id'),
-                                                        url = remote_comment.get('html_url'))
-                        self.log.info("Created new comment %s for revision %s in local DB.",
-                                      comment.key, commit.key)
-                    else:
-                        if comment.author != account:
-                            comment.author = account
-                        comment.body = remote_comment.get('body','').replace('\r','')
-                        # TODO(mandre) Add `updated` column to comment table
 
                 # Commit checks
                 if remote_commit.get('_hubtty_remote_checks_data'):
@@ -952,6 +919,52 @@ class SyncChangeTask(Task):
 
             # remote_hashtags = remote_change.get('hashtags', [])
             # change.setHashtags(remote_hashtags)
+
+            for remote_comment in remote_pr_comments:
+                account = session.getAccountByID(remote_comment['user']['id'],
+                                                 username=remote_comment['user'].get('login'))
+                comment = session.getCommentByID(remote_comment['id'])
+
+                file_id = None
+                commit = session.getCommitBySha(remote_comment['commit_id'])
+                if commit:
+                    fileobj = commit.getFile(remote_comment['path'])
+                    if fileobj is None:
+                        fileobj = commit.createFile(remote_comment['path'], 'M')
+                    file_id = fileobj.key
+
+                if not comment:
+                    created = dateutil.parser.parse(remote_comment['created_at'])
+                    updated = dateutil.parser.parse(remote_comment['updated_at'])
+                    parent = False
+                    if remote_comment.get('side', '') == 'PARENT':
+                        parent = True
+
+                    comment = change.createComment(file_id, remote_comment['id'], account,
+                                                   remote_comment.get('in_reply_to_id'),
+                                                   created, updated, parent,
+                                                   remote_comment.get('commit_id'),
+                                                   remote_comment.get('original_commit_id'),
+                                                   remote_comment.get('line'),
+                                                   remote_comment.get('original_line'),
+                                                   remote_comment.get('body','').replace('\r',''),
+                                                   robot_id = remote_comment.get('robot_id'),
+                                                   robot_run_id = remote_comment.get('robot_run_id'),
+                                                   url = remote_comment.get('html_url'))
+                    self.log.info("Created new comment %s for change %s in local DB.",
+                                    comment.key, change.change_id)
+                else:
+                    if comment.author != account:
+                        comment.author = account
+                    if comment.updated != updated:
+                        comment.updated = updated
+                    if comment.commit_id != remote_comment.get('commit_id'):
+                        comment.commit_id = remote_comment.get('commit_id')
+                    if comment.line != remote_comment.get('line'):
+                        comment.line = remote_comment.get('line')
+                    if comment.file_id != file_id:
+                        comment.file_id = file_id
+                    comment.body = remote_comment.get('body','').replace('\r','')
 
             change.outdated = False
         for url, refs in fetches.items():

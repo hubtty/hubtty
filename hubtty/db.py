@@ -123,13 +123,18 @@ message_table = Table(
 comment_table = Table(
     'comment', metadata,
     Column('key', Integer, primary_key=True),
+    Column('change_key', Integer, ForeignKey("change.key"), index=True),
     Column('file_key', Integer, ForeignKey("file.key"), index=True),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
     Column('id', String(255), index=True), #, unique=True, nullable=False),
     Column('in_reply_to', String(255)),
     Column('created', DateTime, index=True, nullable=False),
+    Column('updated', DateTime, index=True, nullable=False),
     Column('parent', Boolean, nullable=False),
+    Column('commit_id', String(255), index=True, nullable=False),
+    Column('original_commit_id', String(255), index=True, nullable=False),
     Column('line', Integer),
+    Column('original_line', Integer),
     Column('message', Text, nullable=False),
     Column('draft', Boolean, index=True, nullable=False),
     Column('robot_id', String(255)),
@@ -428,6 +433,15 @@ class Change(object):
             if hashtag not in current_hashtags:
                 self.createHashtag(hashtag)
 
+    def createComment(self, *args, **kw):
+        session = Session.object_session(self)
+        args = [self] + list(args)
+        c = Comment(*args, **kw)
+        self.comments.append(c)
+        session.add(c)
+        session.flush()
+        return c
+
     @property
     def author_name(self):
         author_name = 'Anonymous Coward'
@@ -535,15 +549,22 @@ class Message(object):
         return author_name
 
 class Comment(object):
-    def __init__(self, file, id, author, in_reply_to, created, parent, line, message, draft=False,
-                 robot_id=None, robot_run_id=None, url=None):
-        self.file_key = file.key
+    def __init__(self, change, file_id, id, author, in_reply_to, created,
+                 updated, parent, commit_id, original_commit_id, line,
+                 original_line, message, draft=False, robot_id=None,
+                 robot_run_id=None, url=None):
+        self.change_key = change.key
+        self.file_key = file_id
         self.account_key = author.key
         self.id = id
         self.in_reply_to = in_reply_to
         self.created = created
+        self.updated = updated
         self.parent = parent
+        self.commit_id = commit_id
+        self.original_commit_id = original_commit_id
         self.line = line
+        self.original_line = original_line
         self.message = message
         self.draft = draft
         self.robot_id = robot_id
@@ -636,15 +657,6 @@ class File(object):
         else:
             return '%s => %s' % (self.old_path, self.path)
 
-    def createComment(self, *args, **kw):
-        session = Session.object_session(self)
-        args = [self] + list(args)
-        c = Comment(*args, **kw)
-        self.comments.append(c)
-        session.add(c)
-        session.flush()
-        return c
-
 class Server(object):
     def __init__(self):
         pass
@@ -703,6 +715,9 @@ mapper(Change, change_table, properties=dict(
                                cascade='all, delete-orphan'),
         commits=relationship(Commit, backref='change',
                              order_by=commit_table.c.number,
+                             cascade='all, delete-orphan'),
+        comments=relationship(Comment, backref='change',
+                             order_by=comment_table.c.created,
                              cascade='all, delete-orphan'),
         messages=relationship(Message,
                               secondary=commit_table,
