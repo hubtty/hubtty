@@ -403,7 +403,7 @@ class ChangeMessageBox(mywid.HyperText):
         row.review_button.openReview(reply_text)
 
     def refresh(self, change, message):
-        self.commit_key = message.commit.key
+        self.commit_key = self.change_view.last_commit_key
         self.message_created = message.created
         self.message_author = message.author_name
         self.message_text = message.message
