@@ -370,7 +370,7 @@ class ChangeMessageBox(mywid.HyperText):
         pgraphs = []
         pgraph_accumulator = []
         wrap = True
-        for line in text.split('\n')[2:]:
+        for line in text.split('\n'):
             if line.startswith('> '):
                 wrap = False
                 line = '> ' + line
