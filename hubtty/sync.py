@@ -888,9 +888,9 @@ class SyncChangeTask(Task):
                         fileobj = associated_commit.createFile(remote_comment['path'], 'M')
                     file_id = fileobj.key
 
+                updated = dateutil.parser.parse(remote_comment['updated_at'])
                 if not comment:
                     created = dateutil.parser.parse(remote_comment['created_at'])
-                    updated = dateutil.parser.parse(remote_comment['updated_at'])
                     parent = False
                     if remote_comment.get('side', '') == 'PARENT':
                         parent = True
@@ -917,8 +917,8 @@ class SyncChangeTask(Task):
                         comment.commit_id = remote_comment.get('commit_id')
                     if comment.line != remote_comment.get('line'):
                         comment.line = remote_comment.get('line')
-                    if comment.file_id != file_id:
-                        comment.file_id = file_id
+                    if comment.file_key != file_id:
+                        comment.file_key = file_id
                     comment.body = remote_comment.get('body','').replace('\r','')
 
             # Commit reviews
