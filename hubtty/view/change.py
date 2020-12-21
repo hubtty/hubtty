@@ -448,15 +448,13 @@ class ChangeMessageBox(mywid.HyperText):
             comment_text = commentlink.run(self.app, comment_text)
 
         inline_comments = {}
-        for commit in change.commits:
-            for file in commit.files:
-                comments = [c for c in file.comments
-                            if c.author.id == message.author.id
-                            and c.created == message.created]
-                for comment in comments:
-                    path = comment.file.path
-                    inline_comments.setdefault(path, [])
-                    inline_comments[path].append((message.commit.sha[0:7], comment.line or 0, comment.message))
+        comments = [c for c in change.comments
+                    if c.author.id == message.author.id
+                    and c.created == message.created]
+        for comment in comments:
+            path = comment.file.path
+            inline_comments.setdefault(path, [])
+            inline_comments[path].append((comment.original_commit_id[0:7], comment.line or 0, comment.message))
         for v in inline_comments.values():
             v.sort()
 
