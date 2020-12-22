@@ -722,6 +722,7 @@ mapper(Change, change_table, properties=dict(
                              order_by=comment_table.c.created,
                              cascade='all, delete-orphan'),
         messages=relationship(Message, backref='change',
+                             order_by=message_table.c.created,
                               cascade='all, delete-orphan'),
         labels=relationship(Label, backref='change',
                             order_by=(label_table.c.category, label_table.c.value),
@@ -742,6 +743,7 @@ mapper(Change, change_table, properties=dict(
         ))
 mapper(Commit, commit_table, properties=dict(
         messages=relationship(Message, backref='commit',
+                              order_by=message_table.c.created,
                               cascade='all, delete-orphan'),
         files=relationship(File, backref='commit',
                            cascade='all, delete-orphan'),
