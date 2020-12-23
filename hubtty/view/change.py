@@ -458,7 +458,7 @@ class ChangeMessageBox(mywid.HyperText):
         for comment in comments:
             path = comment.file.path
             inline_comments.setdefault(path, [])
-            inline_comments[path].append((comment.original_commit_id[0:7], comment.line or 0, comment.message))
+            inline_comments[path].append((comment.original_commit_id[0:7], comment.original_line or 0, comment.message))
         for v in inline_comments.values():
             v.sort()
 
