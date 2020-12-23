@@ -229,7 +229,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             self.project_name = new_commit.change.project.name
             self.sha = new_commit.sha
             for f in new_commit.files:
-                new_comments += f.comments
+                new_comments += f.current_comments
                 self.new_file_keys[f.path] = f.key
             comment_lists = {}
             comment_filenames = set()

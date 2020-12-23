@@ -314,7 +314,7 @@ class CommitRow(urwid.WidgetWrap):
             if not pending_message:
                 line.append(('revision-drafts', ' (%s draft%s)' % (
                             num_drafts, num_drafts>1 and 's' or '')))
-        num_comments = sum([len(f.comments) for f in commit.files]) - num_drafts
+        num_comments = sum([len(f.current_comments) for f in commit.files]) - num_drafts
         if num_comments:
             line.append(('revision-comments', ' (%s inline comment%s)' % (
                         num_comments, num_comments>1 and 's' or '')))
