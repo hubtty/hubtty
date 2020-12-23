@@ -163,7 +163,7 @@ approval_table = Table(
     Column('change_key', Integer, ForeignKey("change.key"), index=True),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
     Column('category', String(255), nullable=False),
-    Column('value', Integer, nullable=False),
+    Column('sha', String(255), index=True, nullable=False),
     Column('draft', Boolean, index=True, nullable=False),
     )
 account_table = Table(
@@ -587,11 +587,11 @@ class PermittedLabel(object):
         self.value = value
 
 class Approval(object):
-    def __init__(self, change, reviewer, category, value, draft=False):
+    def __init__(self, change, reviewer, category, sha, draft=False):
         self.change_key = change.key
         self.account_key = reviewer.key
         self.category = category
-        self.value = value
+        self.sha = sha
         self.draft = draft
 
     @property
@@ -729,14 +729,12 @@ mapper(Change, change_table, properties=dict(
                                                 permitted_label_table.c.value),
                                       cascade='all, delete-orphan'),
         approvals=relationship(Approval, backref='change',
-                               order_by=(approval_table.c.category,
-                                         approval_table.c.value),
+                               order_by=approval_table.c.category,
                                cascade='all, delete-orphan'),
         draft_approvals=relationship(Approval,
                                      primaryjoin=and_(change_table.c.key==approval_table.c.change_key,
                                                       approval_table.c.draft==True),
-                                     order_by=(approval_table.c.category,
-                                               approval_table.c.value))
+                                     order_by=approval_table.c.category)
         ))
 mapper(Commit, commit_table, properties=dict(
         messages=relationship(Message, backref='commit',

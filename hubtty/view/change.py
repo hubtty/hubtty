@@ -713,12 +713,14 @@ class ChangeView(urwid.WidgetWrap):
                         row.append(w)
                     approvals_for_account[approval.reviewer.id] = approvals
                     votes.addRow(row)
-                if approval.category == 'APPROVED':
-                    approvals['Approved'].set_text(('positive-label', '✓'))
-                elif approval.category == 'CHANGES_REQUESTED':
-                    approvals['Changes Requested'].set_text(('negative-label', '✗'))
-                else:
-                    approvals['Comment'].set_text('💬')
+                # Only set approval status if the review is for the current commit
+                if approval.sha == change.commits[-1].sha:
+                    if approval.category == 'APPROVED':
+                        approvals['Approved'].set_text(('positive-label', '✓'))
+                    elif approval.category == 'CHANGES_REQUESTED':
+                        approvals['Changes Requested'].set_text(('negative-label', '✗'))
+                    else:
+                        approvals['Comment'].set_text('•')
             votes = urwid.Padding(votes, width='pack')
 
             # TODO: update the existing table rather than replacing it
