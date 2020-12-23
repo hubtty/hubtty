@@ -761,9 +761,9 @@ class ChangeView(urwid.WidgetWrap):
                             result_systems[message.author.name] = result_system
                             result_system.update(results)
                 skip = False
-                if self.hide_comments and message.author and message.author.name:
+                if self.hide_comments and message.author and message.author.username:
                     for regex in self.app.config.hide_comments:
-                        if regex.match(message.author.name):
+                        if regex.match(message.author.username):
                             skip = True
                             break
                 if not skip:
