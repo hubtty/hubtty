@@ -448,14 +448,7 @@ class ChangeMessageBox(mywid.HyperText):
             comment_text = commentlink.run(self.app, comment_text)
 
         inline_comments = {}
-        # NOTE(mandre) inline comments are not tied to a review in github and
-        # often have different creation date.
-        comments = [c for c in change.comments
-                    if c.author.id == message.author.id
-                    and c.created > message.created - datetime.timedelta(seconds=5)
-                    and c.created < message.created + datetime.timedelta(seconds=5)
-                    ]
-        for comment in comments:
+        for comment in message.comments:
             path = comment.file.path
             inline_comments.setdefault(path, [])
             inline_comments[path].append((comment.original_commit_id[0:7], comment.original_line or 0, comment.message))

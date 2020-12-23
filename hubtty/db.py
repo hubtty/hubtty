@@ -124,7 +124,7 @@ message_table = Table(
 comment_table = Table(
     'comment', metadata,
     Column('key', Integer, primary_key=True),
-    Column('change_key', Integer, ForeignKey("change.key"), index=True),
+    Column('message_key', Integer, ForeignKey("message.key"), index=True),
     Column('file_key', Integer, ForeignKey("file.key"), index=True),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
     Column('id', String(255), index=True), #, unique=True, nullable=False),
@@ -443,15 +443,6 @@ class Change(object):
             if hashtag not in current_hashtags:
                 self.createHashtag(hashtag)
 
-    def createComment(self, *args, **kw):
-        session = Session.object_session(self)
-        args = [self] + list(args)
-        c = Comment(*args, **kw)
-        self.comments.append(c)
-        session.add(c)
-        session.flush()
-        return c
-
     @property
     def author_name(self):
         author_name = 'Anonymous Coward'
@@ -550,12 +541,21 @@ class Message(object):
                 author_name = self.author.email
         return author_name
 
+    def createComment(self, *args, **kw):
+        session = Session.object_session(self)
+        args = [self] + list(args)
+        c = Comment(*args, **kw)
+        self.comments.append(c)
+        session.add(c)
+        session.flush()
+        return c
+
 class Comment(object):
-    def __init__(self, change, file_id, id, author, in_reply_to, created,
+    def __init__(self, message_obj, file_id, id, author, in_reply_to, created,
                  updated, parent, commit_id, original_commit_id, line,
                  original_line, message, draft=False, robot_id=None,
                  robot_run_id=None, url=None):
-        self.change_key = change.key
+        self.message_key = message_obj.key
         self.file_key = file_id
         self.account_key = author.key
         self.id = id
@@ -718,9 +718,6 @@ mapper(Change, change_table, properties=dict(
         commits=relationship(Commit, backref='change',
                              order_by=commit_table.c.number,
                              cascade='all, delete-orphan'),
-        comments=relationship(Comment, backref='change',
-                             order_by=comment_table.c.created,
-                             cascade='all, delete-orphan'),
         messages=relationship(Message, backref='change',
                              order_by=message_table.c.created,
                               cascade='all, delete-orphan'),
@@ -754,7 +751,11 @@ mapper(Commit, commit_table, properties=dict(
 
         ))
 mapper(Message, message_table, properties=dict(
-        author=relationship(Account)))
+        author=relationship(Account),
+        comments=relationship(Comment, backref='change',
+                              order_by=comment_table.c.created,
+                              cascade='all, delete-orphan'),
+        ))
 mapper(File, file_table, properties=dict(
        comments=relationship(Comment, backref='file',
                              order_by=(comment_table.c.line,
