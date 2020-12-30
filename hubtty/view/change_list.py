@@ -215,8 +215,8 @@ class ChangeRow(urwid.Button, ChangeListColumns):
         self.author.set_text(change.author_name)
         self.branch.set_text(change.branch or '')
         self.project_name = change.project.name
-        # self.commit_sha = change.revisions[-1].commit
-        # self.current_revision_key = change.revisions[-1].key
+        self.commit_sha = change.commits[-1].sha
+        self.current_commit_key = change.commits[-1].key
         today = self.app.time(datetime.datetime.utcnow()).date()
         updated_time = self.app.time(change.updated)
         if today == updated_time.date():
@@ -730,7 +730,7 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             self.app.error(str(e))
 
     def openReview(self, rows):
-        dialog = view_change.ReviewDialog(self.app, rows[0].current_revision_key)
+        dialog = view_change.ReviewDialog(self.app, rows[0].current_commit_key)
         urwid.connect_signal(dialog, 'save',
             lambda button: self.closeReview(dialog, rows, True, False))
         urwid.connect_signal(dialog, 'submit',
@@ -743,8 +743,8 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
 
     def closeReview(self, dialog, rows, upload, submit):
         approvals, message = dialog.getValues()
-        revision_keys = [row.current_revision_key for row in rows]
-        message_keys = self.app.saveReviews(revision_keys, approvals,
+        commit_keys = [row.current_commit_key for row in rows]
+        message_keys = self.app.saveReviews(commit_keys, approvals,
                                             message, upload, submit)
         # TODO(mandre) Uncomment once we implement upload
         # if upload:

@@ -13,8 +13,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-# TODO(mandre) rename revision to commits
-
 import collections
 import errno
 import logging
@@ -122,11 +120,11 @@ class UpdateEvent(object):
     def updateRelatedChanges(self, session, change):
         related_change_keys = set()
         related_change_keys.add(change.key)
-        for revision in change.revisions:
-            parent = session.getCommitBySha(revision.parent)
+        for commit in change.commits:
+            parent = session.getCommitBySha(commit.parent)
             if parent:
                 related_change_keys.add(parent.change.key)
-            for child in session.getCommitsByParent(revision.commit):
+            for child in session.getCommitsByParent(commit.commit):
                 related_change_keys.add(child.change.key)
         self.related_change_keys = related_change_keys
 
@@ -710,7 +708,7 @@ class SyncChangeTask(Task):
                     self.log.info("Created new commit %s for change %s in local DB.",
                                   commit.key, self.change_id)
                     new_commit = True
-            #     actions = remote_revision.get('actions', {})
+            #     actions = remote_commit.get('actions', {})
             #     commit.can_submit = 'submit' in actions
             #     # TODO: handle multiple parents
             #     if commit.parent not in parent_commits:
@@ -722,9 +720,9 @@ class SyncChangeTask(Task):
             #         parent_commits.add(commit.parent)
             #     result.updateRelatedChanges(session, change)
 
-            #     f = revision.getFile('/COMMIT_MSG')
+            #     f = commit.getFile('/COMMIT_MSG')
             #     if f is None:
-            #         f = revision.createFile('/COMMIT_MSG', None,
+            #         f = commit.createFile('/COMMIT_MSG', None,
             #                                 None, None, None)
 
                 remote_commit_details = sync.get('repos/%s/commits/%s'
@@ -773,7 +771,7 @@ class SyncChangeTask(Task):
             # user_votes = {}
             # for approval in change.approvals:
             #     if approval.draft and not new_commit:
-            #         # If we have a new revision, we need to delete
+            #         # If we have a new commit, we need to delete
             #         # draft local approvals because they can no longer
             #         # be uploaded.  Otherwise, keep them because we
             #         # may be about to upload a review.  Ignoring an
@@ -1000,7 +998,7 @@ class CheckReposTask(Task):
                     missing = True
                 if missing or app.fetch_missing_refs:
                     sync.submitTask(
-                        CheckRevisionsTask(project.key,
+                        CheckCommitsTask(project.key,
                                            force_fetch=app.fetch_missing_refs,
                                            priority=LOW_PRIORITY)
                     )
@@ -1008,15 +1006,15 @@ class CheckReposTask(Task):
                 self.log.exception("Exception checking repo %s" %
                                    (project.name,))
 
-class CheckRevisionsTask(Task):
+class CheckCommitsTask(Task):
     def __init__(self, project_key, force_fetch=False,
                  priority=NORMAL_PRIORITY):
-        super(CheckRevisionsTask, self).__init__(priority)
+        super(CheckCommitsTask, self).__init__(priority)
         self.project_key = project_key
         self.force_fetch = force_fetch
 
     def __repr__(self):
-        return '<CheckRevisionsTask %s>' % (self.project_key,)
+        return '<CheckCommitsTask %s>' % (self.project_key,)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -1036,8 +1034,8 @@ class CheckRevisionsTask(Task):
                 pass
             for change in project.open_changes:
                 if repo:
-                    for revision in change.revisions:
-                        if repo.checkCommits([revision.parent, revision.commit]):
+                    for commit in change.commits:
+                        if repo.checkCommits([commit.parent, commit.sha]):
                             to_sync.add(change.change_id)
                 else:
                     to_sync.add(change.change_id)
@@ -1222,39 +1220,39 @@ class SendCherryPickTask(Task):
             session.delete(cp)
             # Inside db session for rollback
             ret = sync.post('changes/%s/revisions/%s/cherrypick' %
-                            (cp.revision.change.id, cp.revision.commit),
+                            (cp.commit.change.change_id, cp.commit.sha),
                             data)
         if ret and 'id' in ret:
             sync.submitTask(SyncChangeTask(ret['id'], priority=self.priority))
 
 class ChangeCommitMessageTask(Task):
-    def __init__(self, revision_key, priority=NORMAL_PRIORITY):
+    def __init__(self, commit_key, priority=NORMAL_PRIORITY):
         super(ChangeCommitMessageTask, self).__init__(priority)
-        self.revision_key = revision_key
+        self.commit_key = commit_key
 
     def __repr__(self):
-        return '<ChangeCommitMessageTask %s>' % (self.revision_key,)
+        return '<ChangeCommitMessageTask %s>' % (self.commit_key,)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
-            other.revision_key == self.revision_key):
+            other.commit_key == self.commit_key):
             return True
         return False
 
     def run(self, sync):
         app = sync.app
         with app.db.getSession() as session:
-            revision = session.getCommit(self.revision_key)
-            revision.pending_message = False
-            data = dict(message=revision.message)
+            commit = session.getCommit(self.commit_key)
+            commit.pending_message = False
+            data = dict(message=commit.message)
             # Inside db session for rollback
-            edit = sync.get('changes/%s/edit' % revision.change.id)
+            edit = sync.get('changes/%s/edit' % commit.change.id)
             if edit is not None:
                 raise Exception("Edit already in progress on change %s" %
-                                (revision.change.number,))
-            sync.put('changes/%s/edit:message' % (revision.change.id,), data)
-            sync.post('changes/%s/edit:publish' % (revision.change.id,), {})
-            change_id = revision.change.id
+                                (commit.change.number,))
+            sync.put('changes/%s/edit:message' % (commit.change.id,), data)
+            sync.post('changes/%s/edit:publish' % (commit.change.id,), {})
+            change_id = commit.change.id
         sync.submitTask(SyncChangeTask(change_id, priority=self.priority))
 
 class UploadReviewTask(Task):
@@ -1281,7 +1279,7 @@ class UploadReviewTask(Task):
                 self.log.debug("Message %s has already been uploaded" % (
                     self.message_key))
                 return
-            change = message.revision.change
+            change = message.commit.change
             if change.pending_status and change.state == 'SUBMITTED':
                 submit = True
         if not change.held:
@@ -1292,23 +1290,23 @@ class UploadReviewTask(Task):
         change_id = None
         with app.db.getSession() as session:
             message = session.getMessage(self.message_key)
-            revision = message.revision
-            change = message.revision.change
+            commit = message.commit
+            change = message.commit.change
             if change.held:
                 self.log.debug("Not uploading review to %s because it is held" %
                                (change.id,))
                 return
             change_id = change.id
-            current_revision = change.revisions[-1]
+            current_commit = change.commits[-1]
             data = dict(message=message.message,
                         strict_labels=False)
-            if revision == current_revision:
+            if commit == current_commit:
                 data['labels'] = {}
                 for approval in change.draft_approvals:
                     data['labels'][approval.category] = approval.value
                     session.delete(approval)
             comments = {}
-            for file in revision.files:
+            for file in commit.files:
                 if file.draft_comments:
                     comment_list = []
                     for comment in file.draft_comments:
@@ -1323,7 +1321,7 @@ class UploadReviewTask(Task):
                 data['comments'] = comments
             session.delete(message)
             # Inside db session for rollback
-            sync.post('changes/%s/revisions/%s/review' % (change.id, revision.commit),
+            sync.post('changes/%s/revisions/%s/review' % (change.change_id, commit.sha),
                       data)
         if submit:
             # In another db session in case submit fails after posting
