@@ -217,7 +217,7 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
 
 class ReviewButton(mywid.FixedButton):
     def __init__(self, commit_row):
-        super(ReviewButton, self).__init__(('revision-button', u'Review'))
+        super(ReviewButton, self).__init__(('commit-button', u'Review'))
         self.commit_row = commit_row
         self.change_view = commit_row.change_view
         urwid.connect_signal(self, 'click',
@@ -246,10 +246,10 @@ class ReviewButton(mywid.FixedButton):
 
 class CommitRow(urwid.WidgetWrap):
     commit_focus_map = {
-                          'revision-name': 'focused-revision-name',
-                          'revision-commit': 'focused-revision-commit',
-                          'revision-comments': 'focused-revision-comments',
-                          'revision-drafts': 'focused-revision-drafts',
+                          'commit-name': 'focused-commit-name',
+                          'commit-sha': 'focused-commit-sha',
+                          'commit-comments': 'focused-commit-comments',
+                          'commit-drafts': 'focused-commit-drafts',
                           }
 
     def __init__(self, app, change_view, repo, commit, expanded=False):
@@ -281,21 +281,21 @@ class CommitRow(urwid.WidgetWrap):
                       urwid.Text(('lines-removed', '-%i' % (total_removed,)))])
         table = urwid.Padding(table, width='pack')
 
-        focus_map={'revision-button': 'focused-revision-button'}
+        focus_map={'commit-button': 'focused-commit-button'}
         self.review_button = ReviewButton(self)
-        buttons = [mywid.FixedButton(('revision-button', "Diff"),
+        buttons = [mywid.FixedButton(('commit-button', "Diff"),
                                      on_press=self.diff),
-                   mywid.FixedButton(('revision-button', "Local Checkout"),
+                   mywid.FixedButton(('commit-button', "Local Checkout"),
                                      on_press=self.checkout),
-                   mywid.FixedButton(('revision-button', "Local Cherry-Pick"),
+                   mywid.FixedButton(('commit-button', "Local Cherry-Pick"),
                                      on_press=self.cherryPick)]
         if self.can_submit:
-            buttons.append(mywid.FixedButton(('revision-button', "Submit"),
+            buttons.append(mywid.FixedButton(('commit-button', "Submit"),
                                              on_press=lambda x: self.change_view.doSubmitChange()))
 
         buttons = [('pack', urwid.AttrMap(b, None, focus_map=focus_map)) for b in buttons]
         buttons = urwid.Columns(buttons + [urwid.Text('')], dividechars=2)
-        buttons = urwid.AttrMap(buttons, 'revision-button')
+        buttons = urwid.AttrMap(buttons, 'commit-button')
         self.more = urwid.Pile([table, buttons])
         padded_title = urwid.Padding(self.title, width='pack')
         self.pile = urwid.Pile([padded_title])
@@ -306,17 +306,17 @@ class CommitRow(urwid.WidgetWrap):
             self.expandContract(None)
 
     def update(self, commit):
-        line = [('revision-commit', commit.sha[0:7]),
-                ('revision-name', ' %s' % commit.message.split('\n')[0])]
+        line = [('commit-sha', commit.sha[0:7]),
+                ('commit-name', ' %s' % commit.message.split('\n')[0])]
         num_drafts = sum([len(f.draft_comments) for f in commit.files])
         if num_drafts:
             pending_message = commit.getPendingMessage()
             if not pending_message:
-                line.append(('revision-drafts', ' (%s draft%s)' % (
+                line.append(('commit-drafts', ' (%s draft%s)' % (
                             num_drafts, num_drafts>1 and 's' or '')))
         num_comments = sum([len(f.current_comments) for f in commit.files]) - num_drafts
         if num_comments:
-            line.append(('revision-comments', ' (%s inline comment%s)' % (
+            line.append(('commit-comments', ' (%s inline comment%s)' % (
                         num_comments, num_comments>1 and 's' or '')))
         self.title.text.set_text(line)
 
@@ -433,8 +433,8 @@ class ChangeMessageBox(mywid.HyperText):
             text.append(('change-message-draft', ' (draft)'))
         else:
             link = mywid.Link('< Reply >',
-                              'revision-button',
-                              'focused-revision-button')
+                              'commit-button',
+                              'focused-commit-button')
             urwid.connect_signal(link, 'selected',
                                  lambda link:self.reply())
             text.append(' ')
