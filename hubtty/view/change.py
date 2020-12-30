@@ -289,9 +289,9 @@ class CommitRow(urwid.WidgetWrap):
                                      on_press=self.checkout),
                    mywid.FixedButton(('commit-button', "Local Cherry-Pick"),
                                      on_press=self.cherryPick)]
-        if self.can_submit:
-            buttons.append(mywid.FixedButton(('commit-button', "Submit"),
-                                             on_press=lambda x: self.change_view.doSubmitChange()))
+        # if self.can_submit:
+        #     buttons.append(mywid.FixedButton(('commit-button', "Submit"),
+        #                                      on_press=lambda x: self.change_view.doSubmitChange()))
 
         buttons = [('pack', urwid.AttrMap(b, None, focus_map=focus_map)) for b in buttons]
         buttons = urwid.Columns(buttons + [urwid.Text('')], dividechars=2)
@@ -511,20 +511,20 @@ class ChangeView(urwid.WidgetWrap):
              "Toggle the starred flag for the current change"),
             (keymap.LOCAL_CHERRY_PICK,
              "Cherry-pick the most recent commit onto the local repo"),
-            (keymap.ABANDON_CHANGE,
-             "Abandon this change"),
+            # (keymap.ABANDON_CHANGE,
+            #  "Abandon this change"),
             (keymap.EDIT_COMMIT_MESSAGE,
              "Edit the commit message of this change"),
             (keymap.REBASE_CHANGE,
              "Rebase this change (remotely)"),
-            (keymap.RESTORE_CHANGE,
-             "Restore this change"),
+            # (keymap.RESTORE_CHANGE,
+            #  "Restore this change"),
             (keymap.REFRESH,
              "Refresh this change"),
             (keymap.EDIT_HASHTAGS,
              "Edit the hashtags of this change"),
-            (keymap.SUBMIT_CHANGE,
-             "Submit this change"),
+            # (keymap.SUBMIT_CHANGE,
+            #  "Submit this change"),
             (keymap.CHERRY_PICK_CHANGE,
              "Propose this change to another branch"),
             ]
@@ -968,26 +968,26 @@ class ChangeView(urwid.WidgetWrap):
             self.hide_comments = not self.hide_comments
             self.refresh()
             return None
-        if keymap.ABANDON_CHANGE in commands:
-            self.abandonChange()
-            return None
+        # if keymap.ABANDON_CHANGE in commands:
+        #     self.abandonChange()
+        #     return None
         if keymap.EDIT_COMMIT_MESSAGE in commands:
             self.editCommitMessage()
             return None
         if keymap.REBASE_CHANGE in commands:
             self.rebaseChange()
             return None
-        if keymap.RESTORE_CHANGE in commands:
-            self.restoreChange()
-            return None
+        # if keymap.RESTORE_CHANGE in commands:
+        #     self.restoreChange()
+        #     return None
         if keymap.REFRESH in commands:
             self.app.sync.submitTask(
                 sync.SyncChangeTask(self.change_rest_id, priority=sync.HIGH_PRIORITY))
             self.app.status.update()
             return None
-        if keymap.SUBMIT_CHANGE in commands:
-            self.doSubmitChange()
-            return None
+        # if keymap.SUBMIT_CHANGE in commands:
+        #     self.doSubmitChange()
+        #     return None
         if keymap.EDIT_HASHTAGS in commands:
             self.editHashtags()
             return None
@@ -1006,36 +1006,36 @@ class ChangeView(urwid.WidgetWrap):
             screen = view_side_diff.SideDiffView(self.app, commit_key)
         self.app.changeScreen(screen)
 
-    def abandonChange(self):
-        dialog = mywid.TextEditDialog(u'Abandon Change', u'Abandon message:',
-                                      u'Abandon Change',
-                                      self.pending_status_message)
-        urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
-        urwid.connect_signal(dialog, 'save', lambda button:
-                                 self.doAbandonRestoreChange(dialog, 'ABANDONED'))
-        self.app.popup(dialog)
+    # def abandonChange(self):
+    #     dialog = mywid.TextEditDialog(u'Abandon Change', u'Abandon message:',
+    #                                   u'Abandon Change',
+    #                                   self.pending_status_message)
+    #     urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
+    #     urwid.connect_signal(dialog, 'save', lambda button:
+    #                              self.doAbandonRestoreChange(dialog, 'ABANDONED'))
+    #     self.app.popup(dialog)
 
-    def restoreChange(self):
-        dialog = mywid.TextEditDialog(u'Restore Change', u'Restore message:',
-                                      u'Restore Change',
-                                      self.pending_status_message)
-        urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
-        urwid.connect_signal(dialog, 'save', lambda button:
-                                 self.doAbandonRestoreChange(dialog, 'NEW'))
-        self.app.popup(dialog)
+    # def restoreChange(self):
+    #     dialog = mywid.TextEditDialog(u'Restore Change', u'Restore message:',
+    #                                   u'Restore Change',
+    #                                   self.pending_status_message)
+    #     urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
+    #     urwid.connect_signal(dialog, 'save', lambda button:
+    #                              self.doAbandonRestoreChange(dialog, 'NEW'))
+    #     self.app.popup(dialog)
 
-    def doAbandonRestoreChange(self, dialog, state):
-        change_key = None
-        with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            change.state = state
-            change.pending_status = True
-            change.pending_status_message = dialog.entry.edit_text
-            change_key = change.key
-        self.app.sync.submitTask(
-            sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
-        self.app.backScreen()
-        self.refresh()
+    # def doAbandonRestoreChange(self, dialog, state):
+    #     change_key = None
+    #     with self.app.db.getSession() as session:
+    #         change = session.getChange(self.change_key)
+    #         change.state = state
+    #         change.pending_status = True
+    #         change.pending_status_message = dialog.entry.edit_text
+    #         change_key = change.key
+    #     self.app.sync.submitTask(
+    #         sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
+    #     self.app.backScreen()
+    #     self.refresh()
 
     def editCommitMessage(self):
         with self.app.db.getSession() as session:
@@ -1110,17 +1110,17 @@ class ChangeView(urwid.WidgetWrap):
         self.app.backScreen()
         self.refresh()
 
-    def doSubmitChange(self):
-        change_key = None
-        with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            change.state = 'SUBMITTED'
-            change.pending_status = True
-            change.pending_status_message = None
-            change_key = change.key
-        self.app.sync.submitTask(
-            sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
-        self.refresh()
+    # def doSubmitChange(self):
+    #     change_key = None
+    #     with self.app.db.getSession() as session:
+    #         change = session.getChange(self.change_key)
+    #         change.state = 'SUBMITTED'
+    #         change.pending_status = True
+    #         change.pending_status_message = None
+    #         change_key = change.key
+    #     self.app.sync.submitTask(
+    #         sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
+    #     self.refresh()
 
     def editHashtags(self):
         dialog = EditHashtagsDialog(self.app, self.hashtags)
