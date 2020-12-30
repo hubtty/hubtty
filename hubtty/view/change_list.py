@@ -746,10 +746,11 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
         revision_keys = [row.current_revision_key for row in rows]
         message_keys = self.app.saveReviews(revision_keys, approvals,
                                             message, upload, submit)
-        if upload:
-            for message_key in message_keys:
-                self.app.sync.submitTask(
-                    sync.UploadReviewTask(message_key, sync.HIGH_PRIORITY))
+        # TODO(mandre) Uncomment once we implement upload
+        # if upload:
+        #     for message_key in message_keys:
+        #         self.app.sync.submitTask(
+        #             sync.UploadReviewTask(message_key, sync.HIGH_PRIORITY))
         self.refresh()
         self.app.backScreen()
 

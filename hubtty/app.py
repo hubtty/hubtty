@@ -770,12 +770,13 @@ class App(object):
             change = session.getChange(change_key)
             change.held = not change.held
             ret = change.held
-            if not change.held:
-                for c in change.commits:
-                    for m in change.messages:
-                        if m.pending:
-                            self.sync.submitTask(
-                                sync.UploadReviewTask(m.key, sync.HIGH_PRIORITY))
+            # TODO(mandre) Uncomment once we implement upload
+            # if not change.held:
+            #     for c in change.commits:
+            #         for m in change.messages:
+            #             if m.pending:
+            #                 self.sync.submitTask(
+            #                     sync.UploadReviewTask(m.key, sync.HIGH_PRIORITY))
         self.updateStatusQueries()
         return ret
 
