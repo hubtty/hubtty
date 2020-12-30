@@ -311,7 +311,7 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             (keymap.TOGGLE_HELD,
              "Toggle the held flag for the currently selected change"),
             (keymap.LOCAL_CHECKOUT,
-             "Checkout the most recent commit of the selected change into the local repo"),
+             "Checkout the selected change into the local repo"),
             (keymap.TOGGLE_HIDDEN,
              "Toggle the hidden flag for the currently selected change"),
             (keymap.TOGGLE_LIST_REVIEWED,
