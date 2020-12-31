@@ -115,9 +115,9 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
 
         rows = []
         categories = {
-            'CHANGES_REQUESTED': 'Request Changes',
-            'COMMENTED': 'Comment',
-            'APPROVED': 'Approve'
+            'REQUEST_CHANGES': 'Request Changes',
+            'COMMENT': 'Comment',
+            'APPROVE': 'Approve'
         }
         values = {}
         descriptions = {}
@@ -137,15 +137,15 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                         current = approval.category
                         break
                 if current is None:
-                    current = 'COMMENTED'
+                    current = 'COMMENT'
 
                 rows.append(urwid.Text('Review changes:'))
                 for category in categories:
                     b = urwid.RadioButton(self.button_group, categories[category], state=(category == current))
                     b._value = category
-                    if category == 'APPROVED':
+                    if category == 'APPROVE':
                         b = urwid.AttrMap(b, 'positive-label')
-                    elif category == 'CHANGES_REQUESTED':
+                    elif category == 'REQUEST_CHANGES':
                         b = urwid.AttrMap(b, 'negative-label')
                     rows.append(b)
                 rows.append(urwid.Divider())
@@ -680,9 +680,9 @@ class ChangeView(urwid.WidgetWrap):
                     votes.addRow(row)
                 # Only set approval status if the review is for the current commit
                 if approval.sha == change.commits[-1].sha:
-                    if approval.category == 'APPROVED':
+                    if approval.category in ['APPROVED', 'APPROVE']:
                         approvals['Approved'].set_text(('positive-label', '✓'))
-                    elif approval.category == 'CHANGES_REQUESTED':
+                    elif approval.category in ['CHANGES_REQUESTED', 'REQUEST_CHANGES']:
                         approvals['Changes Requested'].set_text(('negative-label', '✗'))
                     else:
                         approvals['Comment'].set_text('•')
@@ -1133,10 +1133,10 @@ class ChangeView(urwid.WidgetWrap):
     def saveReview(self, commit_key, approval, message, upload, submit):
         message_keys = self.app.saveReviews([commit_key], approval,
                                             message, upload, submit)
-        # if upload:
-        #     for message_key in message_keys:
-        #         self.app.sync.submitTask(
-        #             sync.UploadReviewTask(message_key, sync.HIGH_PRIORITY))
+        if upload:
+            for message_key in message_keys:
+                self.app.sync.submitTask(
+                    sync.UploadReviewTask(message_key, sync.HIGH_PRIORITY))
         self.refresh()
         if self.app.config.close_change_on_review:
             self.app.backScreen()

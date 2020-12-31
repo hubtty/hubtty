@@ -1282,11 +1282,12 @@ class UploadReviewTask(Task):
                     self.message_key))
                 return
             change = message.commit.change
-            if change.pending_status and change.state == 'SUBMITTED':
-                submit = True
+            # TODO(mandre) figure out if `submit` action makes sense for github workflow
+            # if change.pending_status and change.state == 'SUBMITTED':
+            #     submit = True
         if not change.held:
-            self.log.debug("Syncing %s to find out if it should be held" % (change.id,))
-            t = SyncChangeTask(change.id)
+            self.log.debug("Syncing %s to find out if it should be held" % (change.change_id,))
+            t = SyncChangeTask(change.change_id)
             t.run(sync)
             self.results += t.results
         change_id = None
@@ -1296,43 +1297,42 @@ class UploadReviewTask(Task):
             change = message.commit.change
             if change.held:
                 self.log.debug("Not uploading review to %s because it is held" %
-                               (change.id,))
+                               (change.change_id,))
                 return
-            change_id = change.id
+            change_id = change.change_id
             current_commit = change.commits[-1]
-            data = dict(message=message.message,
-                        strict_labels=False)
+            data = dict(commit_id=current_commit.sha,
+                        body=message.message)
             if commit == current_commit:
-                data['labels'] = {}
                 for approval in change.draft_approvals:
-                    data['labels'][approval.category] = approval.value
+                    data['event'] = approval.category
                     session.delete(approval)
-            comments = {}
+            comments = []
             for file in commit.files:
                 if file.draft_comments:
-                    comment_list = []
                     for comment in file.draft_comments:
-                        d = dict(line=comment.line,
-                                 message=comment.message)
+                        d = dict(path=file.path,
+                                 line=comment.line,
+                                 body=comment.message)
                         if comment.parent:
                             d['side'] = 'PARENT'
-                        comment_list.append(d)
+                        comments.append(d)
                         session.delete(comment)
-                    comments[file.path] = comment_list
             if comments:
                 data['comments'] = comments
             session.delete(message)
             # Inside db session for rollback
-            sync.post('changes/%s/revisions/%s/review' % (change.change_id, commit.sha),
+            sync.post('repos/%s/reviews' % (change_id,),
                       data)
-        if submit:
-            # In another db session in case submit fails after posting
-            # the message succeeds
-            with app.db.getSession() as session:
-                change = session.getChangeByID(change_id)
-                change.pending_status = False
-                change.pending_status_message = None
-                sync.post('changes/%s/submit' % (change_id,), {})
+        # TODO(mandre) figure out if `submit` action makes sense for github workflow
+        # if submit:
+        #     # In another db session in case submit fails after posting
+        #     # the message succeeds
+        #     with app.db.getSession() as session:
+        #         change = session.getChangeByID(change_id)
+        #         change.pending_status = False
+        #         change.pending_status_message = None
+        #         sync.post('changes/%s/submit' % (change_id,), {})
         sync.submitTask(SyncChangeTask(change_id, priority=self.priority))
 
 class PruneDatabaseTask(Task):
@@ -1527,7 +1527,8 @@ class Sync(object):
         self.log.debug('data: %s' % (data,))
         r = self.session.post(url, data=json.dumps(data).encode('utf8'),
                               timeout=TIMEOUT,
-                              headers = {'Content-Type': 'application/json;charset=UTF-8',
+                              headers = {'Accept': 'application/vnd.github.v3+json',
+                                         'Content-Type': 'application/json;charset=UTF-8',
                                          'User-Agent': self.user_agent})
         self.checkResponse(r)
         self.log.debug('Received: %s' % (r.text,))
@@ -1535,9 +1536,9 @@ class Sync(object):
         if r.status_code > 400:
             raise Exception("POST to %s failed with http code %s (%s)",
                             path, r.status_code, r.text)
-        if r.text and len(r.text)>4:
+        if r.text and len(r.text)>0:
             try:
-                ret = json.loads(r.text[4:])
+                ret = json.loads(r.text)
             except Exception:
                 self.log.exception("Unable to parse result %s from post to %s" %
                                    (r.text, url))
