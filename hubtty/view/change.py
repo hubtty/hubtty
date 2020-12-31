@@ -114,10 +114,14 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             lambda button:self._emit('cancel'))
 
         rows = []
-        categories = []
+        categories = {
+            'CHANGES_REQUESTED': 'Request Changes',
+            'COMMENTED': 'Comment',
+            'APPROVED': 'Approve'
+        }
         values = {}
         descriptions = {}
-        self.button_groups = {}
+        self.button_group = []
         with self.app.db.getSession() as session:
             commit = session.getCommit(self.commit_key)
             change = commit.change
@@ -127,61 +131,24 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             buttons.append(('pack', cancel_button))
             buttons = urwid.Columns(buttons, dividechars=2)
             if commit == change.commits[-1]:
-                for label in change.labels:
-                    d = descriptions.setdefault(label.category, {})
-                    d[label.value] = label.description
-                    vmin = d.setdefault('min', label.value)
-                    if label.value < vmin:
-                        d['min'] = label.value
-                    vmax = d.setdefault('max', label.value)
-                    if label.value > vmax:
-                        d['max'] = label.value
-                for label in change.permitted_labels:
-                    if label.category not in categories:
-                        categories.append(label.category)
-                        values[label.category] = []
-                    values[label.category].append(label.value)
-                draft_approvals = {}
-                prior_approvals = {}
+                current = None
                 for approval in change.approvals:
                     if self.app.isOwnAccount(approval.reviewer):
-                        if approval.draft:
-                            draft_approvals[approval.category] = approval
-                        else:
-                            prior_approvals[approval.category] = approval
+                        current = approval.category
+                        break
+                if current is None:
+                    current = 'COMMENTED'
+
+                rows.append(urwid.Text('Review changes:'))
                 for category in categories:
-                    rows.append(urwid.Text(category))
-                    group = []
-                    self.button_groups[category] = group
-                    current = draft_approvals.get(category)
-                    if current is None:
-                        current = prior_approvals.get(category)
-                    if current is None:
-                        current = 0
-                    else:
-                        current = current.value
-                    for value in sorted(values[category], reverse=True):
-                        if value > 0:
-                            strvalue = '+%s' % value
-                        elif value == 0:
-                            strvalue = ' 0'
-                        else:
-                            strvalue = str(value)
-                        strvalue += '  ' + descriptions[category][value]
-                        b = urwid.RadioButton(group, strvalue, state=(value == current))
-                        b._value = value
-                        if value > 0:
-                            if value == descriptions[category]['max']:
-                                b = urwid.AttrMap(b, 'max-label')
-                            else:
-                                b = urwid.AttrMap(b, 'positive-label')
-                        elif value < 0:
-                            if value == descriptions[category]['min']:
-                                b = urwid.AttrMap(b, 'min-label')
-                            else:
-                                b = urwid.AttrMap(b, 'negative-label')
-                        rows.append(b)
-                    rows.append(urwid.Divider())
+                    b = urwid.RadioButton(self.button_group, categories[category], state=(category == current))
+                    b._value = category
+                    if category == 'APPROVED':
+                        b = urwid.AttrMap(b, 'positive-label')
+                    elif category == 'CHANGES_REQUESTED':
+                        b = urwid.AttrMap(b, 'negative-label')
+                    rows.append(b)
+                rows.append(urwid.Divider())
             m = commit.getPendingMessage()
             if not m:
                 m = commit.getDraftMessage()
@@ -197,13 +164,12 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         super(ReviewDialog, self).__init__(urwid.LineBox(fill, 'Review'))
 
     def getValues(self):
-        approvals = {}
-        for category, group in self.button_groups.items():
-            for button in group:
-                if button.state:
-                    approvals[category] = button._value
+        approval = None
+        for button in self.button_group:
+            if button.state:
+                approval = button._value
         message = self.message.edit_text.strip()
-        return (approvals, message)
+        return (approval, message)
 
     def keypress(self, size, key):
         if not self.app.input_buffer:
