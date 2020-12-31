@@ -806,42 +806,30 @@ class App(object):
             lambda button: self.backScreen())
         self.popup(dialog, min_height=min_height)
 
-    def saveReviews(self, commit_keys, approvals, message, upload, submit):
+    def saveReviews(self, commit_keys, approval, message, upload, submit):
         message_keys = []
         with self.db.getSession() as session:
             account = session.getOwnAccount()
             for commit_key in commit_keys:
                 k = self._saveReview(session, account, commit_key,
-                                     approvals, message, upload, submit)
+                                     approval, message, upload, submit)
                 if k:
                     message_keys.append(k)
         return message_keys
 
     def _saveReview(self, session, account, commit_key,
-                    approvals, message, upload, submit):
+                    approval, message, upload, submit):
         message_key = None
         commit = session.getCommit(commit_key)
         change = commit.change
-        draft_approvals = {}
-        for approval in change.draft_approvals:
-            draft_approvals[approval.category] = approval
+        change.createApproval(account, approval, commit.sha, draft=True)
 
-        categories = set()
-        for label in change.permitted_labels:
-            categories.add(label.category)
-        for category in categories:
-            value = approvals.get(category, 0)
-            approval = draft_approvals.get(category)
-            if not approval:
-                approval = change.createApproval(account, category, 0, draft=True)
-                draft_approvals[category] = approval
-            approval.value = value
         draft_message = commit.getPendingMessage()
         if not draft_message:
             draft_message = commit.getDraftMessage()
         if not draft_message:
             if message or upload:
-                draft_message = commit.createMessage(None, account,
+                draft_message = change.createMessage(commit.key, None, account,
                                                      datetime.datetime.utcnow(),
                                                      '', draft=True)
         if draft_message:
@@ -852,10 +840,11 @@ class App(object):
         if upload:
             change.reviewed = True
             self.project_cache.clear(change.project)
-        if submit:
-            change.status = 'SUBMITTED'
-            change.pending_status = True
-            change.pending_status_message = None
+        # TODO(mandre) figure out if `submit` action makes sense for github workflow
+        # if submit:
+        #     change.status = 'SUBMITTED'
+        #     change.pending_status = True
+        #     change.pending_status_message = None
         return message_key
 
 

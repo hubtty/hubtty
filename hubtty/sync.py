@@ -892,6 +892,8 @@ class SyncChangeTask(Task):
                     if associated_commit:
                         associated_commit_id = associated_commit.key
 
+                # FIXME(mandre) Messages created from a review in hubtty are
+                # missing an ID, this will cause duplicated messages
                 message = session.getMessageByID(remote_review['id'])
                 if not message:
                     # Normalize date -> created

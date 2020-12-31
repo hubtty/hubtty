@@ -204,10 +204,9 @@ class ReviewButton(mywid.FixedButton):
                                    min_width=60, min_height=20)
 
     def closeReview(self, upload, submit):
-        approvals, message = self.dialog.getValues()
-        # TODO(mandre) uncomment once implemented
-        # self.change_view.saveReview(self.commit_row.commit_key, approvals,
-        #                             message, upload, submit)
+        approval, message = self.dialog.getValues()
+        self.change_view.saveReview(self.commit_row.commit_key, approval,
+                                    message, upload, submit)
         self.change_view.app.backScreen()
 
 class CommitRow(urwid.WidgetWrap):
@@ -1131,13 +1130,13 @@ class ChangeView(urwid.WidgetWrap):
         # TODO(mandre) uncomment once implemented
         # self.saveReview(row.commit_key, approvals, message, True, submit)
 
-    def saveReview(self, commit_key, approvals, message, upload, submit):
-        message_keys = self.app.saveReviews([commit_key], approvals,
+    def saveReview(self, commit_key, approval, message, upload, submit):
+        message_keys = self.app.saveReviews([commit_key], approval,
                                             message, upload, submit)
-        if upload:
-            for message_key in message_keys:
-                self.app.sync.submitTask(
-                    sync.UploadReviewTask(message_key, sync.HIGH_PRIORITY))
+        # if upload:
+        #     for message_key in message_keys:
+        #         self.app.sync.submitTask(
+        #             sync.UploadReviewTask(message_key, sync.HIGH_PRIORITY))
         self.refresh()
         if self.app.config.close_change_on_review:
             self.app.backScreen()
