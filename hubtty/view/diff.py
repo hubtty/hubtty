@@ -531,7 +531,13 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             account = session.getOwnAccount()
             change = session.getChange(self.change_key)
             commit = session.getCommit(self.new_commit_key)
-            comment = change.createComment(file_key, None, account, None,
+
+            message = commit.getPendingMessage()
+            if not message:
+                message = change.createMessage(commit.key, None, account,
+                                               datetime.datetime.utcnow(),
+                                               '', draft=True)
+            comment = message.createComment(file_key, None, account, None,
                                             datetime.datetime.utcnow(),
                                             datetime.datetime.utcnow(),
                                             parent, commit.sha, commit.sha,
