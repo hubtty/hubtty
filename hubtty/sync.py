@@ -1427,7 +1427,7 @@ class Sync(object):
         self.submitTask(SyncOwnAccountTask(HIGH_PRIORITY))
         if not disable_background_sync:
             self.submitTask(CheckReposTask(HIGH_PRIORITY))
-            # self.submitTask(UploadReviewsTask(HIGH_PRIORITY))
+            self.submitTask(UploadReviewsTask(HIGH_PRIORITY))
             self.submitTask(SyncProjectListTask(HIGH_PRIORITY))
             self.submitTask(SyncSubscribedProjectsTask(NORMAL_PRIORITY))
             self.submitTask(SyncAccountsTask(NORMAL_PRIORITY))
@@ -1477,8 +1477,8 @@ class Sync(object):
                 requests.exceptions.ReadTimeout
         ) as e:
             self.log.warning("Offline due to: %s" % (e,))
-            # if not self.offline:
-            #     self.submitTask(UploadReviewsTask(HIGH_PRIORITY))
+            if not self.offline:
+                self.submitTask(UploadReviewsTask(HIGH_PRIORITY))
             self.offline = True
             self.app.status.update(offline=True, refresh=False)
             os.write(pipe, six.b('refresh\n'))
