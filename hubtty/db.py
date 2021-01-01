@@ -29,6 +29,8 @@ from sqlalchemy.orm.session import Session
 from sqlalchemy.sql import exists
 from sqlalchemy.sql.expression import and_
 
+from hubtty import sync
+
 metadata = MetaData()
 project_table = Table(
     'project', metadata,
@@ -805,6 +807,7 @@ class Database(object):
         self.dburi = dburi
         self.search = search
         self.engine = create_engine(self.dburi)
+        self.app = app
         #metadata.create_all(self.engine)
         self.migrate(app)
         # If we want the objects returned from query() to be usable
@@ -1073,6 +1076,9 @@ class DatabaseSession(object):
             account = self.session().query(Account).filter_by(id=id).one()
         except sqlalchemy.orm.exc.NoResultFound:
             account = self.createAccount(id)
+            if username:
+                self.database.app.sync.submitTask(
+                    sync.SyncAccountTask(username, sync.NORMAL_PRIORITY))
         if name is not None and account.name != name:
             account.name = name
         if username is not None and account.username != username:
