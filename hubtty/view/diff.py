@@ -251,7 +251,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 if comment.draft:
                     message = comment.message
                 else:
-                    message = [('comment-name', comment.author.name),
+                    message = [('comment-name', comment.author.name or comment.author.username),
                                ('comment', u': '+comment.message)]
                 comment_list.append((comment.key, message))
                 comment_lists[key] = comment_list
@@ -269,7 +269,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 if comment.draft:
                     message = comment.message
                 else:
-                    message = [('comment-name', comment.author.name),
+                    message = [('comment-name', comment.author.name or comment.author.username),
                                ('comment', u': '+comment.message)]
                 comment_list.append((comment.key, message))
                 comment_lists[key] = comment_list
