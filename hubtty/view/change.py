@@ -374,9 +374,6 @@ class ChangeMessageBox(mywid.HyperText):
         self.message_text = message.message
         created = self.app.time(message.created)
         lines = message.message.split('\n')
-        if message.draft:
-            lines.insert(0, '')
-            lines.insert(0, 'Patch Set %s:' % (message.commit.number,))
         if self.app.isOwnAccount(message.author):
             name_style = 'change-message-own-name'
             header_style = 'change-message-own-header'
