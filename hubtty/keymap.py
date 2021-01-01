@@ -156,11 +156,26 @@ DEFAULT_KEYMAP = {
 # keymap, so anything not defined here will just use what's defined
 # above.
 VI_KEYMAP = {
-    QUIT: [[':', 'q']],
-    CURSOR_LEFT: 'h',
-    CURSOR_DOWN: 'j',
-    CURSOR_UP: 'k',
-    CURSOR_RIGHT: 'l',
+    QUIT: [[':', 'q'], 'ctrl q'],
+    CURSOR_LEFT: ['h', 'left'],
+    CURSOR_DOWN: ['j', 'down'],
+    CURSOR_UP: ['k', 'up'],
+    CURSOR_RIGHT: ['l', 'right'],
+    # 'ctrl u' mapping conflicts with SUBMIT_CHANGE
+    CURSOR_PAGE_UP: ['ctrl u', 'page up'],
+    # 'ctrl d' mapping conflicts with EDIT_COMMIT_MESSAGE
+    CURSOR_PAGE_DOWN: ['ctrl d', 'page down'],
+    # The `gg` repetition doesn't seem to work, we bind `g` instead
+    CURSOR_MAX_LEFT: ['g', '^', 'home', 'ctrl a'],
+    CURSOR_MAX_RIGHT: ['G', '$', 'end', 'ctrl e'],
+    INTERACTIVE_SEARCH: '/',
+    TOGGLE_REVIEWED: [['t', 'r']],
+    TOGGLE_HIDDEN: [['t', 'h']],
+    TOGGLE_LIST_REVIEWED: [['t', 'R']],
+    TOGGLE_LIST_SUBSCRIBED: 'L',
+
+    SUBMIT_CHANGE: 'ctrl s',
+    EDIT_COMMIT_MESSAGE: 'ctrl c',
 }
 
 URWID_COMMANDS = frozenset((
