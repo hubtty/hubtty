@@ -742,15 +742,14 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
                        min_width=60, min_height=20)
 
     def closeReview(self, dialog, rows, upload, submit):
-        approvals, message = dialog.getValues()
+        approval, message = dialog.getValues()
         commit_keys = [row.current_commit_key for row in rows]
-        message_keys = self.app.saveReviews(commit_keys, approvals,
+        message_keys = self.app.saveReviews(commit_keys, approval,
                                             message, upload, submit)
-        # TODO(mandre) Uncomment once we implement upload
-        # if upload:
-        #     for message_key in message_keys:
-        #         self.app.sync.submitTask(
-        #             sync.UploadReviewTask(message_key, sync.HIGH_PRIORITY))
+        if upload:
+            for message_key in message_keys:
+                self.app.sync.submitTask(
+                    sync.UploadReviewTask(message_key, sync.HIGH_PRIORITY))
         self.refresh()
         self.app.backScreen()
 
