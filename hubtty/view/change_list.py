@@ -534,8 +534,9 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             change.starred = not change.starred
             ret = change.starred
             change.pending_starred = True
-        self.app.sync.submitTask(
-            sync.ChangeStarredTask(change_key, sync.HIGH_PRIORITY))
+        # TODO(mandre) Uncomment when implemented
+        # self.app.sync.submitTask(
+        #     sync.ChangeStarredTask(change_key, sync.HIGH_PRIORITY))
         return ret
 
     def toggleHeld(self, change_key):

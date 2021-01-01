@@ -1060,18 +1060,19 @@ class UploadReviewsTask(Task):
     def run(self, sync):
         app = sync.app
         with app.db.getSession() as session:
-            for c in session.getPendingHashtags():
-                sync.submitTask(SetHashtagsTask(c.key, self.priority))
-            for c in session.getPendingRebases():
-                sync.submitTask(RebaseChangeTask(c.key, self.priority))
-            for c in session.getPendingStatusChanges():
-                sync.submitTask(ChangeStatusTask(c.key, self.priority))
-            for c in session.getPendingStarred():
-                sync.submitTask(ChangeStarredTask(c.key, self.priority))
-            for c in session.getPendingCherryPicks():
-                sync.submitTask(SendCherryPickTask(c.key, self.priority))
-            for r in session.getPendingCommitMessages():
-                sync.submitTask(ChangeCommitMessageTask(r.key, self.priority))
+            # TODO(mandre) Uncomment when implemented
+            # for c in session.getPendingHashtags():
+            #     sync.submitTask(SetHashtagsTask(c.key, self.priority))
+            # for c in session.getPendingRebases():
+            #     sync.submitTask(RebaseChangeTask(c.key, self.priority))
+            # for c in session.getPendingStatusChanges():
+            #     sync.submitTask(ChangeStatusTask(c.key, self.priority))
+            # for c in session.getPendingStarred():
+            #     sync.submitTask(ChangeStarredTask(c.key, self.priority))
+            # for c in session.getPendingCherryPicks():
+            #     sync.submitTask(SendCherryPickTask(c.key, self.priority))
+            # for r in session.getPendingCommitMessages():
+            #     sync.submitTask(ChangeCommitMessageTask(r.key, self.priority))
             for m in session.getPendingMessages():
                 sync.submitTask(UploadReviewTask(m.key, self.priority))
 

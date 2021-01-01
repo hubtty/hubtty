@@ -863,8 +863,9 @@ class ChangeView(urwid.WidgetWrap):
             change = session.getChange(self.change_key)
             change.starred = not change.starred
             change.pending_starred = True
-        self.app.sync.submitTask(
-            sync.ChangeStarredTask(self.change_key, sync.HIGH_PRIORITY))
+        # TODO(mandre) Uncomment when implemented
+        # self.app.sync.submitTask(
+        #     sync.ChangeStarredTask(self.change_key, sync.HIGH_PRIORITY))
 
     def toggleHeld(self):
         return self.app.toggleHeldChange(self.change_key)
@@ -1019,8 +1020,9 @@ class ChangeView(urwid.WidgetWrap):
             commit.message = dialog.entry.edit_text
             commit.pending_message = True
             commit_key = commit.key
-        self.app.sync.submitTask(
-            sync.ChangeCommitMessageTask(commit_key, sync.HIGH_PRIORITY))
+        # TODO(mandre) Uncomment when implemented
+        # self.app.sync.submitTask(
+        #     sync.ChangeCommitMessageTask(commit_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
@@ -1037,8 +1039,9 @@ class ChangeView(urwid.WidgetWrap):
             change = session.getChange(self.change_key)
             change.pending_rebase = True
             change_key = change.key
-        self.app.sync.submitTask(
-            sync.RebaseChangeTask(change_key, sync.HIGH_PRIORITY))
+        # TODO(mandre) Uncomment when implemented
+        # self.app.sync.submitTask(
+        #     sync.RebaseChangeTask(change_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
@@ -1067,8 +1070,9 @@ class ChangeView(urwid.WidgetWrap):
                                (change.commits[-1].sha, branch))
             cp = change.commits[-1].createPendingCherryPick(branch, message)
             cp_key = cp.key
-        self.app.sync.submitTask(
-            sync.SendCherryPickTask(cp_key, sync.HIGH_PRIORITY))
+        # TODO(mandre) Uncomment when implemented
+        # self.app.sync.submitTask(
+        #     sync.SendCherryPickTask(cp_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
@@ -1100,8 +1104,9 @@ class ChangeView(urwid.WidgetWrap):
                 change.setHashtags([x.strip() for x in dialog.entry.edit_text.split(',')])
                 change.pending_hashtags = True
                 change_key = change.key
-            self.app.sync.submitTask(
-                sync.SetHashtagsTask(change_key, sync.HIGH_PRIORITY))
+            # TODO(mandre) Uncomment when implemented
+            # self.app.sync.submitTask(
+            #     sync.SetHashtagsTask(change_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
