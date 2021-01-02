@@ -452,7 +452,7 @@ class ChangeView(urwid.WidgetWrap):
             (keymap.LOCAL_CHECKOUT,
              "Checkout the change into the local repo"),
             (keymap.DIFF,
-             "Show the diff of the most recent commit"),
+             "Show the diff of the first commit"),
             (keymap.TOGGLE_HIDDEN,
              "Toggle the hidden flag for the current change"),
             (keymap.NEXT_CHANGE,
@@ -507,6 +507,7 @@ class ChangeView(urwid.WidgetWrap):
         self.change_key = change_key
         self.commit_rows = {}
         self.message_rows = {}
+        self.first_commit_key = None
         self.last_commit_key = None
         self.hide_comments = True
         self.marked_seen = False
@@ -697,6 +698,7 @@ class ChangeView(urwid.WidgetWrap):
             # may later contain the vote table and change header), so
             # keep track of the index separate from the loop.
             listbox_index = self.listbox_patchset_start
+            self.first_commit_key = change.commits[0].key
             for commit in change.commits:
                 self.last_commit_key = commit.key
                 row = self.commit_rows.get(commit.key)
@@ -896,7 +898,7 @@ class ChangeView(urwid.WidgetWrap):
             row.review_button.openReview()
             return None
         if keymap.DIFF in commands:
-            row = self.commit_rows[self.last_commit_key]
+            row = self.commit_rows[self.first_commit_key]
             row.diff(None)
             return None
         if keymap.LOCAL_CHECKOUT in commands:
