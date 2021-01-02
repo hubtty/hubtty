@@ -238,16 +238,11 @@ class SyncProjectListTask(Task):
     def run(self, sync):
         app = sync.app
 
-        page = 1
-        remote = set()
         remote_keys = set()
         remote_desc = dict()
-        while page == 1 or len(remote) > 0:
-            remote = sync.get('user/repos?page=%d&per_page=100' % page)
-            for r in remote:
-                remote_keys.add(r['full_name'])
-                remote_desc[r['full_name']] = (r.get('description', '') or '').replace('\r','')
-            page = page + 1
+        for r in sync.get('user/repos?per_page=100'):
+            remote_keys.add(r['full_name'])
+            remote_desc[r['full_name']] = (r.get('description', '') or '').replace('\r','')
 
         with app.db.getSession() as session:
             local = {}
@@ -297,7 +292,7 @@ class SyncProjectBranchesTask(Task):
 
     def run(self, sync):
         app = sync.app
-        remote = sync.get('repos/%s/branches' % self.project_name)
+        remote = sync.get('repos/%s/branches?per_page=100' % self.project_name)
         remote_branches = set()
         for b in remote:
             remote_branches.add(b['name'])
@@ -626,10 +621,10 @@ class SyncChangeTask(Task):
     def _syncChange(self, sync):
         app = sync.app
         remote_change = sync.get('repos/%s' % self.change_id)
-        remote_commits = sync.get('repos/%s/commits' % self.change_id)
-        remote_pr_comments = sync.get('repos/%s/comments' % self.change_id)
-        remote_pr_reviews = sync.get('repos/%s/reviews' % self.change_id)
-        remote_issue_comments = sync.get(('repos/%s/comments'
+        remote_commits = sync.get('repos/%s/commits?per_page=100' % self.change_id)
+        remote_pr_comments = sync.get('repos/%s/comments?per_page=100' % self.change_id)
+        remote_pr_reviews = sync.get('repos/%s/reviews?per_page=100' % self.change_id)
+        remote_issue_comments = sync.get(('repos/%s/comments?per_page=100'
                                           % self.change_id).replace('/pulls/', '/issues/'))
 
         project_name = remote_change['base']['repo']['full_name']
@@ -1508,20 +1503,32 @@ class Sync(object):
 
     def get(self, path):
         url = self.url(path)
-        self.log.debug('GET: %s' % (url,))
-        r = self.session.get(url,
-                             timeout=TIMEOUT,
-                             headers = {'Accept': 'application/vnd.github.v3+json',
-                                        'Accept-Encoding': 'gzip',
-                                        'User-Agent': self.user_agent})
-        self.checkResponse(r)
-        if r.status_code == 200:
-            ret = json.loads(r.text)
-            if len(ret):
-                self.log.debug('200 OK, Received: %s' % (ret,))
+        ret = None
+        done = False
+
+        while not done:
+            self.log.debug('GET: %s' % (url,))
+            r = self.session.get(url,
+                                 timeout=TIMEOUT,
+                                 headers = {'Accept': 'application/vnd.github.v3+json',
+                                            'Accept-Encoding': 'gzip',
+                                            'User-Agent': self.user_agent})
+            self.checkResponse(r)
+            if r.status_code == 200:
+                result = json.loads(r.text)
+                if isinstance(ret, list):
+                    ret.extend(result)
+                else:
+                    ret = result
+                if len(result):
+                    self.log.debug('200 OK, Received: %s' % (result,))
+                else:
+                    self.log.debug('200 OK, No body.')
+            if 'next' in r.links.keys():
+                url = r.links['next']['url']
             else:
-                self.log.debug('200 OK, No body.')
-            return ret
+                done = True
+        return ret
 
     def post(self, path, data):
         url = self.url(path)
@@ -1603,28 +1610,11 @@ class Sync(object):
         self.submitTask(task)
 
     def query(self, queries):
-        changes = []
-        sortkey = ''
-        done = False
-        offset = 0
-        while not done:
-            query = '&'.join(queries)
-            # We don't actually want to limit to 500, but that's the server-side default, and
-            # if we don't specify this, we won't get a _more_changes flag.
-            q = 'search/issues?q=%s' % query
-            self.log.debug('Query: %s' % (q,))
-            responses = self.get(q)
-            if len(queries) == 1:
-                return responses.get('items', [])
-                # responses = [responses]
-            done = True
-            # for batch in responses:
-            #     changes += batch
-            #     if batch and '_more_changes' in batch[-1]:
-            #         done = False
-            #         if '_sortkey' in batch[-1]:
-            #             sortkey = '&N=%s' % (batch[-1]['_sortkey'],)
-            #         else:
-            #             offset += len(batch)
-            #             sortkey = '&start=%s' % (offset,)
-        return changes
+        query = '&'.join(queries)
+        q = 'search/issues?per_page=100&q=%s' % query
+        self.log.debug('Query: %s' % (q,))
+        responses = self.get(q)
+        if len(queries) == 1:
+            return responses.get('items', [])
+        else:
+            return responses
