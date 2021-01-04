@@ -354,7 +354,6 @@ class SyncProjectTask(Task):
     def run(self, sync):
         app = sync.app
         now = datetime.datetime.utcnow()
-        queries = []
         with app.db.getSession() as session:
             for project_key in self.project_keys:
                 project = session.getProject(project_key)
@@ -364,11 +363,9 @@ class SyncProjectTask(Task):
                     query += ' created:>%s' % ((project.updated - datetime.timedelta(seconds=4)).replace(microsecond=0).isoformat(),)
                 else:
                     query += ' state:open'
-                queries.append(query)
-        changes = sync.query(queries)
-
-        for c in changes:
-            sync.submitTask(SyncChangeTask(c['pull_request']['url'].split('repos/')[1], priority=self.priority))
+                changes = sync.query(query)
+                for c in changes:
+                    sync.submitTask(SyncChangeTask(c['pull_request']['url'].split('repos/')[1], priority=self.priority))
 
         for key in self.project_keys:
             sync.submitTask(SetProjectUpdatedTask(key, now, priority=self.priority))
@@ -1609,12 +1606,8 @@ class Sync(object):
         task = SyncChangesByCommitsTask([commit], priority)
         self.submitTask(task)
 
-    def query(self, queries):
-        query = '&'.join(queries)
+    def query(self, query):
         q = 'search/issues?per_page=100&q=%s' % query
         self.log.debug('Query: %s' % (q,))
-        responses = self.get(q)
-        if len(queries) == 1:
-            return responses.get('items', [])
-        else:
-            return responses
+        response = self.get(q)
+        return response.get('items', [])
