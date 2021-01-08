@@ -41,6 +41,7 @@ FALLBACK_CONFIG_PATH = '~/.hubtty.yaml'
 
 class ConfigSchema(object):
     server = {v.Required('name'): str,
+              'api-url': str,
               'url': str,
               v.Required('username'): str,
               'token': str,
@@ -148,7 +149,11 @@ class Config(object):
         schema(self.config)
         server = self.getServer(server)
         self.server = server
-        url = server.get('url', 'https://api.github.com/')
+        api_url = server.get('api_url', 'https://api.github.com/')
+        if not api_url.endswith('/'):
+            api_url += '/'
+        self.api_url = api_url
+        url = server.get('url', 'https://github.com/')
         if not url.endswith('/'):
             url += '/'
         self.url = url

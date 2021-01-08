@@ -1491,7 +1491,7 @@ class Sync(object):
         return None
 
     def url(self, path):
-        return self.app.config.url + path
+        return self.app.config.api_url + path
 
     def checkResponse(self, response):
         self.log.debug('HTTP status code: %d', response.status_code)
