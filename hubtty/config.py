@@ -14,7 +14,6 @@
 # under the License.
 
 import collections
-import getpass
 import os
 import re
 import sys
@@ -24,7 +23,6 @@ except:
     pass
 import yaml
 
-from six.moves.urllib import parse as urlparse
 import voluptuous as v
 
 import hubtty.commentlink
@@ -157,8 +155,6 @@ class Config(object):
         if not url.endswith('/'):
             url += '/'
         self.url = url
-        result = urlparse.urlparse(url)
-        self.hostname = result.netloc
         self.username = server['username']
         self.token = server.get('token')
         if self.token is None:
