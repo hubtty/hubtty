@@ -23,7 +23,8 @@ def requestOneTimeCode(url):
     header = {'Accept': 'application/json'}
     data = {
         'client_id': CLIENT_ID,
-        'scope': 'repo:status,read:user'
+        # NOTE: user needs to grant access to organizations individually
+        'scope': 'repo:status,read:org'
     }
     r = requests.post(url, headers=header, json=data)
 
