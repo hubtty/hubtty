@@ -759,7 +759,8 @@ class ChangeView(urwid.WidgetWrap):
 
     def _add_link(self, name, url):
         link = mywid.Link('{:<42}'.format(name), 'link', 'focused-link')
-        urwid.connect_signal(link, 'selected', lambda link:self.app.openURL(url))
+        if url:
+            urwid.connect_signal(link, 'selected', lambda link:self.app.openURL(url))
         return link
 
     def _updateTestResults(self, change, result_systems):

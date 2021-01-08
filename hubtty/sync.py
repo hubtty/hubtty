@@ -587,8 +587,8 @@ class SyncChangeTask(Task):
                 check = commit.createCheck(checker, state, created, updated)
             check.updated = updated
             check.state = state
-            check.url = checks_data.get('target_url')
-            check.message = checks_data.get('description')
+            check.url = checks_data.get('target_url', '')
+            check.message = checks_data.get('description', '')
             # TODO(mandre) Github API doesn't expose this information
             # started = checks_data.get('started')
             # if started:
