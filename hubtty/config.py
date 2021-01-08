@@ -25,6 +25,7 @@ import yaml
 
 import voluptuous as v
 
+import hubtty.auth
 import hubtty.commentlink
 import hubtty.palette
 import hubtty.keymap
@@ -35,6 +36,7 @@ except AttributeError:
     OrderedDict = ordereddict.OrderedDict
 
 DEFAULT_CONFIG_PATH = '~/.config/hubtty/hubtty.yaml'
+DEFAULT_SECURE_PATH = '~/.config/hubtty/hubtty_auth.yaml'
 FALLBACK_CONFIG_PATH = '~/.hubtty.yaml'
 
 class ConfigSchema(object):
@@ -42,7 +44,6 @@ class ConfigSchema(object):
               'api-url': str,
               'url': str,
               v.Required('username'): str,
-              'token': str,
               'dburi': str,
               v.Required('git-root'): str,
               'git-url': str,
@@ -156,20 +157,7 @@ class Config(object):
             url += '/'
         self.url = url
         self.username = server['username']
-        self.token = server.get('token')
-        if self.token is None:
-            self.token = getpass.getpass("Token for %s (%s): "
-                                            % (self.url, self.username))
-        else:
-            # Ensure file is only readable by user as token is stored in
-            # file.
-            mode = os.stat(self.path).st_mode & 0o0777
-            if not mode == 0o600:
-                print (
-                    "Error: Config file '{}' contains a token and does "
-                    "not have permissions set to 0600.\n"
-                    "Permissions are: {}".format(self.path, oct(mode)))
-                sys.exit(1)
+        self.token = self.getToken(server['name'], url)
         self.git_root = os.path.expanduser(server['git-root'])
         git_url = server.get('git-url', 'https://github.com/')
         if not git_url.endswith('/'):
@@ -267,10 +255,25 @@ class Config(object):
                 return server
         return None
 
+    def getToken(self, name, url):
+        path = expandedpath = os.path.expanduser(DEFAULT_SECURE_PATH)
+        with open(path, 'w+') as f:
+            auth = yaml.safe_load(f) or {}
+            conf = auth.get(name, {})
+            token = conf.get('token')
+            if not token:
+                token = hubtty.auth.getToken(url)
+                conf['token'] = token
+                auth[name] = conf
+                yaml.dump(auth, f)
+        os.chmod(path, 0o600)
+
+        return token
+
+
     def printSample(self):
         filename = 'share/hubtty/examples'
         print("""Hubtty requires a configuration file at %s or %s
-If the file contains a token then permissions must be set to 0600.
 
 Several sample configuration files were installed with Hubtty and are
 available in %s in the root of the installation.

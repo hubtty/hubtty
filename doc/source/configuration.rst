@@ -26,9 +26,6 @@ be supplied.  The sample config files are as follows:
   A configuration designed for use with installations of Github
   running on googlesource.com.
 
-You will need a Github token which you can generate from the `Github user settings
-<https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/creating-a-personal-access-token>`_.
-
 Hubtty uses local git repositories to perform much of its work.  These
 can be the same git repositories that you use when developing a
 project.  Hubtty will not alter the working directory or index unless
@@ -70,10 +67,6 @@ line.
   **username (required)**
     Your username in Github. [required]
 
-  **token (required)**
-    Your token in Github.  Obtain it from Settings -> Developer settings ->
-    Personal access tokens in the Github interface.
-
   **git-root (required)**
     A location where Hubtty should store its git repositories.  These
     can be the same git repositories where you do your own work --
@@ -105,7 +98,6 @@ Example:
    servers:
      - name: CHANGEME
        username: CHANGEME
-       token: CHANGEME
        git-root: ~/git/
 
 Palettes

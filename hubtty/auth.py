@@ -1,4 +1,4 @@
-# Copyright 2015 Christoph Gysin <christoph.gysin@gmail.com>
+# Copyright 2020 Martin André <martin.andre@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -12,58 +12,67 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import logging
 import requests
+import sys
+import time
 
-from six.moves.urllib import parse as urlparse
-
-
-class FormAuth(requests.auth.AuthBase):
-
-    def __init__(self, username, token):
-        self.username = username
-        self.token = token
-        self.log = logging.getLogger('hubtty.auth')
-
-    def _retry_using_form_auth(self, response, args):
-        adapter = requests.adapters.HTTPAdapter()
-        request = _copy_request(response.request)
-
-        u = urlparse.urlparse(response.url)
-        url = urlparse.urlunparse([u.scheme, u.netloc, '/login',
-                                   None, None, None])
-        auth = {'username': self.username,
-                'token': self.token}
-        request2 = requests.Request('POST', url, data=auth).prepare()
-        response2 = adapter.send(request2, **args)
-
-        if response2.status_code == 401:
-            self.log.error('Login failed: Invalid username or token?')
-            return response
-
-        cookie = response2.headers.get('set-cookie')
-        if cookie is not None:
-            request.headers['Cookie'] = cookie
-
-        response3 = adapter.send(request, **args)
-        return response3
-
-    def _response_hook(self, response, **kwargs):
-        if response.status_code == 401:
-            return self._retry_using_form_auth(response, kwargs)
-        return response
-
-    def __call__(self, request):
-        request.headers["Connection"] = "Keep-Alive"
-        request.register_hook('response', self._response_hook)
-        return request
+CLIENT_ID = '945afaeb8ba1cd489eab'
 
 
-def _copy_request(request):
-    new_request = requests.PreparedRequest()
-    new_request.method = request.method
-    new_request.url = request.url
-    new_request.body = request.body
-    new_request.hooks = request.hooks
-    new_request.headers = request.headers.copy()
-    return new_request
+def requestOneTimeCode(url):
+    header = {'Accept': 'application/json'}
+    data = {
+        'client_id': CLIENT_ID,
+        'scope': 'repo:status,read:user'
+    }
+    r = requests.post(url, headers=header, json=data)
+
+    if 'error' in r.json():
+        sys.exit("Failed to request device code %s: %s" % (r.json()['error'], r.json()['error_description']))
+    return r.json()
+
+
+def printUserCode(code, url):
+    print("Hubtty needs to access your github account.")
+    print("Copy the code %s and paste it at %s" % (code, url))
+
+
+def poll(url, one_time_code):
+    header = {'Accept': 'application/json'}
+    data={
+        'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
+        'device_code': one_time_code['device_code'],
+        'client_id': CLIENT_ID
+    }
+
+    timeout = one_time_code['expires_in']
+    interval = one_time_code['interval']
+    while True:
+        time.sleep(interval)
+        timeout -= interval
+
+        r = requests.post(url, headers=header, data=data)
+
+        if 'error' in r.json():
+            if r.json()['error'] == 'authorization_pending':
+                pass
+            elif r.json()['error'] == 'slow_down':
+                interval += 5
+                pass
+            else:
+                sys.exit("Failed to get auth token %s: %s" % (r.json()['error'], r.json()['error_description']))
+        else:
+            break
+
+        if timeout < 0:
+            sys.exit("One-time code timed out")
+
+    return r.json()
+
+
+def getToken(base_url):
+    one_time_code = requestOneTimeCode(base_url + 'login/device/code')
+    printUserCode(one_time_code['user_code'], one_time_code['verification_uri'])
+    token = poll(base_url + 'login/oauth/access_token', one_time_code)
+
+    return token['access_token']

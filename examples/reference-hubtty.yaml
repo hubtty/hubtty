@@ -9,9 +9,6 @@ servers:
   - name: CHANGEME
     url: https://CHANGEME.example.org/
     username: CHANGEME
-    # Create yourself a github token
-    # https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/creating-a-personal-access-token
-    token: CHANGEME
     git-root: ~/git/
     lock-file: ~/.hubtty.CHANGEME.lock
 
@@ -23,9 +20,6 @@ servers:
 #    url: https://example.org/
 # Your username in Github. [required]
 #    username: CHANGEME
-# Your authentication token in Github. [required]
-# https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/creating-a-personal-access-token
-#    token: CHANGEME
 # A location where Hubtty should store its git repositories.  These
 # can be the same git repositories where you do your own work --
 # Hubtty will not modify them unless you tell it to, and even then the
