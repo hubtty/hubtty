@@ -257,6 +257,7 @@ class Config(object):
 
     def getToken(self, name, url):
         path = expandedpath = os.path.expanduser(DEFAULT_SECURE_PATH)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w+') as f:
             auth = yaml.safe_load(f) or {}
             conf = auth.get(name, {})
