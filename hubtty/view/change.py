@@ -164,7 +164,7 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         super(ReviewDialog, self).__init__(urwid.LineBox(fill, 'Review'))
 
     def getValues(self):
-        approval = None
+        approval = ''
         for button in self.button_group:
             if button.state:
                 approval = button._value
