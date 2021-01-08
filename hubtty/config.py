@@ -35,6 +35,7 @@ try:
 except AttributeError:
     OrderedDict = ordereddict.OrderedDict
 
+# TODO(mandre) Use XDG_CONFIG_HOME
 DEFAULT_CONFIG_PATH = '~/.config/hubtty/hubtty.yaml'
 DEFAULT_SECURE_PATH = '~/.config/hubtty/hubtty_auth.yaml'
 FALLBACK_CONFIG_PATH = '~/.hubtty.yaml'
@@ -258,14 +259,17 @@ class Config(object):
     def getToken(self, name, url):
         path = expandedpath = os.path.expanduser(DEFAULT_SECURE_PATH)
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'w+') as f:
+        # Ensure the file exists
+        open(path, 'a+').close()
+        with open(path, 'r') as f:
             auth = yaml.safe_load(f) or {}
-            conf = auth.get(name, {})
-            token = conf.get('token')
-            if not token:
-                token = hubtty.auth.getToken(url)
-                conf['token'] = token
-                auth[name] = conf
+        conf = auth.get(name, {})
+        token = conf.get('token')
+        if not token:
+            token = hubtty.auth.getToken(url)
+            conf['token'] = token
+            auth[name] = conf
+            with open(path, 'w') as f:
                 yaml.dump(auth, f)
         os.chmod(path, 0o600)
 
