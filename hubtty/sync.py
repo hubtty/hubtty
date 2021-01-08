@@ -654,7 +654,7 @@ class SyncChangeTask(Task):
                                               remote_change['base']['ref'],
                                               self.change_id,
                                               remote_change['title'],
-                                              remote_change.get('body','').replace('\r',''),
+                                              (remote_change.get('body','') or '').replace('\r',''),
                                               created, updated,
                                               remote_change['state'],
                                               remote_change['additions'],
@@ -678,7 +678,7 @@ class SyncChangeTask(Task):
             else:
                 change.starred = False
             change.title = remote_change['title']
-            change.body = remote_change.get('body','').replace('\r','')
+            change.body = (remote_change.get('body','') or '').replace('\r','')
             change.updated = dateutil.parser.parse(remote_change['updated_at'])
             change.additions = remote_change['additions']
             change.deletions = remote_change['deletions']
@@ -697,7 +697,7 @@ class SyncChangeTask(Task):
                 if not commit:
                     # FIXME(mandre) remove revision number, fetch_auth and fetch_ref
                     commit = change.createCommit(0,
-                                                 remote_commit['commit']['message'].replace('\r',''),
+                                                 (remote_commit['commit']['message'] or '').replace('\r',''),
                                                  remote_commit['sha'],
                                                  remote_commit['parents'][0]['sha'],
                                                  False, 'fetch_ref')
@@ -893,12 +893,12 @@ class SyncChangeTask(Task):
                     # Normalize date -> created
                     created = dateutil.parser.parse(remote_review.get('submitted_at', remote_review.get('created_at')))
                     message = change.createMessage(associated_commit_id, remote_review['id'], account, created,
-                                                   remote_review.get('body','').replace('\r',''))
+                                                   (remote_review.get('body','') or '').replace('\r',''))
                     self.log.info("Created new review message %s for change %s in local DB.", message.key, change.change_id)
                 else:
                     if message.author != account:
                         message.author = account
-                    message.body = remote_review.get('body','').replace('\r','')
+                    message.body = (remote_review.get('body','') or '').replace('\r','')
 
                 review_status = remote_review.get('state')
                 if review_status:
@@ -936,7 +936,7 @@ class SyncChangeTask(Task):
                                                     remote_comment.get('original_commit_id'),
                                                     remote_comment.get('line'),
                                                     remote_comment.get('original_line'),
-                                                    remote_comment.get('body','').replace('\r',''),
+                                                    (remote_comment.get('body','') or '').replace('\r',''),
                                                     robot_id = remote_comment.get('robot_id'),
                                                     robot_run_id = remote_comment.get('robot_run_id'),
                                                     url = remote_comment.get('html_url'))
@@ -953,7 +953,7 @@ class SyncChangeTask(Task):
                         comment.line = remote_comment.get('line')
                     if comment.file_key != file_id:
                         comment.file_key = file_id
-                    comment.body = remote_comment.get('body','').replace('\r','')
+                    comment.body = (remote_comment.get('body','') or '').replace('\r','')
 
             change.outdated = False
         for url, refs in fetches.items():
