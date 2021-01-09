@@ -238,7 +238,7 @@ class SyncProjectListTask(Task):
     def run(self, sync):
         app = sync.app
 
-        remote_keys = set()
+        remote_keys = set(sync.app.config.additional_repositories)
         remote_desc = dict()
         for r in sync.get('user/repos?per_page=100'):
             remote_keys.add(r['full_name'])
@@ -256,7 +256,7 @@ class SyncProjectListTask(Task):
 
             for name in remote_keys-local_keys:
                 project = session.createProject(name,
-                                                description=remote_desc[name])
+                                                description=remote_desc.get(name))
                 self.log.info("Created project %s", project.name)
                 self.results.append(ProjectAddedEvent(project))
 

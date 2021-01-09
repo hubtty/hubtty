@@ -11,6 +11,8 @@ servers:
     username: CHANGEME
     git-root: ~/git/
     lock-file: ~/.hubtty.CHANGEME.lock
+    additional-repositories:
+      - mandre/hubtty
 
 # Each server section can have the following fields:
 # A name that describes the server, to reference on the command line. [required]
@@ -43,6 +45,11 @@ servers:
 # Hubtty uses a lock file per server to prevent multiple processes
 # from running at the same time. Example:
 #    lock-file: /run/lockme.lock
+# By default hubtty lists all repositories to which the user has explicit
+# permission.  You can add extra repositories to this list using the
+# additional-repositories. Example:
+#    additional-repositories:
+#      - mandre/hubtty
 
 # Hubtty comes with two palettes defined internally.  The default
 # palette is suitable for use on a terminal with a dark background.

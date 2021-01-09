@@ -92,6 +92,11 @@ line.
     Hubtty uses a lock file per server to prevent multiple processes
     from running at the same time. The default is ~/.hubtty.servername.lock
 
+  **additional-repositories**
+    By default hubtty lists all repositories to which the user has explicit
+    permission.  You can add extra repositories to this list using the
+    additional-repositories.
+
 Example:
 
 .. code-block: yaml

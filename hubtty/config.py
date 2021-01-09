@@ -50,6 +50,7 @@ class ConfigSchema(object):
               'git-url': str,
               'log-file': str,
               'lock-file': str,
+              'additional-repositories': [str],
               'socket': str,
               }
 
@@ -172,6 +173,8 @@ class Config(object):
         self.log_file = os.path.expanduser(log_file)
         lock_file = server.get('lock-file', '~/.hubtty.%s.lock' % server['name'])
         self.lock_file = os.path.expanduser(lock_file)
+
+        self.additional_repositories = server.get('additional-repositories', [])
 
         self.palettes = {'default': hubtty.palette.Palette({}),
                          'light': hubtty.palette.Palette(hubtty.palette.LIGHT_PALETTE),
