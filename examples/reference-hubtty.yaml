@@ -9,7 +9,6 @@ servers:
   - name: CHANGEME
     url: https://CHANGEME.example.org/
     git-root: ~/git/
-    lock-file: ~/.hubtty.CHANGEME.lock
     additional-repositories:
       - mandre/hubtty
 
@@ -30,14 +29,14 @@ servers:
 #    git-url: ssh://user@example.org:29418
 # The location of Hubtty's sqlite database.  If you have more than one
 # server, you should specify a dburi for any additional servers.
-# By default a SQLite database called ~/.hubtty.db is used.
-#    dburi: sqlite:////home/user/.hubtty.db
+# By default a SQLite database called ~/.local/share/hubtty/hubtty.db is used.
+#    dburi: sqlite:////home/user/.local/share/hubtty/hubtty.db
 # By default Hubtty logs errors to a file and truncates that file each
 # time it starts (so that it does not grow without bound).  If you
 # would like to log to a different location, you may specify it here.
-#    log-file: ~/.hubtty.log
+#    log-file: ~/.local/share/hubtty/hubtty.log
 # Hubtty listens on a unix domain socket for remote commands at
-# ~/.hubtty.sock.  You may change the path here:
+# $XDG_RUNTIME_DIR/hubtty.sock.  You may change the path here:
 #    socket: ~/.hubtty.sock
 # Hubtty uses a lock file per server to prevent multiple processes
 # from running at the same time. Example:

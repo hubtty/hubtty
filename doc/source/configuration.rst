@@ -18,14 +18,6 @@ be supplied.  The sample config files are as follows:
 **reference-hubtty.yaml**
   An exhaustive list of all supported options with examples.
 
-**opendev-hubtty.yaml**
-  A configuration designed for use with OpenDev's installation of
-  Github.
-
-**googlesource-hubtty.yaml**
-  A configuration designed for use with installations of Github
-  running on googlesource.com.
-
 Hubtty uses local git repositories to perform much of its work.  These
 can be the same git repositories that you use when developing a
 project.  Hubtty will not alter the working directory or index unless
@@ -73,7 +65,8 @@ line.
   **dburi**
     The location of Hubtty's sqlite database.  If you have more than
     one server, you should specify a dburi for any additional servers.
-    By default a SQLite database called ~/.hubtty.db is used.
+    By default a SQLite database called $XDG_DATA_HOME/hubtty/hubtty.db
+    is used.
 
   **log-file**
     By default Hubtty logs errors to a file and truncates that file
@@ -83,11 +76,12 @@ line.
 
   **socket**
     Hubtty listens on a unix domain socket for remote commands at
-    ~/.hubtty.sock.  This option may be used to change the path.
+    $XDG_RUNTIME_DIR/hubtty.sock.  This option may be used to change the path.
 
   **lock-file**
     Hubtty uses a lock file per server to prevent multiple processes
-    from running at the same time. The default is ~/.hubtty.servername.lock
+    from running at the same time. The default is
+    $XDG_RUNTIME_DIR/hubtty.servername.lock
 
   **additional-repositories**
     By default hubtty lists all repositories to which the user has explicit

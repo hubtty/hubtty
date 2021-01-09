@@ -21,6 +21,7 @@ try:
     import ordereddict
 except:
     pass
+from xdg import BaseDirectory
 import yaml
 
 import voluptuous as v
@@ -35,10 +36,8 @@ try:
 except AttributeError:
     OrderedDict = ordereddict.OrderedDict
 
-# TODO(mandre) Use XDG_CONFIG_HOME
-DEFAULT_CONFIG_PATH = '~/.config/hubtty/hubtty.yaml'
-DEFAULT_SECURE_PATH = '~/.config/hubtty/hubtty_auth.yaml'
-FALLBACK_CONFIG_PATH = '~/.hubtty.yaml'
+CONFIG_PATH = os.path.join(BaseDirectory.save_config_path('hubtty'), 'hubtty.yaml')
+SECURE_CONFIG_PATH = os.path.join(BaseDirectory.save_config_path('hubtty'), 'hubtty_auth.yaml')
 
 class ConfigSchema(object):
     server = {v.Required('name'): str,
@@ -163,13 +162,19 @@ class Config(object):
         if not git_url.endswith('/'):
             git_url += '/'
         self.git_url = git_url
-        self.dburi = server.get('dburi',
-                                'sqlite:///' + os.path.expanduser('~/.hubtty.db'))
-        socket_path = server.get('socket', '~/.hubtty.sock')
+        data_path = BaseDirectory.save_data_path('hubtty')
+        runtime_path = BaseDirectory.get_runtime_dir(strict=False)
+        self.dburi = server.get('dburi', 'sqlite:///' + os.path.join(data_path,
+                                                                     'hubtty.db'))
+        socket_path = server.get('socket', os.path.join(runtime_path,
+                                                        'hubtty.sock'))
         self.socket_path = os.path.expanduser(socket_path)
-        log_file = server.get('log-file', '~/.hubtty.log')
+        log_file = server.get('log-file', os.path.join(data_path,
+                                                       'hubtty.log'))
         self.log_file = os.path.expanduser(log_file)
-        lock_file = server.get('lock-file', '~/.hubtty.%s.lock' % server['name'])
+        lock_file = server.get('lock-file', os.path.join(runtime_path,
+                                                         'hubtty.%s.lock'
+                                                         % server['name']))
         self.lock_file = os.path.expanduser(lock_file)
 
         self.additional_repositories = server.get('additional-repositories', [])
@@ -243,7 +248,7 @@ class Config(object):
                 [1, 10, 100, 200, 400, 600, 800, 1000])
 
     def verifyConfigFile(self, path):
-        for checkpath in [ path, DEFAULT_CONFIG_PATH, FALLBACK_CONFIG_PATH ]:
+        for checkpath in [ path, CONFIG_PATH ]:
             if checkpath is not None:
                 expandedpath = os.path.expanduser(checkpath)
                 if os.path.exists(expandedpath):
@@ -258,8 +263,7 @@ class Config(object):
         return None
 
     def getToken(self, name, url):
-        path = expandedpath = os.path.expanduser(DEFAULT_SECURE_PATH)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        path = SECURE_CONFIG_PATH
         # Ensure the file exists
         open(path, 'a+').close()
         with open(path, 'r') as f:
@@ -279,10 +283,10 @@ class Config(object):
 
     def printSample(self):
         filename = 'share/hubtty/examples'
-        print("""Hubtty requires a configuration file at %s or %s
+        print("""Hubtty requires a configuration file at %s
 
 Several sample configuration files were installed with Hubtty and are
 available in %s in the root of the installation.
 
 For more information, please see the README.
-""" % (DEFAULT_CONFIG_PATH, FALLBACK_CONFIG_PATH, filename,))
+""" % (CONFIG_PATH, filename,))

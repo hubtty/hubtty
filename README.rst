@@ -131,7 +131,7 @@ In general, pressing the F1 key will show help text on any screen, and
 ESC will take you to the previous screen.
 
 Hubtty works seamlessly offline or online.  All of the actions that it
-performs are first recorded in a local database (in ``~/.hubtty.db``
+performs are first recorded in a local database (in ``~/.local/share/hubtty/hubtty.db``
 by default), and are then transmitted to Github.  If Hubtty is unable
 to contact Github for any reason, it will continue to operate against
 the local database, and once it re-establishes contact, it will
