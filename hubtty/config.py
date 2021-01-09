@@ -44,7 +44,6 @@ class ConfigSchema(object):
     server = {v.Required('name'): str,
               'api-url': str,
               'url': str,
-              v.Required('username'): str,
               'dburi': str,
               v.Required('git-root'): str,
               'git-url': str,
@@ -158,7 +157,6 @@ class Config(object):
         if not url.endswith('/'):
             url += '/'
         self.url = url
-        self.username = server['username']
         self.token = self.getToken(server['name'], url)
         self.git_root = os.path.expanduser(server['git-root'])
         git_url = server.get('git-url', 'https://github.com/')

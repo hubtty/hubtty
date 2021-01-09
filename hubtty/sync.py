@@ -193,7 +193,7 @@ class SyncOwnAccountTask(Task):
 
     def run(self, sync):
         app = sync.app
-        remote = sync.get('users/' + app.config.username)
+        remote = sync.get('user')
         sync.account_id = remote['id']
         with app.db.getSession() as session:
             account = session.getAccountByID(remote['id'],
@@ -876,8 +876,8 @@ class SyncChangeTask(Task):
                 self.log.info("New review comment %s", remote_review)
                 if 'user' in remote_review:
                     account = session.getAccountByID(remote_review['user']['id'],
-                                                    username=remote_review['user'].get('login'))
-                    if account.username != app.config.username:
+                                                     username=remote_review['user'].get('login'))
+                    if not app.isOwnAccount(account):
                         new_message = True
                 else:
                     account = session.getSystemAccount()

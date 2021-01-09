@@ -64,9 +64,6 @@ line.
     The URL of the Github server.  HTTPS should be preferred.
     Defaults to https://github.com.
 
-  **username (required)**
-    Your username in Github. [required]
-
   **git-root (required)**
     A location where Hubtty should store its git repositories.  These
     can be the same git repositories where you do your own work --
@@ -102,7 +99,6 @@ Example:
 .. code-block: yaml
    servers:
      - name: CHANGEME
-       username: CHANGEME
        git-root: ~/git/
 
 Palettes

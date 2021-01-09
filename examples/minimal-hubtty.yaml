@@ -6,5 +6,4 @@
 
 servers:
   - name: CHANGEME
-    username: CHANGEME
     git-root: ~/git/

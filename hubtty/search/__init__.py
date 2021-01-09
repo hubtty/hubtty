@@ -88,7 +88,6 @@ if __name__ == '__main__':
 
     app = Dummy()
     app.config = Dummy()
-    app.config.username = 'bob'
-    search = SearchCompiler(app.config.username)
+    search = SearchCompiler('bob')
     x = search.parse(query)
     print(x)
