@@ -441,6 +441,8 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
 
     def getSelectedRows(self, cls):
         ret = []
+        if not self.listbox.body:
+            return []
         for row in self.listbox.body:
             if isinstance(row, cls) and row.mark:
                 ret.append(row)
