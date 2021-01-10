@@ -16,6 +16,7 @@
 import collections
 import os
 import re
+from shutil import copyfile
 import sys
 try:
     import ordereddict
@@ -253,8 +254,8 @@ class Config(object):
                 expandedpath = os.path.expanduser(checkpath)
                 if os.path.exists(expandedpath):
                     return expandedpath
-        self.printSample()
-        sys.exit(1)
+        self.copyDefault()
+        return CONFIG_PATH
 
     def getServer(self, name=None):
         for server in self.config['servers']:
@@ -281,12 +282,8 @@ class Config(object):
         return token
 
 
-    def printSample(self):
-        filename = 'share/hubtty/examples'
-        print("""Hubtty requires a configuration file at %s
-
-Several sample configuration files were installed with Hubtty and are
-available in %s in the root of the installation.
-
-For more information, please see the README.
-""" % (CONFIG_PATH, filename,))
+    def copyDefault(self):
+        filename = os.path.join(sys.prefix, 'share', 'hubtty', 'examples',
+                                'reference-hubtty.yaml')
+        copyfile(filename, CONFIG_PATH)
+        print("Copied a default configuration file to %s" % CONFIG_PATH)
