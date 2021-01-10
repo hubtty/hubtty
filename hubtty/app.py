@@ -53,15 +53,15 @@ import hubtty.version
 WELCOME_TEXT = """\
 Welcome to Hubtty!
 
-To get started, you should subscribe to some projects.  Press the "L"
-key (shift-L) to list all the projects, navigate to the ones you are
-interested in, and then press "s" to subscribe to them.  Hubtty will
-automatically sync changes in your subscribed projects.
+To get started, you should subscribe to some projects.  Press the "L" key (shift-L) to list all the projects the user has explicit permission on, navigate to the ones you are interested in, and then press "s" to subscribe to them.  Use the `additional-repositories` setting to add more projects to this list.
 
-Press the F1 key anywhere to get help.  Your terminal emulator may
-require you to press function-F1 or alt-F1 instead.
+Hubtty will automatically clone the repositories and sync changes in your subscribed projects. Repositories are cloned in ~/hubtty by default.
 
-"""
+Change your configuration in %s.
+
+Press the F1 key anywhere to get help.  Your terminal emulator may require you to press function-F1 or alt-F1 instead.
+
+""" % config.CONFIG_PATH
 
 class StatusHeader(urwid.WidgetWrap):
     def __init__(self, app):
