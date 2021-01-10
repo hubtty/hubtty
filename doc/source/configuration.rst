@@ -54,7 +54,11 @@ line.
 
   **url**
     The URL of the Github server.  HTTPS should be preferred.
-    Defaults to https://github.com.
+    Defaults to https://github.com/.
+
+  **api-url**
+    The URL of the Github API server.  HTTPS should be preferred.
+    Defaults to https://api.github.com/.
 
   **git-root (required)**
     A location where Hubtty should store its git repositories.  These

@@ -16,8 +16,11 @@ servers:
 # A name that describes the server, to reference on the command line. [required]
 #  - name: sample
 # The URL of the Github server.  HTTPS should be preferred.
-# Defaults to https://github.com.
+# Defaults to https://github.com/.
 #    url: https://example.org/
+# The URL of the Github API server.  HTTPS should be preferred.
+# Defaults to https://api.github.com/.
+#    api-url: https://api.example.org/
 # A location where Hubtty should store its git repositories.  These
 # can be the same git repositories where you do your own work --
 # Hubtty will not modify them unless you tell it to, and even then the
