@@ -1497,6 +1497,9 @@ class Sync(object):
         self.log.debug('HTTP status code: %d', response.status_code)
         if response.status_code == 503:
             raise OfflineError("Received 503 status code")
+        elif response.status_code > 400:
+            raise Exception("Received %s status code: %s"
+                            % (response.status_code, response.text))
 
     def get(self, path):
         url = self.url(path)
