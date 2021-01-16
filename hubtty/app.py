@@ -529,9 +529,12 @@ class App(object):
         text = WELCOME_TEXT
         dialog = mywid.MessageDialog('Welcome', text)
         lines = text.split('\n')
+        total_lines = 0
+        for line in lines:
+            total_lines = total_lines + 1 + int(len(line)/76)
         urwid.connect_signal(dialog, 'close',
             lambda button: self.backScreen())
-        self.popup(dialog, min_width=76, min_height=len(lines)+4)
+        self.popup(dialog, min_width=76, min_height=total_lines+4)
 
     def _syncOneChangeFromQuery(self, query):
         number = changeid = restid = None
