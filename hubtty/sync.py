@@ -48,6 +48,9 @@ TIMEOUT=30
 class OfflineError(Exception):
     pass
 
+class RateLimitError(Exception):
+    pass
+
 class MultiQueue(object):
     def __init__(self, priorities):
         try:
@@ -1475,7 +1478,7 @@ class Sync(object):
             task.run(self)
             task.complete(True)
             self.queue.complete(task)
-        except (requests.ConnectionError, OfflineError,
+        except (requests.ConnectionError, OfflineError, RateLimitError,
                 requests.exceptions.ChunkedEncodingError,
                 requests.exceptions.ReadTimeout
         ) as e:
@@ -1504,6 +1507,8 @@ class Sync(object):
 
     def checkResponse(self, response):
         self.log.debug('HTTP status code: %d', response.status_code)
+        if int(response.headers.get('X-RateLimit-Remaining', 10)) < 10:
+            raise RateLimitError("Less than 10 requests remaining in the current limit window")
         if response.status_code == 503:
             raise OfflineError("Received 503 status code")
         elif response.status_code > 400:
