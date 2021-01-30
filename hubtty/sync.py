@@ -1507,8 +1507,6 @@ class Sync(object):
 
     def checkResponse(self, response):
         self.log.debug('HTTP status code: %d', response.status_code)
-        if int(response.headers.get('X-RateLimit-Remaining', 10)) < 10:
-            raise RateLimitError("Less than 10 requests remaining in the current limit window")
         if response.status_code == 503:
             raise OfflineError("Received 503 status code")
         elif response.status_code > 400:
@@ -1528,6 +1526,17 @@ class Sync(object):
                                             'Accept-Encoding': 'gzip',
                                             'User-Agent': self.user_agent})
             self.checkResponse(r)
+            if int(r.headers.get('X-RateLimit-Remaining', 1)) < 1:
+                if r.headers.get('X-RateLimit-Reset'):
+                    sleep = int(r.headers.get('X-RateLimit-Reset')) - int(time.time())
+                    self.log.debug('Hit rate limit, retrying in %d seconds', sleep)
+                    time.sleep(sleep)
+                    continue
+                else:
+                    raise RateLimitError("Hitting RateLimit")
+
+            # TODO(mandre) Check for incomplete results
+            # https://docs.github.com/en/rest/reference/search#timeouts-and-incomplete-results
             if r.status_code == 200:
                 result = json.loads(r.text)
                 if isinstance(ret, list):
