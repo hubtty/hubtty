@@ -436,6 +436,11 @@ class Change(object):
             if hashtag not in current_hashtags:
                 self.createHashtag(hashtag)
 
+    def isValid(self):
+        # This might happen when the sync was partial, i.e. we hit rate limit
+        # or the connection dropped
+        return len(self.commits) > 0
+
     @property
     def author_name(self):
         author_name = 'Anonymous Coward'
@@ -964,7 +969,14 @@ class DatabaseSession(object):
                 q = q.order_by(project_table.c.name)
         self.database.log.debug("Search SQL: %s" % q)
         try:
-            return q.all()
+            validChanges = []
+            for c in q.all():
+                if c.isValid():
+                    validChanges.append(c)
+                else:
+                    self.database.app.sync.submitTask(
+                        sync.SyncChangeTask(c.change_id, priority=sync.HIGH_PRIORITY))
+            return validChanges
         except sqlalchemy.orm.exc.NoResultFound:
             return []
 
