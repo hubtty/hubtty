@@ -360,7 +360,7 @@ class SyncProjectTask(Task):
                 query = 'type:pr repo:%s' % project.name
                 if project.updated:
                     # Allow 4 seconds for request time, etc.
-                    query += ' created:>%s' % ((project.updated - datetime.timedelta(seconds=4)).replace(microsecond=0).isoformat(),)
+                    query += ' updated:>%s' % ((project.updated - datetime.timedelta(seconds=4)).replace(microsecond=0).isoformat(),)
                 else:
                     query += ' state:open'
                 changes = sync.query(query)
