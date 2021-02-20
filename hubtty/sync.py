@@ -566,6 +566,14 @@ class SyncChangeTask(Task):
 
     def _updateChecks(self, session, commit, remote_checks_data):
         # Called from run inside of db transaction
+
+        # Delete outdated checks
+        remote_check_names = [c['context'] for c in remote_checks_data['statuses']]
+        for check in commit.checks:
+            if check.name not in remote_check_names:
+                self.log.info("Deleted check %s", check.key)
+                session.delete(check)
+
         local_checks = {c.name: c for c in commit.checks}
         for checks_data in remote_checks_data['statuses']:
             uuid = checks_data['id']
