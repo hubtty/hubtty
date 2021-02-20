@@ -206,21 +206,12 @@ server_table = Table(
     Column('key', Integer, primary_key=True),
     Column('own_account_key', Integer, ForeignKey("account.key"), index=True),
     )
-checker_table = Table(
-    'checker', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('uuid', String(255), index=True, unique=True, nullable=False),
-    Column('name', String(255), nullable=False),
-    Column('status', String(255), nullable=False),
-    Column('blocking', String(255)),
-    Column('description', Text),
-    )
 check_table = Table(
     'check', metadata,
     Column('key', Integer, primary_key=True),
     Column('commit_key', Integer, ForeignKey("commit.key"), index=True),
-    Column('checker_key', Integer, ForeignKey("checker.key"), index=True),
     Column('state', String(255), nullable=False),
+    Column('name', String(255)),
     Column('url', Text),
     Column('message', Text),
     Column('started', DateTime),
@@ -665,16 +656,10 @@ class Server(object):
     def __init__(self):
         pass
 
-class Checker(object):
-    def __init__(self, uuid, name, status):
-        self.uuid = uuid
-        self.name = name
-        self.status = status
-
 class Check(object):
-    def __init__(self, commit, checker, state, created, updated):
+    def __init__(self, commit, name, state, created, updated):
         self.commit_key = commit.key
-        self.checker_key = checker.key
+        self.name = name
         self.state = state
         self.created = created
         self.updated = updated
@@ -785,9 +770,7 @@ mapper(Hashtag, hashtag_table)
 mapper(Server, server_table, properties=dict(
     own_account=relationship(Account)
     ))
-mapper(Checker, checker_table)
-mapper(Check, check_table, properties=dict(
-    checker=relationship(Checker)))
+mapper(Check, check_table)
 
 
 def match(expr, item):
@@ -1141,15 +1124,3 @@ class DatabaseSession(object):
         self.session().add(o)
         self.session().flush()
         return o
-
-    def createChecker(self, *args, **kw):
-        o = Checker(*args, **kw)
-        self.session().add(o)
-        self.session().flush()
-        return o
-
-    def getCheckerByUUID(self, uuid):
-        try:
-            return self.session().query(Checker).filter_by(uuid=uuid).one()
-        except sqlalchemy.orm.exc.NoResultFound:
-            return None

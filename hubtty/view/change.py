@@ -774,10 +774,10 @@ class ChangeView(urwid.WidgetWrap):
         for check in commit.checks:
             if not (check.url or check.message):
                 continue
-            # link checker name/url, color result, in time
+            # link check name/url, color result, in time
             color = 'check-%s' % check.state
             result = (color, check.message)
-            line = [self._add_link(check.checker.name, check.url), result]
+            line = [self._add_link(check.name, check.url), result]
             if check.finished and check.started:
                 line.append(' in %s' % (check.finished-check.started))
             line.append('\n')

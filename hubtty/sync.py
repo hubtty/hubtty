@@ -566,25 +566,19 @@ class SyncChangeTask(Task):
 
     def _updateChecks(self, session, commit, remote_checks_data):
         # Called from run inside of db transaction
-        local_checks = {c.checker.uuid: c for c in commit.checks}
+        local_checks = {c.name: c for c in commit.checks}
         for checks_data in remote_checks_data['statuses']:
             uuid = checks_data['id']
             name = checks_data['context']
             state = checks_data['state']
-            checker = session.getCheckerByUUID(uuid)
-            if checker is None:
-                self.log.info("Creating checker %s", uuid)
-                checker = session.createChecker(uuid, name, state)
-            checker.name = name
-            checker.status = state
             # TODO(mandre) how do we get this from GH API?
-            # checker.blocking = ' '.join(checks_data['blocking'])
-            check = local_checks.get(uuid)
+            # check.blocking = ' '.join(checks_data['blocking'])
+            check = local_checks.get(name)
             updated = dateutil.parser.parse(checks_data['updated_at'])
             if check is None:
                 created = dateutil.parser.parse(checks_data['created_at'])
                 self.log.info("Creating check %s on commit %s", uuid, commit.key)
-                check = commit.createCheck(checker, state, created, updated)
+                check = commit.createCheck(name, state, created, updated)
             check.updated = updated
             check.state = state
             check.url = checks_data.get('target_url', '')
