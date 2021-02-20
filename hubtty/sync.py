@@ -628,7 +628,7 @@ class SyncChangeTask(Task):
 
         project_name = remote_change['base']['repo']['full_name']
 
-        remote_checks_data = sync.get('repos/%s/status/%s' % (project_name, remote_commits[-1]['sha']))
+        remote_checks_data = sync.get('repos/%s/commits/%s/status' % (project_name, remote_commits[-1]['sha']))
         remote_commits[-1]['_hubtty_remote_checks_data'] = remote_checks_data
 
         fetches = collections.defaultdict(list)
