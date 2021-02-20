@@ -772,7 +772,7 @@ class ChangeView(urwid.WidgetWrap):
         # Add check results
         commit = change.commits[-1]
         for check in commit.checks:
-            if not check.url or check.message:
+            if not (check.url or check.message):
                 continue
             # link checker name/url, color result, in time
             color = 'check-%s' % check.state
