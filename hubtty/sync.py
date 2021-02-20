@@ -685,6 +685,13 @@ class SyncChangeTask(Task):
             change.merged = remote_change['merged']
             change.mergeable = remote_change.get('mergeable') or True
 
+            # Delete commits that no longer belong to the change
+            remote_commits_sha = [c['sha'] for c in remote_commits]
+            for commit in change.commits:
+                if commit.sha not in remote_commits_sha:
+                    self.log.info("Deleted commit %s", commit.sha)
+                    session.delete(commit)
+
             repo = gitrepo.get_repo(change.project.name, app.config)
             new_commit = False
             for remote_commit in remote_commits:
