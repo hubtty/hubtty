@@ -327,6 +327,7 @@ class SyncSubscribedProjectsTask(Task):
         app = sync.app
         with app.db.getSession() as session:
             keys = [p.key for p in session.getProjects(subscribed=True)]
+        # Sync projects at most 10 at a time
         for i in range(0, len(keys), 10):
             t = SyncProjectTask(keys[i:i+10], self.priority)
             self.tasks.append(t)
@@ -358,17 +359,36 @@ class SyncProjectTask(Task):
         app = sync.app
         now = datetime.datetime.utcnow()
         with app.db.getSession() as session:
+            full_sync = []
+            partial_sync = []
+            sync_from = now
             for project_key in self.project_keys:
                 project = session.getProject(project_key)
-                query = 'type:pr repo:%s' % project.name
                 if project.updated:
-                    # Allow 4 seconds for request time, etc.
-                    query += ' updated:>%s' % ((project.updated - datetime.timedelta(seconds=4)).replace(microsecond=0).isoformat(),)
+                    partial_sync.append(project.name)
+                    # We can use the oldest sync time of the bunch, because
+                    # when we sync projects individually when subscribing to
+                    # them.
+                    if project.updated < sync_from:
+                        sync_from = project.updated
                 else:
-                    query += ' state:open'
+                    full_sync.append(project.name)
+
+            def sync_projects(projects, query):
+                for project_name in projects:
+                    query += ' repo:%s' % project_name
                 changes = sync.query(query)
                 for c in changes:
                     sync.submitTask(SyncChangeTask(c['pull_request']['url'].split('repos/')[1], priority=self.priority))
+
+            if full_sync:
+                query = 'type:pr state:open'
+                sync_projects(full_sync, query)
+
+            if partial_sync:
+                # Allow 4 seconds for request time, etc.
+                query = 'type:pr updated:>%s' % ((sync_from - datetime.timedelta(seconds=4)).replace(microsecond=0).isoformat(),)
+                sync_projects(partial_sync, query)
 
         for key in self.project_keys:
             sync.submitTask(SetProjectUpdatedTask(key, now, priority=self.priority))
