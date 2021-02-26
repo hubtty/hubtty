@@ -286,7 +286,7 @@ def SearchParser():
             p[0] = hubtty.db.change_table.c.state == 'SUBMITTED'
         elif p[2] == 'merged':
             p[0] = hubtty.db.change_table.c.merged == True
-        elif p[2] == 'abandoned':
+        elif p[2] == 'unmerged' or p[2] == 'abandoned':
             p[0] = and_(hubtty.db.change_table.c.state == 'closed',
                         hubtty.db.change_table.c.merged == False)
         elif p[2] == 'author':
@@ -335,7 +335,7 @@ def SearchParser():
         '''status_term : OP_STATUS string'''
         if p[2] == 'merged':
             p[0] = hubtty.db.change_table.c.merged == True
-        elif p[2] == 'abandoned':
+        elif p[2] == 'unmerged' or p[2] == 'abandoned':
             p[0] = and_(hubtty.db.change_table.c.state == 'closed',
                         hubtty.db.change_table.c.merged == False)
         else:
