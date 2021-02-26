@@ -81,6 +81,7 @@ def SearchParser():
                 | change_term
                 | author_term
                 | reviewer_term
+                | commenter_term
                 | mentions_term
                 | commit_term
                 | project_term
@@ -148,6 +149,29 @@ def SearchParser():
         filters = []
         filters.append(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key)
         filters.append(hubtty.db.approval_table.c.account_key == hubtty.db.account_table.c.key)
+        try:
+            number = int(p[2])
+        except:
+            number = None
+        if number is not None:
+            filters.append(hubtty.db.account_table.c.id == number)
+        elif p[2] == 'self':
+            account_id = p.parser.account_id
+            filters.append(hubtty.db.account_table.c.id == account_id)
+        else:
+            filters.append(or_(hubtty.db.account_table.c.username == p[2],
+                               hubtty.db.account_table.c.email == p[2],
+                               hubtty.db.account_table.c.name == p[2]))
+        s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+        p[0] = hubtty.db.change_table.c.key.in_(s)
+
+    def p_commenter_term(p):
+        '''commenter_term : OP_COMMENTER string
+                          | OP_COMMENTER NUMBER'''
+        filters = []
+        filters.append(and_(hubtty.db.message_table.c.change_key == hubtty.db.change_table.c.key,
+                            hubtty.db.message_table.c.commit_key == None))
+        filters.append(hubtty.db.message_table.c.account_key == hubtty.db.account_table.c.key)
         try:
             number = int(p[2])
         except:

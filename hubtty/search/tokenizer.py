@@ -21,6 +21,7 @@ operators = {
     'change': 'OP_CHANGE',
     'author': 'OP_AUTHOR',
     'reviewer': 'OP_REVIEWER',
+    'commenter': 'OP_COMMENTER',
     #'OP_REVIEWERIN', # needs local group membership
     'mentions': 'OP_MENTIONS',
     'commit': 'OP_COMMIT',
