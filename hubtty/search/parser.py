@@ -287,8 +287,8 @@ def SearchParser():
         elif p[2] == 'merged':
             p[0] = hubtty.db.change_table.c.merged == True
         elif p[2] == 'abandoned':
-            p[0] = (hubtty.db.change_table.c.state == 'closed' and
-                    hubtty.db.change_table.c.merged == False)
+            p[0] = and_(hubtty.db.change_table.c.state == 'closed',
+                        hubtty.db.change_table.c.merged == False)
         elif p[2] == 'author':
             p[0] = hubtty.db.account_table.c.id == account_id
         elif p[2] == 'starred':
@@ -336,8 +336,8 @@ def SearchParser():
         if p[2] == 'merged':
             p[0] = hubtty.db.change_table.c.merged == True
         elif p[2] == 'abandoned':
-            p[0] = (hubtty.db.change_table.c.state == 'closed'
-                    and hubtty.db.change_table.c.merged == False)
+            p[0] = and_(hubtty.db.change_table.c.state == 'closed',
+                        hubtty.db.change_table.c.merged == False)
         else:
             p[0] = hubtty.db.change_table.c.state == p[2]
 
