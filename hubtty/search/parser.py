@@ -81,6 +81,7 @@ def SearchParser():
                 | change_term
                 | author_term
                 | reviewer_term
+                | mentions_term
                 | commit_term
                 | project_term
                 | projects_term
@@ -162,6 +163,24 @@ def SearchParser():
                                hubtty.db.account_table.c.name == p[2]))
         s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
         p[0] = hubtty.db.change_table.c.key.in_(s)
+
+    def p_mentions_term(p):
+        '''mentions_term : OP_MENTIONS string'''
+        # Currently search for mentions in PR messages and comments
+        # TODO(mandre) might want to extend to commit messages and PR bodies as well
+        filters = []
+        filters.append(hubtty.db.message_table.c.change_key == hubtty.db.change_table.c.key)
+        filters.append(hubtty.db.message_table.c.message.like('%%@%s%%' % p[2]))
+        message_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+
+        filters = []
+        filters.append(hubtty.db.message_table.c.change_key == hubtty.db.change_table.c.key)
+        filters.append(hubtty.db.comment_table.c.message_key == hubtty.db.message_table.c.key)
+        filters.append(hubtty.db.comment_table.c.message.like('%%@%s%%' % p[2]))
+        comment_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+
+        p[0] = or_(hubtty.db.change_table.c.key.in_(message_select),
+                   hubtty.db.change_table.c.key.in_(comment_select))
 
     def p_commit_term(p):
         '''commit_term : OP_COMMIT string'''
