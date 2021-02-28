@@ -23,6 +23,7 @@ operators = {
     'reviewed-by': 'OP_REVIEWEDBY',
     'commenter': 'OP_COMMENTER',
     'mentions': 'OP_MENTIONS',
+    'involves': 'OP_INVOLVES',
     'commit': 'OP_COMMIT',
     'project': 'OP_PROJECT',
     'projects': 'OP_PROJECTS',
