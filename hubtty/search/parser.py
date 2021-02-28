@@ -16,7 +16,7 @@ import datetime
 import re
 
 import ply.yacc as yacc
-from sqlalchemy.sql.expression import and_, or_, not_, select, func
+from sqlalchemy.sql.expression import and_, or_, not_, select, func, exists
 
 import hubtty.db
 import hubtty.search
@@ -84,6 +84,7 @@ def SearchParser():
                 | commenter_term
                 | mentions_term
                 | involves_term
+                | review_term
                 | commit_term
                 | project_term
                 | projects_term
@@ -243,6 +244,30 @@ def SearchParser():
                    hubtty.db.change_table.c.key.in_(mentions_message_select),
                    hubtty.db.change_table.c.key.in_(mentions_comment_select),
                    hubtty.db.change_table.c.key.in_(commenter_select))
+
+    def p_review_term(p):
+        '''review_term : OP_REVIEW string'''
+        if p[2] == 'none':
+            filters = []
+            filters.append(~ exists().where(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key))
+            s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+            p[0] = hubtty.db.change_table.c.key.in_(s)
+        elif p[2] == 'approved':
+            filters = []
+            filters.append(and_(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key,
+                                hubtty.db.approval_table.c.category == 'APPROVED'))
+            s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+            p[0] = hubtty.db.change_table.c.key.in_(s)
+        elif p[2] == 'changes_requested':
+            filters = []
+            filters.append(and_(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key,
+                                hubtty.db.approval_table.c.category == 'CHANGES_REQUESTED'))
+            s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+            p[0] = hubtty.db.change_table.c.key.in_(s)
+        # elif p[2] == 'required':
+        #     # TODO not implemented
+        else:
+            raise hubtty.search.SearchSyntaxError('Syntax error: review:%s is not supported' % p[2])
 
     def p_commit_term(p):
         '''commit_term : OP_COMMIT string'''
