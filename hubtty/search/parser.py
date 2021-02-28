@@ -80,7 +80,7 @@ def SearchParser():
                 | recentlyseen_term
                 | change_term
                 | author_term
-                | reviewer_term
+                | reviewed-by_term
                 | commenter_term
                 | mentions_term
                 | commit_term
@@ -143,9 +143,9 @@ def SearchParser():
                        hubtty.db.account_table.c.email == p[2],
                        hubtty.db.account_table.c.name == p[2])
 
-    def p_reviewer_term(p):
-        '''reviewer_term : OP_REVIEWER string
-                         | OP_REVIEWER NUMBER'''
+    def p_reviewed_by_term(p):
+        '''reviewed-by_term : OP_REVIEWEDBY string
+                            | OP_REVIEWEDBY NUMBER'''
         filters = []
         filters.append(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key)
         filters.append(hubtty.db.approval_table.c.account_key == hubtty.db.account_table.c.key)
@@ -338,6 +338,7 @@ def SearchParser():
             # A hubtty extension
             p[0] = hubtty.db.change_table.c.held == True
         elif p[2] == 'reviewer':
+            # A hubtty extension: synonym of reviewed-by:self
             filters = []
             filters.append(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key)
             filters.append(hubtty.db.approval_table.c.account_key == hubtty.db.account_table.c.key)

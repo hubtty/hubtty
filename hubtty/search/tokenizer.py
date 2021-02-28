@@ -20,9 +20,8 @@ operators = {
     'recentlyseen': 'OP_RECENTLYSEEN', # Hubtty extension
     'change': 'OP_CHANGE',
     'author': 'OP_AUTHOR',
-    'reviewer': 'OP_REVIEWER',
+    'reviewed-by': 'OP_REVIEWEDBY',
     'commenter': 'OP_COMMENTER',
-    #'OP_REVIEWERIN', # needs local group membership
     'mentions': 'OP_MENTIONS',
     'commit': 'OP_COMMIT',
     'project': 'OP_PROJECT',
@@ -72,7 +71,7 @@ def SearchTokenizer():
     t_ignore = ' \t'   # NOQA (and intentionally not using r'' due to tab char)
 
     def t_OP(t):
-        r'[a-zA-Z_][a-zA-Z_]*:'
+        r'[a-zA-Z_][a-zA-Z_-]*:'
         t.type = operators.get(t.value[:-1], 'OP')
         return t
 
