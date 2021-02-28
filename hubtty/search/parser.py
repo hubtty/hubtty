@@ -378,13 +378,7 @@ def SearchParser():
         '''is_term : OP_IS string'''
         #TODO: implement draft
         account_id = p.parser.account_id
-        if p[2] == 'reviewed':
-            filters = []
-            filters.append(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key)
-            filters.append(hubtty.db.approval_table.c.value != 0)
-            s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
-            p[0] = hubtty.db.change_table.c.key.in_(s)
-        elif p[2] == 'open':
+        if p[2] == 'open':
             p[0] = hubtty.db.change_table.c.state == 'open'
         elif p[2] == 'closed':
             p[0] = hubtty.db.change_table.c.state == 'closed'
