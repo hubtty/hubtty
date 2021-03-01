@@ -86,6 +86,7 @@ def SearchParser():
                 | involves_term
                 | review_term
                 | created_term
+                | updated_term
                 | commit_term
                 | project_term
                 | projects_term
@@ -285,6 +286,22 @@ def SearchParser():
             ref_date = datetime.date.fromisoformat(p[2])
             p[0] = and_(hubtty.db.change_table.c.created >= ref_date,
                         hubtty.db.change_table.c.created < ref_date + datetime.timedelta(days=1))
+
+    def p_updated_term(p):
+        '''updated_term : OP_UPDATED DATE
+                        | OP_UPDATED DATECOMP'''
+        if p[2].startswith('<='):
+            p[0] = hubtty.db.change_table.c.updated <= datetime.date.fromisoformat(p[2][2:])
+        elif p[2].startswith('>='):
+            p[0] = hubtty.db.change_table.c.updated >= datetime.date.fromisoformat(p[2][2:])
+        elif p[2].startswith('<'):
+            p[0] = hubtty.db.change_table.c.updated < datetime.date.fromisoformat(p[2][1:])
+        elif p[2].startswith('>'):
+            p[0] = hubtty.db.change_table.c.updated > datetime.date.fromisoformat(p[2][1:])
+        else:
+            ref_date = datetime.date.fromisoformat(p[2])
+            p[0] = and_(hubtty.db.change_table.c.updated >= ref_date,
+                        hubtty.db.change_table.c.updated < ref_date + datetime.timedelta(days=1))
 
     def p_commit_term(p):
         '''commit_term : OP_COMMIT string'''

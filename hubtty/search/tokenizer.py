@@ -26,6 +26,7 @@ operators = {
     'involves': 'OP_INVOLVES',
     'review': 'OP_REVIEW',
     'created': 'OP_CREATED',
+    'updated': 'OP_UPDATED',
     'commit': 'OP_COMMIT',
     'project': 'OP_PROJECT',
     'projects': 'OP_PROJECTS',
