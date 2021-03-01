@@ -25,6 +25,7 @@ operators = {
     'mentions': 'OP_MENTIONS',
     'involves': 'OP_INVOLVES',
     'review': 'OP_REVIEW',
+    'created': 'OP_CREATED',
     'commit': 'OP_COMMIT',
     'project': 'OP_PROJECT',
     'projects': 'OP_PROJECTS',
@@ -62,6 +63,8 @@ tokens = [
     'SSTRING',
     'DSTRING',
     'USTRING',
+    'DATE',
+    'DATECOMP',
     #'REGEX',
     #'SHA',
     ] + list(operators.values())
@@ -89,6 +92,14 @@ def SearchTokenizer():
     def t_DSTRING(t):
         r'"([^\\"]+|\\"|\\\\)*"'
         t.value=t.value[1:-1].decode("string-escape")
+        return t
+
+    def t_DATE(t):
+        r'\d{4}(-\d\d(-\d\d(T\d\d:\d\d(:\d\d)?(\.\d+)?(([+-]\d\d:\d\d)|Z)?)?)?)?'
+        return t
+
+    def t_DATECOMP(t):
+        r'[<>]=?\d{4}(-\d\d(-\d\d(T\d\d:\d\d(:\d\d)?(\.\d+)?(([+-]\d\d:\d\d)|Z)?)?)?)?'
         return t
 
     def t_AND(t):

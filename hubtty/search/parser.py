@@ -85,6 +85,7 @@ def SearchParser():
                 | mentions_term
                 | involves_term
                 | review_term
+                | created_term
                 | commit_term
                 | project_term
                 | projects_term
@@ -268,6 +269,22 @@ def SearchParser():
         #     # TODO not implemented
         else:
             raise hubtty.search.SearchSyntaxError('Syntax error: review:%s is not supported' % p[2])
+
+    def p_created_term(p):
+        '''created_term : OP_CREATED DATE
+                        | OP_CREATED DATECOMP'''
+        if p[2].startswith('<='):
+            p[0] = hubtty.db.change_table.c.created <= datetime.date.fromisoformat(p[2][2:])
+        elif p[2].startswith('>='):
+            p[0] = hubtty.db.change_table.c.created >= datetime.date.fromisoformat(p[2][2:])
+        elif p[2].startswith('<'):
+            p[0] = hubtty.db.change_table.c.created < datetime.date.fromisoformat(p[2][1:])
+        elif p[2].startswith('>'):
+            p[0] = hubtty.db.change_table.c.created > datetime.date.fromisoformat(p[2][1:])
+        else:
+            ref_date = datetime.date.fromisoformat(p[2])
+            p[0] = and_(hubtty.db.change_table.c.created >= ref_date,
+                        hubtty.db.change_table.c.created < ref_date + datetime.timedelta(days=1))
 
     def p_commit_term(p):
         '''commit_term : OP_COMMIT string'''
