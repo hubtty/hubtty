@@ -81,7 +81,7 @@ def SearchTokenizer():
         return t
 
     def t_CHANGE_ID(t):
-        r'I[a-fA-F0-9]{7,40}'
+        r'([a-zA-Z_]+/)+\d+'
         return t
 
     def t_SSTRING(t):

@@ -551,7 +551,7 @@ class App(object):
             if changeid:
                 changes = session.getChangesByChangeID(changeid)
             change_keys = [c.key for c in changes if c]
-            restids = [c.id for c in changes if c]
+            restids = [c.change_id for c in changes if c]
         if not change_keys:
             if self.sync.offline:
                 raise Exception('Can not sync change while offline.')
