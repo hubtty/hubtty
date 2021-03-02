@@ -91,8 +91,6 @@ def SearchParser():
                 | commit_term
                 | project_key_term
                 | branch_term
-                | message_term
-                | comment_term
                 | has_term
                 | in_term
                 | is_term
@@ -326,28 +324,6 @@ def SearchParser():
             p[0] = func.matches(p[2], hubtty.db.change_table.c.branch)
         else:
             p[0] = hubtty.db.change_table.c.branch == p[2]
-
-    def p_message_term(p):
-        '''message_term : OP_MESSAGE string'''
-        filters = []
-        filters.append(hubtty.db.commit_table.c.change_key == hubtty.db.change_table.c.key)
-        filters.append(hubtty.db.commit_table.c.message.like('%%%s%%' % p[2]))
-        s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
-        p[0] = hubtty.db.change_table.c.key.in_(s)
-
-    def p_comment_term(p):
-        '''comment_term : OP_COMMENT string'''
-        filters = []
-        filters.append(hubtty.db.commit_table.c.change_key == hubtty.db.change_table.c.key)
-        filters.append(hubtty.db.commit_table.c.message == p[2])
-        commit_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
-        filters = []
-        filters.append(hubtty.db.commit_table.c.change_key == hubtty.db.change_table.c.key)
-        filters.append(hubtty.db.comment_table.c.commit_key == hubtty.db.commit_table.c.key)
-        filters.append(hubtty.db.comment_table.c.message == p[2])
-        comment_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
-        p[0] = or_(hubtty.db.change_table.c.key.in_(comment_select),
-                   hubtty.db.change_table.c.key.in_(commit_select))
 
     def p_has_term(p):
         '''has_term : OP_HAS string'''

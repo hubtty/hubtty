@@ -36,8 +36,6 @@ operators = {
     'base': 'OP_BASE',
     #'tr': 'OP_TR', # needs trackingids
     #'bug': 'OP_BUG', # needs trackingids
-    'message': 'OP_MESSAGE',
-    'comment': 'OP_COMMENT',
     'file': 'OP_FILE',
     'path': 'OP_PATH',
     'has': 'OP_HAS',
