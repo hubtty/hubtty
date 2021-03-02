@@ -321,7 +321,8 @@ def SearchParser():
         p[0] = hubtty.db.change_table.c.project_key == p[2]
 
     def p_branch_term(p):
-        '''branch_term : OP_BRANCH string'''
+        '''branch_term : OP_BRANCH string
+                       | OP_BASE string'''
         if p[2].startswith('^'):
             p[0] = func.matches(p[2], hubtty.db.change_table.c.branch)
         else:

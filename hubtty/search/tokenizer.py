@@ -33,6 +33,7 @@ operators = {
     'commit': 'OP_COMMIT',
     '_project_key': 'OP_PROJECT_KEY',  # internal hubtty use only
     'branch': 'OP_BRANCH',
+    'base': 'OP_BASE',
     'ref': 'OP_REF',
     #'tr': 'OP_TR', # needs trackingids
     #'bug': 'OP_BUG', # needs trackingids
