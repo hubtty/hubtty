@@ -249,7 +249,7 @@ Change List Options
 
 **change-list-query**
   This is the query used for the list of changes when a project is
-  selected.  The default is `status:open`.
+  selected.  The default is `state:open`.
 
 **change-list-options**
   This section defines default sorting options for the change list.
@@ -330,7 +330,7 @@ Example:
 
    dashboards:
      - name: "My changes"
-       query: "author:self status:open"
+       query: "author:self state:open"
        key: "f2"
 
 Reviewkeys

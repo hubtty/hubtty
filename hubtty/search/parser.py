@@ -94,7 +94,7 @@ def SearchParser():
                 | has_term
                 | in_term
                 | is_term
-                | status_term
+                | state_term
                 | file_term
                 | path_term
                 | limit_term
@@ -417,8 +417,8 @@ def SearchParser():
                             hubtty.db.file_table.c.old_path == p[2]),
                         hubtty.db.file_table.c.status is not None)
 
-    def p_status_term(p):
-        '''status_term : OP_STATUS string'''
+    def p_state_term(p):
+        '''state_term : OP_STATE string'''
         if p[2] == 'merged':
             p[0] = hubtty.db.change_table.c.merged == True
         elif p[2] == 'unmerged' or p[2] == 'abandoned':

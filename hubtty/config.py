@@ -209,7 +209,7 @@ class Config(object):
                                 text="{url}",
                                 url="{url}"))])))
 
-        self.project_change_list_query = self.config.get('change-list-query', 'status:open')
+        self.project_change_list_query = self.config.get('change-list-query', 'state:open')
 
         self.diff_view = self.config.get('diff-view', 'side-by-side')
 

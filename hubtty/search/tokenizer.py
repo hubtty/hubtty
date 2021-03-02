@@ -41,7 +41,7 @@ operators = {
     'has': 'OP_HAS',
     'in': 'OP_IN',
     'is': 'OP_IS',
-    'status': 'OP_STATUS',
+    'state': 'OP_STATE',
     'limit': 'OP_LIMIT',
     }
 

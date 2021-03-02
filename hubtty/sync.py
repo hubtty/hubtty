@@ -1381,7 +1381,7 @@ class PruneDatabaseTask(Task):
             return
         app = sync.app
         with app.db.getSession() as session:
-            for change in session.getChanges('status:closed age:%s' % self.age):
+            for change in session.getChanges('state:closed age:%s' % self.age):
                 t = PruneChangeTask(change.key, priority=self.priority)
                 self.tasks.append(t)
                 sync.submitTask(t)
