@@ -94,6 +94,7 @@ def SearchParser():
                 | message_term
                 | comment_term
                 | has_term
+                | in_term
                 | is_term
                 | status_term
                 | file_term
@@ -360,6 +361,29 @@ def SearchParser():
             p[0] = hubtty.db.change_table.c.key.in_(s)
         else:
             raise hubtty.search.SearchSyntaxError('Syntax error: has:%s is not supported' % p[2])
+
+    def p_in_term(p):
+        '''in_term : OP_IN string string'''
+        if p[2] == 'title':
+            p[0] = hubtty.db.change_table.c.title.like('%%%s%%' % p[3])
+        elif p[2] == 'body':
+            p[0] = hubtty.db.change_table.c.body.like('%%%s%%' % p[3])
+        elif p[2] == 'comments':
+            filters = []
+            filters.append(hubtty.db.message_table.c.change_key == hubtty.db.change_table.c.key)
+            filters.append(hubtty.db.message_table.c.message.like('%%%s%%' % p[3]))
+            message_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+
+            filters = []
+            filters.append(hubtty.db.message_table.c.change_key == hubtty.db.change_table.c.key)
+            filters.append(hubtty.db.comment_table.c.message_key == hubtty.db.message_table.c.key)
+            filters.append(hubtty.db.comment_table.c.message.like('%%%s%%' % p[3]))
+            comment_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+
+            p[0] = or_(hubtty.db.change_table.c.key.in_(message_select),
+                    hubtty.db.change_table.c.key.in_(comment_select))
+        else:
+            raise hubtty.search.SearchSyntaxError('Syntax error: in:%s is not supported' % p[2])
 
     def p_is_term(p):
         '''is_term : OP_IS string'''

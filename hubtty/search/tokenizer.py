@@ -41,6 +41,7 @@ operators = {
     'file': 'OP_FILE',
     'path': 'OP_PATH',
     'has': 'OP_HAS',
+    'in': 'OP_IN',
     'is': 'OP_IS',
     'status': 'OP_STATUS',
     'limit': 'OP_LIMIT',
