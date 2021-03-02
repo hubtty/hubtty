@@ -89,8 +89,6 @@ def SearchParser():
                 | updated_term
                 | user_term
                 | commit_term
-                | project_term
-                | projects_term
                 | project_key_term
                 | branch_term
                 | ref_term
@@ -317,17 +315,6 @@ def SearchParser():
         filters.append(hubtty.db.commit_table.c.commit == p[2])
         s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
         p[0] = hubtty.db.change_table.c.key.in_(s)
-
-    def p_project_term(p):
-        '''project_term : OP_PROJECT string'''
-        if p[2].startswith('^'):
-            p[0] = func.matches(p[2], hubtty.db.project_table.c.name)
-        else:
-            p[0] = hubtty.db.project_table.c.name == p[2]
-
-    def p_projects_term(p):
-        '''projects_term : OP_PROJECTS string'''
-        p[0] = hubtty.db.project_table.c.name.like('%s%%' % p[2])
 
     def p_project_key_term(p):
         '''project_key_term : OP_PROJECT_KEY NUMBER'''

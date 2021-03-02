@@ -1123,7 +1123,7 @@ class ChangeView(urwid.WidgetWrap):
             self.app.doSearch("status:open author:%s" % (self.author_login,))
 
     def searchProject(self, widget):
-        self.app.doSearch("status:open project:%s" % (self.project_name,))
+        self.app.doSearch("status:open repo:%s" % (self.project_name,))
 
     def reviewKey(self, reviewkey):
         approvals = {}

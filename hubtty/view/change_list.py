@@ -488,7 +488,7 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
 
     def getQueryString(self):
         if self.project_key is not None:
-            return "project:%s %s" % (self.query_desc, self.app.config.project_change_list_query)
+            return "repo:%s %s" % (self.query_desc, self.app.config.project_change_list_query)
         return self.query
 
     def clearChangeList(self):

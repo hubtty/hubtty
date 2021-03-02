@@ -31,8 +31,6 @@ operators = {
     'org': 'OP_ORG',
     'repo': 'OP_REPO',
     'commit': 'OP_COMMIT',
-    'project': 'OP_PROJECT',
-    'projects': 'OP_PROJECTS',
     '_project_key': 'OP_PROJECT_KEY',  # internal hubtty use only
     'branch': 'OP_BRANCH',
     'ref': 'OP_REF',
