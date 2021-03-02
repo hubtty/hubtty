@@ -91,7 +91,6 @@ def SearchParser():
                 | commit_term
                 | project_key_term
                 | branch_term
-                | label_term
                 | message_term
                 | comment_term
                 | has_term
@@ -326,39 +325,6 @@ def SearchParser():
             p[0] = func.matches(p[2], hubtty.db.change_table.c.branch)
         else:
             p[0] = hubtty.db.change_table.c.branch == p[2]
-
-    label_re = re.compile(r'(?P<label>[a-zA-Z0-9_-]+([a-zA-Z]|((?<![-+])[0-9])))'
-                          r'(?P<operator>[<>]?=?)(?P<value>[-+]?[0-9]+)'
-                          r'($|,(user=)?(?P<user>\S+))')
-
-    def p_label_term(p):
-        '''label_term : OP_LABEL string'''
-        args = label_re.match(p[2])
-        label = args.group('label')
-        op = args.group('operator') or '='
-        value = int(args.group('value'))
-        user = args.group('user')
-
-        filters = []
-        filters.append(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key)
-        filters.append(hubtty.db.approval_table.c.category == label)
-        if op == '=':
-            filters.append(hubtty.db.approval_table.c.value == value)
-        elif op == '>=':
-            filters.append(hubtty.db.approval_table.c.value >= value)
-        elif op == '<=':
-            filters.append(hubtty.db.approval_table.c.value <= value)
-        if user is not None:
-            filters.append(hubtty.db.approval_table.c.account_key == hubtty.db.account_table.c.key)
-            if user == 'self':
-                filters.append(hubtty.db.account_table.c.id == p.parser.account_id)
-            else:
-                filters.append(
-                    or_(hubtty.db.account_table.c.username == user,
-                        hubtty.db.account_table.c.email == user,
-                        hubtty.db.account_table.c.name == user))
-        s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
-        p[0] = hubtty.db.change_table.c.key.in_(s)
 
     def p_message_term(p):
         '''message_term : OP_MESSAGE string'''
