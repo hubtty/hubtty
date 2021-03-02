@@ -309,7 +309,7 @@ def SearchParser():
         '''commit_term : OP_COMMIT string'''
         filters = []
         filters.append(hubtty.db.commit_table.c.change_key == hubtty.db.change_table.c.key)
-        filters.append(hubtty.db.commit_table.c.commit == p[2])
+        filters.append(func.matches(p[2], hubtty.db.commit_table.c.sha))
         s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
         p[0] = hubtty.db.change_table.c.key.in_(s)
 
