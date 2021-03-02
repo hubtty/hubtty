@@ -91,7 +91,6 @@ def SearchParser():
                 | commit_term
                 | project_key_term
                 | branch_term
-                | ref_term
                 | label_term
                 | message_term
                 | comment_term
@@ -327,13 +326,6 @@ def SearchParser():
             p[0] = func.matches(p[2], hubtty.db.change_table.c.branch)
         else:
             p[0] = hubtty.db.change_table.c.branch == p[2]
-
-    def p_ref_term(p):
-        '''ref_term : OP_REF string'''
-        if p[2].startswith('^'):
-            p[0] = func.matches(p[2], 'refs/heads/'+hubtty.db.change_table.c.branch)
-        else:
-            p[0] = hubtty.db.change_table.c.branch == p[2][len('refs/heads/'):]
 
     label_re = re.compile(r'(?P<label>[a-zA-Z0-9_-]+([a-zA-Z]|((?<![-+])[0-9])))'
                           r'(?P<operator>[<>]?=?)(?P<value>[-+]?[0-9]+)'
