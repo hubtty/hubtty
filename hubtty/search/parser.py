@@ -87,6 +87,7 @@ def SearchParser():
                 | review_term
                 | created_term
                 | updated_term
+                | user_term
                 | commit_term
                 | project_term
                 | projects_term
@@ -146,6 +147,12 @@ def SearchParser():
             p[0] = or_(hubtty.db.account_table.c.username == p[2],
                        hubtty.db.account_table.c.email == p[2],
                        hubtty.db.account_table.c.name == p[2])
+
+    def p_user_term(p):
+        '''user_term : OP_USER string
+                     | OP_ORG string
+                     | OP_REPO string'''
+        p[0] = func.matches(p[2] + '/', hubtty.db.change_table.c.change_id)
 
     def p_reviewed_by_term(p):
         '''reviewed-by_term : OP_REVIEWEDBY string
