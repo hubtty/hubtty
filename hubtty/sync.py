@@ -936,8 +936,12 @@ class SyncChangeTask(Task):
                 if review_status:
                     # TODO(mandre)
                     # - Rename approval.category to approval.status
-                    change.createApproval(account, review_status, remote_review.get('commit_id'))
-                    self.log.info("Created new approval for %s from %s commit %s.", change.change_id, account.username, remote_review.get('commit_id'))
+                    approval = session.getApproval(change, account, remote_review.get('commit_id'))
+                    if approval:
+                        approval.category = review_status
+                    else:
+                        change.createApproval(account, review_status, remote_review.get('commit_id'))
+                        self.log.info("Created new approval for %s from %s commit %s.", change.change_id, account.username, remote_review.get('commit_id'))
 
             # Inline comments
             for remote_comment in remote_pr_comments:
