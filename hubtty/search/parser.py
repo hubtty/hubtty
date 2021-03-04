@@ -16,7 +16,7 @@ import datetime
 import re
 
 import ply.yacc as yacc
-from sqlalchemy.sql.expression import and_, or_, not_, select, func
+from sqlalchemy.sql.expression import and_, or_, not_, select, func, exists
 
 import hubtty.db
 import hubtty.search
@@ -80,19 +80,21 @@ def SearchParser():
                 | recentlyseen_term
                 | change_term
                 | author_term
-                | reviewer_term
+                | reviewed-by_term
+                | commenter_term
+                | mentions_term
+                | involves_term
+                | review_term
+                | created_term
+                | updated_term
+                | user_term
                 | commit_term
-                | project_term
-                | projects_term
                 | project_key_term
                 | branch_term
-                | ref_term
-                | label_term
-                | message_term
-                | comment_term
                 | has_term
+                | in_term
                 | is_term
-                | status_term
+                | state_term
                 | file_term
                 | path_term
                 | limit_term
@@ -141,9 +143,15 @@ def SearchParser():
                        hubtty.db.account_table.c.email == p[2],
                        hubtty.db.account_table.c.name == p[2])
 
-    def p_reviewer_term(p):
-        '''reviewer_term : OP_REVIEWER string
-                         | OP_REVIEWER NUMBER'''
+    def p_user_term(p):
+        '''user_term : OP_USER string
+                     | OP_ORG string
+                     | OP_REPO string'''
+        p[0] = func.matches(p[2] + '/', hubtty.db.change_table.c.change_id)
+
+    def p_reviewed_by_term(p):
+        '''reviewed-by_term : OP_REVIEWEDBY string
+                            | OP_REVIEWEDBY NUMBER'''
         filters = []
         filters.append(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key)
         filters.append(hubtty.db.approval_table.c.account_key == hubtty.db.account_table.c.key)
@@ -163,97 +171,159 @@ def SearchParser():
         s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
         p[0] = hubtty.db.change_table.c.key.in_(s)
 
+    def p_commenter_term(p):
+        '''commenter_term : OP_COMMENTER string
+                          | OP_COMMENTER NUMBER'''
+        filters = []
+        filters.append(and_(hubtty.db.message_table.c.change_key == hubtty.db.change_table.c.key,
+                            hubtty.db.message_table.c.commit_key == None))
+        filters.append(hubtty.db.message_table.c.account_key == hubtty.db.account_table.c.key)
+        try:
+            number = int(p[2])
+        except:
+            number = None
+        if number is not None:
+            filters.append(hubtty.db.account_table.c.id == number)
+        elif p[2] == 'self':
+            account_id = p.parser.account_id
+            filters.append(hubtty.db.account_table.c.id == account_id)
+        else:
+            filters.append(or_(hubtty.db.account_table.c.username == p[2],
+                               hubtty.db.account_table.c.email == p[2],
+                               hubtty.db.account_table.c.name == p[2]))
+        s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+        p[0] = hubtty.db.change_table.c.key.in_(s)
+
+    def p_mentions_term(p):
+        '''mentions_term : OP_MENTIONS string'''
+        # Currently search for mentions in PR messages and comments
+        # TODO(mandre) might want to extend to commit messages and PR bodies as well
+        filters = []
+        filters.append(hubtty.db.message_table.c.change_key == hubtty.db.change_table.c.key)
+        filters.append(hubtty.db.message_table.c.message.like('%%@%s%%' % p[2]))
+        message_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+
+        filters = []
+        filters.append(hubtty.db.message_table.c.change_key == hubtty.db.change_table.c.key)
+        filters.append(hubtty.db.comment_table.c.message_key == hubtty.db.message_table.c.key)
+        filters.append(hubtty.db.comment_table.c.message.like('%%@%s%%' % p[2]))
+        comment_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+
+        p[0] = or_(hubtty.db.change_table.c.key.in_(message_select),
+                   hubtty.db.change_table.c.key.in_(comment_select))
+
+    def p_involves_term(p):
+        '''involves_term : OP_INVOLVES string'''
+        # According to github, involves is the union of: author, assignee,
+        # mentions, and commenter.  We're however not yet syncing assignee so
+        # we're using reviewed-by that has the same effect.
+
+        filters = []
+        filters.append(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key)
+        filters.append(hubtty.db.approval_table.c.account_key == hubtty.db.account_table.c.key)
+        filters.append(hubtty.db.account_table.c.username == p[2])
+        reviewer_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+
+        # TODO(mandre) might want to extend to commit messages and PR bodies as well
+        filters = []
+        filters.append(hubtty.db.message_table.c.change_key == hubtty.db.change_table.c.key)
+        filters.append(hubtty.db.message_table.c.message.like('%%@%s%%' % p[2]))
+        mentions_message_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+
+        filters = []
+        filters.append(hubtty.db.message_table.c.change_key == hubtty.db.change_table.c.key)
+        filters.append(hubtty.db.comment_table.c.message_key == hubtty.db.message_table.c.key)
+        filters.append(hubtty.db.comment_table.c.message.like('%%@%s%%' % p[2]))
+        mentions_comment_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+
+        filters = []
+        filters.append(and_(hubtty.db.message_table.c.change_key == hubtty.db.change_table.c.key,
+                            hubtty.db.message_table.c.commit_key == None))
+        filters.append(hubtty.db.message_table.c.account_key == hubtty.db.account_table.c.key)
+        filters.append(hubtty.db.account_table.c.username == p[2])
+        commenter_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+
+        p[0] = or_(hubtty.db.account_table.c.username == p[2],
+                   hubtty.db.change_table.c.key.in_(reviewer_select),
+                   hubtty.db.change_table.c.key.in_(mentions_message_select),
+                   hubtty.db.change_table.c.key.in_(mentions_comment_select),
+                   hubtty.db.change_table.c.key.in_(commenter_select))
+
+    def p_review_term(p):
+        '''review_term : OP_REVIEW string'''
+        if p[2] == 'none':
+            filters = []
+            filters.append(~ exists().where(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key))
+            s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+            p[0] = hubtty.db.change_table.c.key.in_(s)
+        elif p[2] == 'approved':
+            filters = []
+            filters.append(and_(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key,
+                                hubtty.db.approval_table.c.category == 'APPROVED'))
+            s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+            p[0] = hubtty.db.change_table.c.key.in_(s)
+        elif p[2] == 'changes_requested':
+            filters = []
+            filters.append(and_(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key,
+                                hubtty.db.approval_table.c.category == 'CHANGES_REQUESTED'))
+            s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+            p[0] = hubtty.db.change_table.c.key.in_(s)
+        # elif p[2] == 'required':
+        #     # TODO not implemented
+        else:
+            raise hubtty.search.SearchSyntaxError('Syntax error: review:%s is not supported' % p[2])
+
+    def p_created_term(p):
+        '''created_term : OP_CREATED DATE
+                        | OP_CREATED DATECOMP'''
+        if p[2].startswith('<='):
+            p[0] = hubtty.db.change_table.c.created <= datetime.date.fromisoformat(p[2][2:])
+        elif p[2].startswith('>='):
+            p[0] = hubtty.db.change_table.c.created >= datetime.date.fromisoformat(p[2][2:])
+        elif p[2].startswith('<'):
+            p[0] = hubtty.db.change_table.c.created < datetime.date.fromisoformat(p[2][1:])
+        elif p[2].startswith('>'):
+            p[0] = hubtty.db.change_table.c.created > datetime.date.fromisoformat(p[2][1:])
+        else:
+            ref_date = datetime.date.fromisoformat(p[2])
+            p[0] = and_(hubtty.db.change_table.c.created >= ref_date,
+                        hubtty.db.change_table.c.created < ref_date + datetime.timedelta(days=1))
+
+    def p_updated_term(p):
+        '''updated_term : OP_UPDATED DATE
+                        | OP_UPDATED DATECOMP'''
+        if p[2].startswith('<='):
+            p[0] = hubtty.db.change_table.c.updated <= datetime.date.fromisoformat(p[2][2:])
+        elif p[2].startswith('>='):
+            p[0] = hubtty.db.change_table.c.updated >= datetime.date.fromisoformat(p[2][2:])
+        elif p[2].startswith('<'):
+            p[0] = hubtty.db.change_table.c.updated < datetime.date.fromisoformat(p[2][1:])
+        elif p[2].startswith('>'):
+            p[0] = hubtty.db.change_table.c.updated > datetime.date.fromisoformat(p[2][1:])
+        else:
+            ref_date = datetime.date.fromisoformat(p[2])
+            p[0] = and_(hubtty.db.change_table.c.updated >= ref_date,
+                        hubtty.db.change_table.c.updated < ref_date + datetime.timedelta(days=1))
+
     def p_commit_term(p):
         '''commit_term : OP_COMMIT string'''
         filters = []
         filters.append(hubtty.db.commit_table.c.change_key == hubtty.db.change_table.c.key)
-        filters.append(hubtty.db.commit_table.c.commit == p[2])
+        filters.append(func.matches(p[2], hubtty.db.commit_table.c.sha))
         s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
         p[0] = hubtty.db.change_table.c.key.in_(s)
-
-    def p_project_term(p):
-        '''project_term : OP_PROJECT string'''
-        if p[2].startswith('^'):
-            p[0] = func.matches(p[2], hubtty.db.project_table.c.name)
-        else:
-            p[0] = hubtty.db.project_table.c.name == p[2]
-
-    def p_projects_term(p):
-        '''projects_term : OP_PROJECTS string'''
-        p[0] = hubtty.db.project_table.c.name.like('%s%%' % p[2])
 
     def p_project_key_term(p):
         '''project_key_term : OP_PROJECT_KEY NUMBER'''
         p[0] = hubtty.db.change_table.c.project_key == p[2]
 
     def p_branch_term(p):
-        '''branch_term : OP_BRANCH string'''
+        '''branch_term : OP_BRANCH string
+                       | OP_BASE string'''
         if p[2].startswith('^'):
             p[0] = func.matches(p[2], hubtty.db.change_table.c.branch)
         else:
             p[0] = hubtty.db.change_table.c.branch == p[2]
-
-    def p_ref_term(p):
-        '''ref_term : OP_REF string'''
-        if p[2].startswith('^'):
-            p[0] = func.matches(p[2], 'refs/heads/'+hubtty.db.change_table.c.branch)
-        else:
-            p[0] = hubtty.db.change_table.c.branch == p[2][len('refs/heads/'):]
-
-    label_re = re.compile(r'(?P<label>[a-zA-Z0-9_-]+([a-zA-Z]|((?<![-+])[0-9])))'
-                          r'(?P<operator>[<>]?=?)(?P<value>[-+]?[0-9]+)'
-                          r'($|,(user=)?(?P<user>\S+))')
-
-    def p_label_term(p):
-        '''label_term : OP_LABEL string'''
-        args = label_re.match(p[2])
-        label = args.group('label')
-        op = args.group('operator') or '='
-        value = int(args.group('value'))
-        user = args.group('user')
-
-        filters = []
-        filters.append(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key)
-        filters.append(hubtty.db.approval_table.c.category == label)
-        if op == '=':
-            filters.append(hubtty.db.approval_table.c.value == value)
-        elif op == '>=':
-            filters.append(hubtty.db.approval_table.c.value >= value)
-        elif op == '<=':
-            filters.append(hubtty.db.approval_table.c.value <= value)
-        if user is not None:
-            filters.append(hubtty.db.approval_table.c.account_key == hubtty.db.account_table.c.key)
-            if user == 'self':
-                filters.append(hubtty.db.account_table.c.id == p.parser.account_id)
-            else:
-                filters.append(
-                    or_(hubtty.db.account_table.c.username == user,
-                        hubtty.db.account_table.c.email == user,
-                        hubtty.db.account_table.c.name == user))
-        s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
-        p[0] = hubtty.db.change_table.c.key.in_(s)
-
-    def p_message_term(p):
-        '''message_term : OP_MESSAGE string'''
-        filters = []
-        filters.append(hubtty.db.commit_table.c.change_key == hubtty.db.change_table.c.key)
-        filters.append(hubtty.db.commit_table.c.message.like('%%%s%%' % p[2]))
-        s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
-        p[0] = hubtty.db.change_table.c.key.in_(s)
-
-    def p_comment_term(p):
-        '''comment_term : OP_COMMENT string'''
-        filters = []
-        filters.append(hubtty.db.commit_table.c.change_key == hubtty.db.change_table.c.key)
-        filters.append(hubtty.db.commit_table.c.message == p[2])
-        commit_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
-        filters = []
-        filters.append(hubtty.db.commit_table.c.change_key == hubtty.db.change_table.c.key)
-        filters.append(hubtty.db.comment_table.c.commit_key == hubtty.db.commit_table.c.key)
-        filters.append(hubtty.db.comment_table.c.message == p[2])
-        comment_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
-        p[0] = or_(hubtty.db.change_table.c.key.in_(comment_select),
-                   hubtty.db.change_table.c.key.in_(commit_select))
 
     def p_has_term(p):
         '''has_term : OP_HAS string'''
@@ -268,27 +338,42 @@ def SearchParser():
         else:
             raise hubtty.search.SearchSyntaxError('Syntax error: has:%s is not supported' % p[2])
 
+    def p_in_term(p):
+        '''in_term : OP_IN string string'''
+        if p[2] == 'title':
+            p[0] = hubtty.db.change_table.c.title.like('%%%s%%' % p[3])
+        elif p[2] == 'body':
+            p[0] = hubtty.db.change_table.c.body.like('%%%s%%' % p[3])
+        elif p[2] == 'comments':
+            filters = []
+            filters.append(hubtty.db.message_table.c.change_key == hubtty.db.change_table.c.key)
+            filters.append(hubtty.db.message_table.c.message.like('%%%s%%' % p[3]))
+            message_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+
+            filters = []
+            filters.append(hubtty.db.message_table.c.change_key == hubtty.db.change_table.c.key)
+            filters.append(hubtty.db.comment_table.c.message_key == hubtty.db.message_table.c.key)
+            filters.append(hubtty.db.comment_table.c.message.like('%%%s%%' % p[3]))
+            comment_select = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
+
+            p[0] = or_(hubtty.db.change_table.c.key.in_(message_select),
+                    hubtty.db.change_table.c.key.in_(comment_select))
+        else:
+            raise hubtty.search.SearchSyntaxError('Syntax error: in:%s is not supported' % p[2])
+
     def p_is_term(p):
         '''is_term : OP_IS string'''
         #TODO: implement draft
         account_id = p.parser.account_id
-        if p[2] == 'reviewed':
-            filters = []
-            filters.append(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key)
-            filters.append(hubtty.db.approval_table.c.value != 0)
-            s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
-            p[0] = hubtty.db.change_table.c.key.in_(s)
-        elif p[2] == 'open':
+        if p[2] == 'open':
             p[0] = hubtty.db.change_table.c.state == 'open'
         elif p[2] == 'closed':
             p[0] = hubtty.db.change_table.c.state == 'closed'
-        elif p[2] == 'submitted':
-            p[0] = hubtty.db.change_table.c.state == 'SUBMITTED'
         elif p[2] == 'merged':
             p[0] = hubtty.db.change_table.c.merged == True
-        elif p[2] == 'abandoned':
-            p[0] = (hubtty.db.change_table.c.state == 'closed' and
-                    hubtty.db.change_table.c.merged == False)
+        elif p[2] == 'unmerged' or p[2] == 'abandoned':
+            p[0] = and_(hubtty.db.change_table.c.state == 'closed',
+                        hubtty.db.change_table.c.merged == False)
         elif p[2] == 'author':
             p[0] = hubtty.db.account_table.c.id == account_id
         elif p[2] == 'starred':
@@ -297,6 +382,7 @@ def SearchParser():
             # A hubtty extension
             p[0] = hubtty.db.change_table.c.held == True
         elif p[2] == 'reviewer':
+            # A hubtty extension: synonym of reviewed-by:self
             filters = []
             filters.append(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key)
             filters.append(hubtty.db.approval_table.c.account_key == hubtty.db.account_table.c.key)
@@ -331,13 +417,13 @@ def SearchParser():
                             hubtty.db.file_table.c.old_path == p[2]),
                         hubtty.db.file_table.c.status is not None)
 
-    def p_status_term(p):
-        '''status_term : OP_STATUS string'''
+    def p_state_term(p):
+        '''state_term : OP_STATE string'''
         if p[2] == 'merged':
             p[0] = hubtty.db.change_table.c.merged == True
-        elif p[2] == 'abandoned':
-            p[0] = (hubtty.db.change_table.c.state == 'closed'
-                    and hubtty.db.change_table.c.merged == False)
+        elif p[2] == 'unmerged' or p[2] == 'abandoned':
+            p[0] = and_(hubtty.db.change_table.c.state == 'closed',
+                        hubtty.db.change_table.c.merged == False)
         else:
             p[0] = hubtty.db.change_table.c.state == p[2]
 

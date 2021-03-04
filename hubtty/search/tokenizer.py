@@ -20,24 +20,28 @@ operators = {
     'recentlyseen': 'OP_RECENTLYSEEN', # Hubtty extension
     'change': 'OP_CHANGE',
     'author': 'OP_AUTHOR',
-    'reviewer': 'OP_REVIEWER',
-    #'OP_REVIEWERIN', # needs local group membership
+    'reviewed-by': 'OP_REVIEWEDBY',
+    'commenter': 'OP_COMMENTER',
+    'mentions': 'OP_MENTIONS',
+    'involves': 'OP_INVOLVES',
+    'review': 'OP_REVIEW',
+    'created': 'OP_CREATED',
+    'updated': 'OP_UPDATED',
+    'user': 'OP_USER',
+    'org': 'OP_ORG',
+    'repo': 'OP_REPO',
     'commit': 'OP_COMMIT',
-    'project': 'OP_PROJECT',
-    'projects': 'OP_PROJECTS',
     '_project_key': 'OP_PROJECT_KEY',  # internal hubtty use only
     'branch': 'OP_BRANCH',
-    'ref': 'OP_REF',
+    'base': 'OP_BASE',
     #'tr': 'OP_TR', # needs trackingids
     #'bug': 'OP_BUG', # needs trackingids
-    'label': 'OP_LABEL',
-    'message': 'OP_MESSAGE',
-    'comment': 'OP_COMMENT',
     'file': 'OP_FILE',
     'path': 'OP_PATH',
     'has': 'OP_HAS',
+    'in': 'OP_IN',
     'is': 'OP_IS',
-    'status': 'OP_STATUS',
+    'state': 'OP_STATE',
     'limit': 'OP_LIMIT',
     }
 
@@ -59,6 +63,8 @@ tokens = [
     'SSTRING',
     'DSTRING',
     'USTRING',
+    'DATE',
+    'DATECOMP',
     #'REGEX',
     #'SHA',
     ] + list(operators.values())
@@ -70,12 +76,12 @@ def SearchTokenizer():
     t_ignore = ' \t'   # NOQA (and intentionally not using r'' due to tab char)
 
     def t_OP(t):
-        r'[a-zA-Z_][a-zA-Z_]*:'
+        r'[a-zA-Z_][a-zA-Z_-]*:'
         t.type = operators.get(t.value[:-1], 'OP')
         return t
 
     def t_CHANGE_ID(t):
-        r'I[a-fA-F0-9]{7,40}'
+        r'([a-zA-Z_]+/)+\d+'
         return t
 
     def t_SSTRING(t):
@@ -86,6 +92,14 @@ def SearchTokenizer():
     def t_DSTRING(t):
         r'"([^\\"]+|\\"|\\\\)*"'
         t.value=t.value[1:-1].decode("string-escape")
+        return t
+
+    def t_DATE(t):
+        r'\d{4}(-\d\d(-\d\d(T\d\d:\d\d(:\d\d)?(\.\d+)?(([+-]\d\d:\d\d)|Z)?)?)?)?'
+        return t
+
+    def t_DATECOMP(t):
+        r'[<>]=?\d{4}(-\d\d(-\d\d(T\d\d:\d\d(:\d\d)?(\.\d+)?(([+-]\d\d:\d\d)|Z)?)?)?)?'
         return t
 
     def t_AND(t):
