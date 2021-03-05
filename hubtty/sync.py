@@ -905,6 +905,11 @@ class SyncChangeTask(Task):
             new_message = False
             remote_pr_reviews.extend(remote_issue_comments)
             for remote_review in remote_pr_reviews:
+
+                # TODO(mandre) sync pending reviews
+                if remote_review.get('state') == 'PENDING':
+                    continue
+
                 self.log.info("New review comment %s", remote_review)
                 if 'user' in remote_review:
                     account = session.getAccountByID(remote_review['user']['id'],
@@ -923,7 +928,9 @@ class SyncChangeTask(Task):
                 message = session.getMessageByID(remote_review['id'])
                 if not message:
                     # Normalize date -> created
-                    created = dateutil.parser.parse(remote_review.get('submitted_at', remote_review.get('created_at')))
+                    creation_date = remote_review.get('submitted_at', remote_review.get('created_at'))
+                    if creation_date:
+                        created = dateutil.parser.parse(creation_date)
                     message = change.createMessage(associated_commit_id, remote_review['id'], account, created,
                                                    (remote_review.get('body','') or '').replace('\r',''))
                     self.log.info("Created new review message %s for change %s in local DB.", message.key, change.change_id)
