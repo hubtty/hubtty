@@ -1036,6 +1036,13 @@ class DatabaseSession(object):
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
+    def getApproval(self, change, account, sha):
+        try:
+            return self.session().query(Approval).filter_by(
+                change_key=change.key, account_key=account.key, sha=sha).one()
+        except sqlalchemy.orm.exc.NoResultFound:
+            return None
+
     def getHeld(self):
         return self.session().query(Change).filter_by(held=True).all()
 
