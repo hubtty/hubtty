@@ -633,7 +633,7 @@ class SyncChangeTask(Task):
             try:
                 self.log.error("Marking change %s outdated" % (self.change_id,))
                 with sync.app.db.getSession() as session:
-                    change = session.getChangeByID(self.change_id)
+                    change = session.getChangeByChangeID(self.change_id)
                     if change:
                         change.outdated = True
             except Exception:
@@ -657,7 +657,7 @@ class SyncChangeTask(Task):
         fetches = collections.defaultdict(list)
         parent_commits = set()
         with app.db.getSession() as session:
-            change = session.getChangeByID(self.change_id)
+            change = session.getChangeByChangeID(self.change_id)
             account = session.getAccountByID(remote_change['user']['id'],
                                              username=remote_change['user'].get('login'))
             if not change:
@@ -1364,7 +1364,7 @@ class UploadReviewTask(Task):
         #     # In another db session in case submit fails after posting
         #     # the message succeeds
         #     with app.db.getSession() as session:
-        #         change = session.getChangeByID(change_id)
+        #         change = session.getChangeByChangeID(change_id)
         #         change.pending_status = False
         #         change.pending_status_message = None
         #         sync.post('changes/%s/submit' % (change_id,), {})
