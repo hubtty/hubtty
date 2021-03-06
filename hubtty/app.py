@@ -824,7 +824,12 @@ class App(object):
         message_key = None
         commit = session.getCommit(commit_key)
         change = commit.change
-        change.createApproval(account, approval, commit.sha, draft=True)
+
+        existing_approval = session.getApproval(change, account, commit.sha)
+        if existing_approval:
+            existing_approval.draft = True
+        else:
+            change.createApproval(account, approval, commit.sha, draft=True)
 
         draft_message = commit.getPendingMessage()
         if not draft_message:
