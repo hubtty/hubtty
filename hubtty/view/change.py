@@ -496,7 +496,12 @@ class ChangeView(urwid.WidgetWrap):
         commands = self.getCommands()
         ret = [(c[0], key(c[0]), c[1]) for c in commands]
         for k in self.app.config.reviewkeys.values():
-            action = ', '.join(['{category}:{value}'.format(**a) for a in k['approvals']])
+            if k.get('description'):
+                action = k['description']
+            else:
+                action = k['approval']
+                if k.get('message'):
+                    action = action + ": " + k.get('message')
             ret.append(('', keymap.formatKey(k['key']), action))
         return ret
 
@@ -1126,16 +1131,14 @@ class ChangeView(urwid.WidgetWrap):
         self.app.doSearch("state:open repo:%s" % (self.project_name,))
 
     def reviewKey(self, reviewkey):
-        approvals = {}
-        for a in reviewkey['approvals']:
-            approvals[a['category']] = a['value']
-        self.app.log.debug("Reviewkey %s with approvals %s" %
-                           (reviewkey['key'], approvals))
+        approval = reviewkey.get('approval', 'COMMENT')
+        self.app.log.debug("Reviewkey %s with approval %s" %
+                           (reviewkey['key'], approval))
         row = self.commit_rows[self.last_commit_key]
         message = reviewkey.get('message', '')
         submit = reviewkey.get('submit', False)
-        # TODO(mandre) uncomment once implemented
-        # self.saveReview(row.commit_key, approvals, message, True, submit)
+        upload = not reviewkey.get('draft', False)
+        self.saveReview(row.commit_key, approval, message, upload, submit)
 
     def saveReview(self, commit_key, approval, message, upload, submit):
         message_keys = self.app.saveReviews([commit_key], approval,

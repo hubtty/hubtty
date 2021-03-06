@@ -89,11 +89,10 @@ class ConfigSchema(object):
 
     dashboards = [dashboard]
 
-    reviewkey_approval = {v.Required('category'): str,
-                          v.Required('value'): int}
-
-    reviewkey = {v.Required('approvals'): [reviewkey_approval],
+    reviewkey = {v.Required('approval'): v.Any('REQUEST_CHANGES', 'COMMENT', 'APPROVE'),
                  v.Optional('message'): str,
+                 v.Optional('description'): str,
+                 v.Optional('draft'): bool,
                  'submit': bool,
                  v.Required('key'): str}
 
