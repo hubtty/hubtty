@@ -175,7 +175,12 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         commands = self.getCommands()
         ret = [(c[0], key(c[0]), c[1]) for c in commands]
         for k in self.app.config.reviewkeys.values():
-            action = ', '.join(['{category}:{value}'.format(**a) for a in k['approvals']])
+            if k.get('description'):
+                action = k['description']
+            else:
+                action = k['approval']
+                if k.get('message'):
+                    action = action + ": " + k.get('message')
             ret.append(('', keymap.formatKey(k['key']), action))
         return ret
 

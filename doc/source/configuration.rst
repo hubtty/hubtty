@@ -339,8 +339,7 @@ Reviewkeys
 Reviewkeys are hotkeys that perform immediate reviews within the
 change screen.  Any pending comments or review messages will be
 attached to the review; otherwise an empty review message will be
-left.  The approvals list is exhaustive, so if you specify an empty
-list, Hubtty will submit a review that clears any previous approvals.
+left.
 Reviewkeys appear in the help text for the change screen.
 
 **reviewkeys**
@@ -350,40 +349,39 @@ Reviewkeys appear in the help text for the change screen.
   **key**
     This key to which this review action should be bound.
 
-  **approvals**
-    A list of approvals to include when this reviewkey is activated.
-    Each element of the list should include both a category and a
-    value.
-
-    **category**
-      The name of the review label for this approval.
-
-    **value**
-      The value for this approval.
+  **approval**
+    The status for the approval. Must be one of REQUEST_CHANGES, COMMENT, or
+    APPROVE.
 
   **message**
     Optional, it can be used to include a message during the review.
 
-  **submit**
-    Set this to `true` to instruct Github to submit the change when
-    this reviewkey is activated.
+  **description**
+    Optional, changes the description for the reviewkey in the help message.
 
-The following example includes a reviewkey that clears all labels,
-one that leaves a +1 "Code-Review" approval and another one that
-leaves 'recheck' on a review.
+  **draft**
+    Optional, keep the review as a draft and don't submit it right away.
+
+
+The following example includes a reviewkey that leaves a "/retest" message on
+a review, one that approves the PR, and another one that creates a draft message
+requesting for changes.
 
 .. code-block: yaml
 
-   reviewkeys:
-     - key: 'meta 0'
-       approvals: []
-     - key: 'meta 1'
-       approvals:
-         - category: 'Code-Review'
-           value: 1
-     - key: 'meta 2'
-       approvals: []
-       message: 'recheck'
+    reviewkeys:
+      - key: 'meta 0'
+        approval: 'COMMENT'
+        message: "/retest"
+      - key: 'meta 1'
+        approval: 'APPROVE'
+        message: ":shipit:"
+        description: 'Approve change'
+      - key: 'meta 2'
+        approval: 'REQUEST_CHANGES'
+        message: "Please add unit tests"
+        description: 'Request unit tests'
+        draft: True
 
 General Options
 +++++++++++++++
