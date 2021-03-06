@@ -61,13 +61,8 @@ class SearchCompiler(object):
                           result)
             tables.remove(hubtty.db.account_table)
         if hubtty.db.file_table in tables:
-            # We only want to look at files for the most recent
-            # commit.
-            s = select([func.max(hubtty.db.commit_table.c.number)], correlate=False).where(
-                hubtty.db.commit_table.c.change_key==hubtty.db.change_table.c.key).correlate(hubtty.db.change_table)
             result = and_(hubtty.db.file_table.c.commit_key == hubtty.db.commit_table.c.key,
                           hubtty.db.commit_table.c.change_key == hubtty.db.change_table.c.key,
-                          hubtty.db.commit_table.c.number == s,
                           result)
             tables.remove(hubtty.db.file_table)
         if tables:

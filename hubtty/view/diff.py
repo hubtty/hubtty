@@ -23,65 +23,6 @@ from hubtty import mywid
 from hubtty import sync
 from hubtty.view import mouse_scroll_decorator
 
-# class PatchsetDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
-#     signals = ['ok', 'cancel']
-
-#     def __init__(self, patchsets, old, new):
-#         button_widgets = []
-#         ok_button = mywid.FixedButton('OK')
-#         cancel_button = mywid.FixedButton('Cancel')
-#         urwid.connect_signal(ok_button, 'click',
-#                              lambda button:self._emit('ok'))
-#         urwid.connect_signal(cancel_button, 'click',
-#                              lambda button:self._emit('cancel'))
-#         button_widgets.append(('pack', ok_button))
-#         button_widgets.append(('pack', cancel_button))
-#         button_columns = urwid.Columns(button_widgets, dividechars=2)
-
-#         left = []
-#         right = []
-#         left.append(urwid.Text('Old'))
-#         right.append(urwid.Text('New'))
-#         self.old_buttons = []
-#         self.new_buttons = []
-#         self.patchset_keys = {}
-#         oldb = mywid.FixedRadioButton(self.old_buttons, 'Base',
-#                                       state=(old==None))
-#         left.append(oldb)
-#         right.append(urwid.Text(''))
-#         self.patchset_keys[oldb] = None
-#         for key, num in patchsets:
-#             oldb = mywid.FixedRadioButton(self.old_buttons, 'Patchset %d' % num,
-#                                           state=(old==key))
-#             newb = mywid.FixedRadioButton(self.new_buttons, 'Patchset %d' % num,
-#                                           state=(new==key))
-#             left.append(oldb)
-#             right.append(newb)
-#             self.patchset_keys[oldb] = key
-#             self.patchset_keys[newb] = key
-#         left = urwid.Pile(left)
-#         right = urwid.Pile(right)
-#         table  = urwid.Columns([left, right])
-#         rows = []
-#         rows.append(table)
-#         rows.append(urwid.Divider())
-#         rows.append(button_columns)
-#         pile = urwid.Pile(rows)
-#         fill = urwid.Filler(pile, valign='top')
-#         title = 'Patchsets'
-#         super(PatchsetDialog, self).__init__(urwid.LineBox(fill, title))
-
-#     def getSelected(self):
-#         old = new = None
-#         for b in self.old_buttons:
-#             if b.state:
-#                 old = self.patchset_keys[b]
-#                 break
-#         for b in self.new_buttons:
-#             if b.state:
-#                 new = self.patchset_keys[b]
-#                 break
-#         return old, new
 
 class LineContext(object):
     def __init__(self, old_file_key, new_file_key,
@@ -160,8 +101,6 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         return [
             (keymap.ACTIVATE,
              "Add an inline comment"),
-            # (keymap.SELECT_PATCHSETS,
-            #  "Select old/new patchsets to diff"),
             (keymap.NEXT_COMMIT,
              "Diff the next commit"),
             (keymap.PREV_COMMIT,
@@ -203,7 +142,6 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             self.new_file_keys = {}
             if self.old_commit_key is not None:
                 old_commit = session.getCommit(self.old_commit_key)
-                self.old_commit_num = old_commit.number
                 self.base_sha = old_commit.sha
                 for f in old_commit.files:
                     old_comments += f.comments
@@ -211,7 +149,6 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 show_old_commit = True
             else:
                 old_commit = None
-                self.old_commit_num = None
                 self.base_sha = new_commit.parent
                 show_old_commit = False
                 # The old files are the same as the new files since we
@@ -229,7 +166,6 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 new_commit.sha[0:7])
             self.short_title = u'Diff of %s/%s' % (new_commit.change.number,
                                                    new_commit.sha[0:7])
-            self.new_commit_num = new_commit.number
             self.change_key = new_commit.change.key
             self.project_name = new_commit.change.project.name
             self.sha = new_commit.sha
@@ -477,9 +413,6 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         if (isinstance(old_focus, BaseDiffCommentEdit) and
             (old_focus != new_focus or (keymap.PREV_SCREEN in commands))):
             self.cleanupEdit(old_focus)
-        # if keymap.SELECT_PATCHSETS in commands:
-        #     self.openPatchsetDialog()
-        #     return None
         if keymap.NEXT_COMMIT in commands:
             self.moveCommit(1)
             return None
@@ -520,7 +453,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             session.delete(comment)
 
     def saveComment(self, context, text, new=True):
-        if (not new) and (not self.old_commit_num):
+        if not new:
             parent = True
         else:
             parent = False
@@ -555,26 +488,6 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         if change_view:
             change_view.reviewKey(reviewkey)
         self.app.backScreen()
-
-    # def openPatchsetDialog(self):
-    #     commits = []
-    #     with self.app.db.getSession() as session:
-    #         change = session.getChange(self.change_key)
-    #         for r in change.commits:
-    #             commits.append((r.key, r.number))
-    #     dialog = PatchsetDialog(commits,
-    #                             self.old_commit_key,
-    #                             self.new_commit_key)
-    #     urwid.connect_signal(dialog, 'cancel',
-    #         lambda button: self.app.backScreen())
-    #     urwid.connect_signal(dialog, 'ok',
-    #         lambda button: self._openPatchsetDialog(dialog))
-    #     self.app.popup(dialog, min_width=30, min_height=8)
-
-    # def _openPatchsetDialog(self, dialog):
-    #     self.app.backScreen()
-    #     self.old_commit_key, self.new_commit_key = dialog.getSelected()
-    #     self._init()
 
     def moveCommit(self, offset):
         commits = []

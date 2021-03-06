@@ -101,13 +101,9 @@ commit_table = Table(
     'commit', metadata,
     Column('key', Integer, primary_key=True),
     Column('change_key', Integer, ForeignKey("change.key"), index=True),
-    Column('number', Integer, index=True, nullable=False),
     Column('message', Text, nullable=False),
     Column('sha', String(255), index=True, nullable=False),
     Column('parent', String(255), index=True, nullable=False),
-    # TODO: fetch_ref, fetch_auth are unused; remove
-    Column('fetch_auth', Boolean, nullable=False),
-    Column('fetch_ref', String(255), nullable=False),
     Column('pending_message', Boolean, index=True, nullable=False),
     Column('can_submit', Boolean, nullable=False),
     )
@@ -454,16 +450,12 @@ class Change(object):
         return author_name
 
 class Commit(object):
-    def __init__(self, change, number, message, sha, parent,
-                 fetch_auth, fetch_ref, pending_message=False,
+    def __init__(self, change, message, sha, parent, pending_message=False,
                  can_submit=False):
         self.change_key = change.key
-        self.number = number
         self.message = message
         self.sha = sha
         self.parent = parent
-        self.fetch_auth = fetch_auth
-        self.fetch_ref = fetch_ref
         self.pending_message = pending_message
         self.can_submit = can_submit
 
@@ -708,7 +700,6 @@ mapper(Change, change_table, properties=dict(
         hashtags=relationship(Hashtag, backref='change',
                                cascade='all, delete-orphan'),
         commits=relationship(Commit, backref='change',
-                             order_by=commit_table.c.number,
                              cascade='all, delete-orphan'),
         messages=relationship(Message, backref='change',
                              order_by=message_table.c.created,
@@ -999,12 +990,6 @@ class DatabaseSession(object):
             return self.session().query(Commit).filter(Commit.parent.in_(parent)).all()
         except sqlalchemy.orm.exc.NoResultFound:
             return []
-
-    def getCommitByNumber(self, change, number):
-        try:
-            return self.session().query(Commit).filter_by(change_key=change.key, number=number).one()
-        except sqlalchemy.orm.exc.NoResultFound:
-            return None
 
     def getFile(self, key):
         try:

@@ -727,12 +727,9 @@ class SyncChangeTask(Task):
                 if (not commit) or self.force_fetch:
                     fetches[url].append('+%(ref)s:%(ref)s' % dict(ref=ref))
                 if not commit:
-                    # FIXME(mandre) remove revision number, fetch_auth and fetch_ref
-                    commit = change.createCommit(0,
-                                                 (remote_commit['commit']['message'] or '').replace('\r',''),
+                    commit = change.createCommit((remote_commit['commit']['message'] or '').replace('\r',''),
                                                  remote_commit['sha'],
-                                                 remote_commit['parents'][0]['sha'],
-                                                 False, 'fetch_ref')
+                                                 remote_commit['parents'][0]['sha'])
                     self.log.info("Created new commit %s for change %s in local DB.",
                                   commit.key, self.change_id)
                     new_commit = True
