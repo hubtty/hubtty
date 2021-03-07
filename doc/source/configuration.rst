@@ -18,6 +18,9 @@ be supplied.  The sample config files are as follows:
 **reference-hubtty.yaml**
   An exhaustive list of all supported options with examples.
 
+**openshift-hubtty.yaml**
+  A configuration designed for OpenShift reviews.
+
 Hubtty uses local git repositories to perform much of its work.  These
 can be the same git repositories that you use when developing a
 project.  Hubtty will not alter the working directory or index unless
