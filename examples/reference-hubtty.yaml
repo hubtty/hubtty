@@ -118,7 +118,7 @@ servers:
 commentlinks:
   # Match commit sha, and replace them with a link to an internal
   # Hubtty search for PRs containing that commit.
-  - match: "(?P<sha>\\b[a-f0-9]{6,40}\\b)"
+  - match: "(?P<sha>\\s[a-f0-9]{6,40}\\b)"
     replacements:
       - search:
           text: "{sha}"
