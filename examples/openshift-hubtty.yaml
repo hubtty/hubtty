@@ -115,6 +115,12 @@ servers:
 # review messages.  They can be replaced with internal or external
 # links, or have colors applied.
 commentlinks:
+  # Match Bugs, and replace them with a link to bugzilla
+  - match: "(?P<bug_str>[Bb]ug (?P<id>\\d+))"
+    replacements:
+     - link:
+         text: "{bug_str}"
+         url: "https://bugzilla.redhat.com/show_bug.cgi?id={id}"
   # Match commit sha, and replace them with a link to an internal
   # Hubtty search for PRs containing that commit.
   - match: "(?P<sha>\\b[a-f0-9]{6,40}\\b)"
@@ -129,12 +135,6 @@ commentlinks:
       - search:
           text: "{mention_str}"
           query: "author:{username}"
-  # Match Bugs, and replace them with a link to bugzilla
-  - match: "(?P<bug_str>[Bb]ug (?P<id>\\d+))"
-    replacements:
-     - link:
-         text: "{bug_str}"
-         url: "https://bugzilla.redhat.com/show_bug.cgi?id={id}"
 # Any number of commentlink entries may be specified.  Start each with
 # a "match" key and regex.  Named match groups within the regex may be
 # used in the replacements section.  Any number of replacements may be
