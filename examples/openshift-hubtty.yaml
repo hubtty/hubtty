@@ -117,7 +117,7 @@ servers:
 # Replacements are applied in order.
 commentlinks:
   # Match Bugs, and replace them with a link to bugzilla
-  - match: "(?P<bug_str>[Bb]ug (?P<id>\\d+))"
+  - match: "(?P<bug_str>([Bb]ug|[Bb][Zz]) ?#?(?P<id>\\d+))"
     replacements:
      - link:
          text: "{bug_str}"
