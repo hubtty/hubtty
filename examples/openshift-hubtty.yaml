@@ -114,6 +114,7 @@ servers:
 # Commentlinks are regular expressions that are applied to commit and
 # review messages.  They can be replaced with internal or external
 # links, or have colors applied.
+# Replacements are applied in order.
 commentlinks:
   # Match Bugs, and replace them with a link to bugzilla
   - match: "(?P<bug_str>[Bb]ug (?P<id>\\d+))"

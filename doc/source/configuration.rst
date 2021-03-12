@@ -188,6 +188,7 @@ Commentlinks
 Commentlinks are regular expressions that are applied to commit and
 review messages.  They can be replaced with internal or external
 links, or have colors applied.
+Replacement are applied in order.
 
 **commentlinks**
   This is a list of commentlink patterns.  Each commentlink pattern is
