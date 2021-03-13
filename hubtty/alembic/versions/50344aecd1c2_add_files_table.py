@@ -70,10 +70,10 @@ def upgrade():
                 if cstatus not in ['MERGED', 'ABANDONED']:
                     print("Empty diffstat for %s %s change %s,%s" % (cstatus, pname, cnumber, rnumber))
             m = pathre.match(path)
-            status = hubtty.db.File.STATUS_MODIFIED
+            status = 'M'
             old_path = None
             if m:
-                status = hubtty.db.File.STATUS_RENAMED
+                status = 'R'
                 pre = m.group(2) or ''
                 post = m.group(6) or ''
                 old_path = pre+m.group(3)+post

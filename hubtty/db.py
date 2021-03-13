@@ -526,13 +526,6 @@ class SyncQuery(object):
         self.name = name
 
 class File(object):
-    STATUS_ADDED = 'A'
-    STATUS_DELETED = 'D'
-    STATUS_RENAMED = 'R'
-    STATUS_COPIED = 'C'
-    STATUS_REWRITTEN = 'W'
-    STATUS_MODIFIED = 'M'
-
     def __init__(self, commit, path, status, old_path=None,
                  inserted=None, deleted=None):
         self.commit_key = commit.key
