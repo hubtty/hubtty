@@ -939,10 +939,9 @@ class SyncChangeTask(Task):
                 review_status = remote_review.get('state')
                 if review_status:
                     # TODO(mandre)
-                    # - Rename approval.category to approval.status
                     approval = session.getApproval(change, account, remote_review.get('commit_id'))
                     if approval:
-                        approval.category = review_status
+                        approval.state = review_status
                     else:
                         change.createApproval(account, review_status, remote_review.get('commit_id'))
                         self.log.info("Created new approval for %s from %s commit %s.", change.change_id, account.username, remote_review.get('commit_id'))
@@ -1340,7 +1339,7 @@ class UploadReviewTask(Task):
                         body=message.message)
             if commit == current_commit:
                 for approval in change.draft_approvals:
-                    data['event'] = approval.category
+                    data['event'] = approval.state
                     session.delete(approval)
             comments = []
             for file in commit.files:

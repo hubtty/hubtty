@@ -134,7 +134,7 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                 current = None
                 for approval in change.approvals:
                     if self.app.isOwnAccount(approval.reviewer):
-                        current = approval.category
+                        current = approval.state
                         break
                 if current is None:
                     current = 'COMMENT'
@@ -683,9 +683,9 @@ class ChangeView(urwid.WidgetWrap):
                     votes.addRow(row)
                 # Only set approval status if the review is for the current commit
                 if approval.sha == change.commits[-1].sha:
-                    if approval.category in ['APPROVED', 'APPROVE']:
+                    if approval.state in ['APPROVED', 'APPROVE']:
                         approvals['Approved'].set_text(('positive-label', '✓'))
-                    elif approval.category in ['CHANGES_REQUESTED', 'REQUEST_CHANGES']:
+                    elif approval.state in ['CHANGES_REQUESTED', 'REQUEST_CHANGES']:
                         approvals['Changes Requested'].set_text(('negative-label', '✗'))
                     else:
                         approvals['Comment'].set_text('•')

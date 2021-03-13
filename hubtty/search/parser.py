@@ -258,14 +258,16 @@ def SearchParser():
             p[0] = hubtty.db.change_table.c.key.in_(s)
         elif p[2] == 'approved':
             filters = []
+            # TODO(mandre) Also need to look for approval with state APPROVE
             filters.append(and_(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key,
-                                hubtty.db.approval_table.c.category == 'APPROVED'))
+                                hubtty.db.approval_table.c.state == 'APPROVED'))
             s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
             p[0] = hubtty.db.change_table.c.key.in_(s)
         elif p[2] == 'changes_requested':
             filters = []
+            # TODO(mandre) Also need to look for approval with state REQUEST_CHANGES
             filters.append(and_(hubtty.db.approval_table.c.change_key == hubtty.db.change_table.c.key,
-                                hubtty.db.approval_table.c.category == 'CHANGES_REQUESTED'))
+                                hubtty.db.approval_table.c.state == 'CHANGES_REQUESTED'))
             s = select([hubtty.db.change_table.c.key], correlate=False).where(and_(*filters))
             p[0] = hubtty.db.change_table.c.key.in_(s)
         # elif p[2] == 'required':

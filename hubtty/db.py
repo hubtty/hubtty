@@ -160,7 +160,7 @@ approval_table = Table(
     Column('key', Integer, primary_key=True),
     Column('change_key', Integer, ForeignKey("change.key"), index=True),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
-    Column('category', String(255), nullable=False),
+    Column('state', String(255), nullable=False),
     Column('sha', String(255), index=True, nullable=False),
     Column('draft', Boolean, index=True, nullable=False),
     )
@@ -338,18 +338,18 @@ class Change(object):
         for approval in self.approvals:
             if approval.draft:
                 continue
-            cur_min = cat_min.get(approval.category, 0)
-            cur_max = cat_max.get(approval.category, 0)
+            cur_min = cat_min.get(approval.state, 0)
+            cur_max = cat_max.get(approval.state, 0)
             cur_min = min(approval.value, cur_min)
             cur_max = max(approval.value, cur_max)
-            cat_min[approval.category] = cur_min
-            cat_max[approval.category] = cur_max
-            cur_value = cat_value.get(approval.category, 0)
+            cat_min[approval.state] = cur_min
+            cat_max[approval.state] = cur_max
+            cur_value = cat_value.get(approval.state, 0)
             if abs(cur_min) > abs(cur_value):
                 cur_value = cur_min
             if abs(cur_max) > abs(cur_value):
                 cur_value = cur_max
-            cat_value[approval.category] = cur_value
+            cat_value[approval.state] = cur_value
         self._approval_cache = cat_value
 
     def getMinMaxPermittedForCategory(self, category):
@@ -577,10 +577,10 @@ class PermittedLabel(object):
         self.value = value
 
 class Approval(object):
-    def __init__(self, change, reviewer, category, sha, draft=False):
+    def __init__(self, change, reviewer, state, sha, draft=False):
         self.change_key = change.key
         self.account_key = reviewer.key
-        self.category = category
+        self.state = state
         self.sha = sha
         self.draft = draft
 
@@ -712,12 +712,12 @@ mapper(Change, change_table, properties=dict(
                                                 permitted_label_table.c.value),
                                       cascade='all, delete-orphan'),
         approvals=relationship(Approval, backref='change',
-                               order_by=approval_table.c.category,
+                               order_by=approval_table.c.state,
                                cascade='all, delete-orphan'),
         draft_approvals=relationship(Approval,
                                      primaryjoin=and_(change_table.c.key==approval_table.c.change_key,
                                                       approval_table.c.draft==True),
-                                     order_by=approval_table.c.category)
+                                     order_by=approval_table.c.state)
         ))
 mapper(Commit, commit_table, properties=dict(
         messages=relationship(Message, backref='commit',
