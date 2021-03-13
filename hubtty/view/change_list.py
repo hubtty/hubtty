@@ -62,7 +62,7 @@ class ChangeListColumns(object):
                 cols.append((getattr(self, attr),
                              options(*colinfo.options)))
 
-        for c in self.review_state_columns:
+        for c in self.category_columns:
             cols.append(c)
 
 
@@ -95,7 +95,7 @@ class ChangeRow(urwid.Button, ChangeListColumns):
     def selectable(self):
         return True
 
-    def __init__(self, app, change, prefix, review_states,
+    def __init__(self, app, change, prefix, categories,
                  enabled_columns, callback=None):
         super(ChangeRow, self).__init__('', on_press=callback, user_data=change.key)
         self.app = app
@@ -113,8 +113,8 @@ class ChangeRow(urwid.Button, ChangeListColumns):
         self.columns = urwid.Columns([], dividechars=1)
         self.row_style = urwid.AttrMap(self.columns, '')
         self._w = urwid.AttrMap(self.row_style, None, focus_map=self.change_focus_map)
-        self.review_state_columns = []
-        self.update(change, review_states)
+        self.category_columns = []
+        self.update(change, categories)
 
     def search(self, search, attribute):
         if self.title.search(search, attribute):
@@ -191,7 +191,7 @@ class ChangeRow(urwid.Button, ChangeListColumns):
             ret.append(' ')
         return ret
 
-    def update(self, change, review_states):
+    def update(self, change, categories):
         if change.reviewed or change.hidden:
             style = 'reviewed-change'
         else:
@@ -252,25 +252,19 @@ class ChangeRow(urwid.Button, ChangeListColumns):
         else:
             self.size.set_text(self._makeSizeGraph(total_added, total_removed))
 
-        self.review_state_columns = []
-        for state in review_states:
-            v = change.getMaxForCategory(state)
-            cat_min, cat_max = change.getMinMaxPermittedForCategory(state)
-            if v == 0:
-                val = ''
-            elif v > 0:
-                val = '%2i' % v
-                if v == cat_max:
-                    val = ('max-label', val)
-                else:
-                    val = ('positive-label', val)
-            else:
-                val = '%i' % v
-                if v == cat_min:
-                    val = ('min-label', val)
-                else:
-                    val = ('negative-label', val)
-            self.review_state_columns.append((urwid.Text(val),
+        self.category_columns = []
+        for category in categories:
+            v = ''
+            val = ''
+            if category == 'Code-Review':
+                v = change.getReviewState()
+            if v in ['APPROVED']:
+                val = ('positive-label', ' ✓')
+            elif v in ['CHANGES_REQUESTED']:
+                val = ('negative-label', ' ✗')
+            elif v in ['COMMENTED']:
+                val = ' •'
+            self.category_columns.append((urwid.Text(val),
                                           self.columns.options('given', 2)))
         self.updateColumns()
 
@@ -285,13 +279,13 @@ class ChangeListHeader(urwid.WidgetWrap, ChangeListColumns):
         self.author = urwid.Text(u'Author', wrap='clip')
         self.branch = urwid.Text(u'Branch', wrap='clip')
         self.columns = urwid.Columns([], dividechars=1)
-        self.review_state_columns = []
+        self.category_columns = []
         super(ChangeListHeader, self).__init__(self.columns)
 
-    def update(self, review_states):
-        self.review_state_columns = []
-        for state in review_states:
-            self.review_state_columns.append((urwid.Text(' %s' % state[0]),
+    def update(self, categories):
+        self.category_columns = []
+        for category in categories:
+            self.category_columns.append((urwid.Text(' %s' % category[0]),
                                           self._w.options('given', 2)))
         self.updateColumns()
 
@@ -384,7 +378,7 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
         else:
             self.reverse = app.config.change_list_options['reverse']
         self.header = ChangeListHeader(self.enabled_columns)
-        self.review_states = []
+        self.categories = []
         self.refresh()
         self._w.contents.append((app.header, ('pack', 1)))
         self._w.contents.append((urwid.Divider(), ('pack', 1)))
@@ -423,12 +417,10 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
                 i = self.short_title.rfind('/')
                 self.short_title = self.short_title[i+1:]
             self.app.status.update(title=self.title)
-            review_states = set()
-            for change in change_list:
-                review_states |= set(change.getCategories())
-            self.review_states = sorted(review_states)
+            categories = ['Code-Review']
+            self.categories = sorted(categories)
             self.chooseColumns()
-            self.header.update(self.review_states)
+            self.header.update(self.categories)
             i = 0
             if self.reverse:
                 change_list.reverse()
@@ -445,13 +437,13 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
                 if not row:
                     row = ChangeRow(self.app, change,
                                     prefixes.get(change.key, ''),
-                                    self.review_states,
+                                    self.categories,
                                     self.enabled_columns,
                                     callback=self.onSelect)
                     self.listbox.body.insert(i, row)
                     self.change_rows[change.key] = row
                 else:
-                    row.update(change, self.review_states)
+                    row.update(change, self.categories)
                     unseen_keys.remove(change.key)
                 new_rows.append(row)
                 i += 1
@@ -472,7 +464,7 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
         for colinfo in COLUMNS:
             if (colinfo.name not in self.disabled_columns):
                 cols -= colinfo.spacing
-        cols -= 3 * len(self.review_states)
+        cols -= 3 * len(self.categories)
 
         for colinfo in COLUMNS:
             if colinfo.name in self.optional_columns:
@@ -627,7 +619,7 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             row = self.change_rows[change_key]
             with self.app.db.getSession() as session:
                 change = session.getChange(change_key)
-                row.update(change, self.review_states)
+                row.update(change, self.categories)
             self.advance()
             return True
         if keymap.TOGGLE_STARRED in commands:
@@ -639,7 +631,7 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             row = self.change_rows[change_key]
             with self.app.db.getSession() as session:
                 change = session.getChange(change_key)
-                row.update(change, self.review_states)
+                row.update(change, self.categories)
             self.advance()
             return True
         if keymap.TOGGLE_MARK in commands:
@@ -651,7 +643,7 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             row.mark = not row.mark
             with self.app.db.getSession() as session:
                 change = session.getChange(change_key)
-                row.update(change, self.review_states)
+                row.update(change, self.categories)
             self.advance()
             return True
         if keymap.REFRESH in commands:

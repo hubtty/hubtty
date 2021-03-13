@@ -140,21 +140,6 @@ comment_table = Table(
     Column('robot_run_id', String(255)),
     Column('url', Text()),
     )
-label_table = Table(
-    'label', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('change_key', Integer, ForeignKey("change.key"), index=True),
-    Column('category', String(255), nullable=False),
-    Column('value', Integer, nullable=False),
-    Column('description', String(255), nullable=False),
-    )
-permitted_label_table = Table(
-    'permitted_label', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('change_key', Integer, ForeignKey("change.key"), index=True),
-    Column('category', String(255), nullable=False),
-    Column('value', Integer, nullable=False),
-    )
 approval_table = Table(
     'approval', metadata,
     Column('key', Integer, primary_key=True),
@@ -322,51 +307,16 @@ class Change(object):
         self.merged = merged
         self.mergeable = mergeable
 
-    def getCategories(self):
-        categories = set([label.category for label in self.labels])
-        return sorted(categories)
-
-    def getMaxForCategory(self, category):
-        if not hasattr(self, '_approval_cache'):
-            self._updateApprovalCache()
-        return self._approval_cache.get(category, 0)
-
-    def _updateApprovalCache(self):
-        cat_min = {}
-        cat_max = {}
-        cat_value = {}
-        for approval in self.approvals:
-            if approval.draft:
-                continue
-            cur_min = cat_min.get(approval.state, 0)
-            cur_max = cat_max.get(approval.state, 0)
-            cur_min = min(approval.value, cur_min)
-            cur_max = max(approval.value, cur_max)
-            cat_min[approval.state] = cur_min
-            cat_max[approval.state] = cur_max
-            cur_value = cat_value.get(approval.state, 0)
-            if abs(cur_min) > abs(cur_value):
-                cur_value = cur_min
-            if abs(cur_max) > abs(cur_value):
-                cur_value = cur_max
-            cat_value[approval.state] = cur_value
-        self._approval_cache = cat_value
-
-    def getMinMaxPermittedForCategory(self, category):
-        if not hasattr(self, '_permitted_cache'):
-            self._updatePermittedCache()
-        return self._permitted_cache.get(category, (0,0))
-
-    def _updatePermittedCache(self):
-        cache = {}
-        for label in self.labels:
-            if label.category not in cache:
-                cache[label.category] = [0, 0]
-            if label.value > cache[label.category][1]:
-                cache[label.category][1] = label.value
-            if label.value < cache[label.category][0]:
-                cache[label.category][0] = label.value
-        self._permitted_cache = cache
+    def getReviewState(self):
+        last_commit = self.commits[-1].sha
+        approvals = [a.state for a in self.approvals if a.sha == last_commit]
+        if 'APPROVED' in approvals or 'APPROVE' in approvals:
+            return 'APPROVED'
+        elif 'CHANGES_REQUESTED' in approvals or 'REQUEST_CHANGES' in approvals:
+            return 'CHANGES_REQUESTED'
+        elif approvals:
+            return 'COMMENTED'
+        return ''
 
     def createCommit(self, *args, **kw):
         session = Session.object_session(self)
@@ -376,15 +326,6 @@ class Change(object):
         session.add(r)
         session.flush()
         return r
-
-    def createLabel(self, *args, **kw):
-        session = Session.object_session(self)
-        args = [self] + list(args)
-        l = Label(*args, **kw)
-        self.labels.append(l)
-        session.add(l)
-        session.flush()
-        return l
 
     def createMessage(self, *args, **kw):
         session = Session.object_session(self)
@@ -400,15 +341,6 @@ class Change(object):
         args = [self] + list(args)
         l = Approval(*args, **kw)
         self.approvals.append(l)
-        session.add(l)
-        session.flush()
-        return l
-
-    def createPermittedLabel(self, *args, **kw):
-        session = Session.object_session(self)
-        args = [self] + list(args)
-        l = PermittedLabel(*args, **kw)
-        self.permitted_labels.append(l)
         session.add(l)
         session.flush()
         return l
@@ -563,19 +495,6 @@ class Comment(object):
         self.robot_run_id = robot_run_id
         self.url = url
 
-class Label(object):
-    def __init__(self, change, category, value, description):
-        self.change_key = change.key
-        self.category = category
-        self.value = value
-        self.description = description
-
-class PermittedLabel(object):
-    def __init__(self, change, category, value):
-        self.change_key = change.key
-        self.category = category
-        self.value = value
-
 class Approval(object):
     def __init__(self, change, reviewer, state, sha, draft=False):
         self.change_key = change.key
@@ -704,13 +623,6 @@ mapper(Change, change_table, properties=dict(
         messages=relationship(Message, backref='change',
                              order_by=message_table.c.created,
                               cascade='all, delete-orphan'),
-        labels=relationship(Label, backref='change',
-                            order_by=(label_table.c.category, label_table.c.value),
-                            cascade='all, delete-orphan'),
-        permitted_labels=relationship(PermittedLabel, backref='change',
-                                      order_by=(permitted_label_table.c.category,
-                                                permitted_label_table.c.value),
-                                      cascade='all, delete-orphan'),
         approvals=relationship(Approval, backref='change',
                                order_by=approval_table.c.state,
                                cascade='all, delete-orphan'),
@@ -756,8 +668,6 @@ mapper(File, file_table, properties=dict(
 
 mapper(Comment, comment_table, properties=dict(
         author=relationship(Account)))
-mapper(Label, label_table)
-mapper(PermittedLabel, permitted_label_table)
 mapper(Approval, approval_table, properties=dict(
         reviewer=relationship(Account)))
 mapper(PendingCherryPick, pending_cherry_pick_table)
