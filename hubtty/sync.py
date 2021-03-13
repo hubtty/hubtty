@@ -936,14 +936,13 @@ class SyncChangeTask(Task):
                         message.author = account
                     message.body = (remote_review.get('body','') or '').replace('\r','')
 
-                review_status = remote_review.get('state')
-                if review_status:
-                    # TODO(mandre)
+                review_state = remote_review.get('state')
+                if review_state:
                     approval = session.getApproval(change, account, remote_review.get('commit_id'))
                     if approval:
-                        approval.state = review_status
+                        approval.state = review_state
                     else:
-                        change.createApproval(account, review_status, remote_review.get('commit_id'))
+                        change.createApproval(account, review_state, remote_review.get('commit_id'))
                         self.log.info("Created new approval for %s from %s commit %s.", change.change_id, account.username, remote_review.get('commit_id'))
 
             # Inline comments

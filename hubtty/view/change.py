@@ -114,7 +114,7 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             lambda button:self._emit('cancel'))
 
         rows = []
-        categories = {
+        review_states = {
             'REQUEST_CHANGES': 'Request Changes',
             'COMMENT': 'Comment',
             'APPROVE': 'Approve'
@@ -140,12 +140,12 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                     current = 'COMMENT'
 
                 rows.append(urwid.Text('Review changes:'))
-                for category in categories:
-                    b = urwid.RadioButton(self.button_group, categories[category], state=(category == current))
-                    b._value = category
-                    if category == 'APPROVE':
+                for state in review_states:
+                    b = urwid.RadioButton(self.button_group, review_states[state], state=(state == current))
+                    b._value = state
+                    if state == 'APPROVE':
                         b = urwid.AttrMap(b, 'positive-label')
-                    elif category == 'REQUEST_CHANGES':
+                    elif state == 'REQUEST_CHANGES':
                         b = urwid.AttrMap(b, 'negative-label')
                     rows.append(b)
                 rows.append(urwid.Divider())
@@ -655,10 +655,10 @@ class ChangeView(urwid.WidgetWrap):
             self.permalink_label.text.set_text(('change-data', self.permalink_url))
             self.pr_description.set_text('\n'.join([change.title, '', change.body]))
 
-            categories = ['Changes Requested', 'Comment', 'Approved']
+            review_states = ['Changes Requested', 'Comment', 'Approved']
             approval_headers = [urwid.Text(('table-header', 'Name'))]
-            for category in categories:
-                approval_headers.append(urwid.Text(('table-header', category)))
+            for state in review_states:
+                approval_headers.append(urwid.Text(('table-header', state)))
             votes = mywid.Table(approval_headers)
             approvals_for_account = {}
             pending_message = change.commits[-1].getPendingMessage()
@@ -675,9 +675,9 @@ class ChangeView(urwid.WidgetWrap):
                     else:
                         style = 'reviewer-name'
                     row.append(urwid.Text((style, approval.reviewer_name)))
-                    for i, category in enumerate(categories):
+                    for i, state in enumerate(review_states):
                         w = urwid.Text(u'', align=urwid.CENTER)
-                        approvals[category] = w
+                        approvals[state] = w
                         row.append(w)
                     approvals_for_account[approval.reviewer.id] = approvals
                     votes.addRow(row)
