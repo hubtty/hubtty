@@ -849,8 +849,6 @@ class SyncChangeTask(Task):
                                                     remote_comment.get('line'),
                                                     remote_comment.get('original_line'),
                                                     (remote_comment.get('body','') or '').replace('\r',''),
-                                                    robot_id = remote_comment.get('robot_id'),
-                                                    robot_run_id = remote_comment.get('robot_run_id'),
                                                     url = remote_comment.get('html_url'))
                     self.log.info("Created new comment %s for change %s in local DB.",
                                     comment.key, change.change_id)

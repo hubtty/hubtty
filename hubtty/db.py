@@ -64,19 +64,19 @@ change_table = Table(
     'change', metadata,
     Column('key', Integer, primary_key=True),
     Column('project_key', Integer, ForeignKey("project.key"), index=True),
-    Column('id', String(255), index=True, unique=True, nullable=False),
+    Column('id', Integer, index=True, unique=True, nullable=False),
     Column('number', Integer, index=True, nullable=False),
     Column('branch', String(255), index=True, nullable=False),
     Column('change_id', String(255), index=True, unique=True, nullable=False),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
-    Column('title', Text, nullable=False),
+    Column('title', String(255), nullable=False),
     Column('body', Text, nullable=False),
     Column('created', DateTime, index=True, nullable=False),
     Column('updated', DateTime, index=True, nullable=False),
     Column('state', String(16), index=True, nullable=False),
     Column('additions', Integer, nullable=False),
     Column('deletions', Integer, nullable=False),
-    Column('html_url', String(255), nullable=False),
+    Column('html_url', Text, nullable=False),
     Column('hidden', Boolean, index=True, nullable=False),
     Column('reviewed', Boolean, index=True, nullable=False),
     Column('starred', Boolean, index=True, nullable=False),
@@ -102,8 +102,8 @@ commit_table = Table(
     Column('key', Integer, primary_key=True),
     Column('change_key', Integer, ForeignKey("change.key"), index=True),
     Column('message', Text, nullable=False),
-    Column('sha', String(255), index=True, nullable=False),
-    Column('parent', String(255), index=True, nullable=False),
+    Column('sha', String(64), index=True, nullable=False),
+    Column('parent', String(64), index=True, nullable=False),
     Column('pending_message', Boolean, index=True, nullable=False),
     # TODO(mandre) this needs to move to change
     Column('can_submit', Boolean, nullable=False),
@@ -114,7 +114,7 @@ message_table = Table(
     Column('change_key', Integer, ForeignKey("change.key"), index=True),
     Column('commit_key', Integer, ForeignKey("commit.key"), index=True),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
-    Column('id', String(255), index=True), #, unique=True, nullable=False),
+    Column('id', Integer, index=True), #, unique=True, nullable=False),
     Column('created', DateTime, index=True, nullable=False),
     Column('message', Text, nullable=False),
     Column('draft', Boolean, index=True, nullable=False),
@@ -126,19 +126,17 @@ comment_table = Table(
     Column('message_key', Integer, ForeignKey("message.key"), index=True),
     Column('file_key', Integer, ForeignKey("file.key"), index=True),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
-    Column('id', String(255), index=True), #, unique=True, nullable=False),
-    Column('in_reply_to', String(255), index=True),
+    Column('id', Integer, index=True), #, unique=True, nullable=False),
+    Column('in_reply_to', Integer, index=True),
     Column('created', DateTime, index=True, nullable=False),
     Column('updated', DateTime, nullable=False),
     Column('parent', Boolean, nullable=False),
-    Column('commit_id', String(255), nullable=False),
-    Column('original_commit_id', String(255), nullable=False),
+    Column('commit_id', String(64), nullable=False),
+    Column('original_commit_id', String(64), nullable=False),
     Column('line', Integer, index=True),
     Column('original_line', Integer),
     Column('message', Text, nullable=False),
     Column('draft', Boolean, index=True, nullable=False),
-    Column('robot_id', String(255)),
-    Column('robot_run_id', String(255)),
     Column('url', Text()),
     )
 approval_table = Table(
@@ -146,8 +144,8 @@ approval_table = Table(
     Column('key', Integer, primary_key=True),
     Column('change_key', Integer, ForeignKey("change.key"), index=True),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
-    Column('state', String(255), index=True, nullable=False),
-    Column('sha', String(255), nullable=False),
+    Column('state', String(32), index=True, nullable=False),
+    Column('sha', String(64), nullable=False),
     Column('draft', Boolean, index=True, nullable=False),
     UniqueConstraint('change_key', 'account_key', 'sha', name='approval_change_key_account_key_sha_const'),
     )
@@ -182,8 +180,7 @@ file_table = Table(
     Column('old_path', Text, index=True),
     Column('inserted', Integer),
     Column('deleted', Integer),
-    # TODO(mandre) reflect status length change in DB
-    Column('status', String(255), index=True, nullable=False),
+    Column('status', String(16), index=True, nullable=False),
     )
 server_table = Table(
     'server', metadata,
@@ -194,7 +191,7 @@ check_table = Table(
     'check', metadata,
     Column('key', Integer, primary_key=True),
     Column('commit_key', Integer, ForeignKey("commit.key"), index=True),
-    Column('state', String(255), nullable=False),
+    Column('state', String(16), nullable=False),
     Column('name', String(255), index=True),
     Column('url', Text),
     Column('message', Text),
@@ -478,8 +475,7 @@ class Message(object):
 class Comment(object):
     def __init__(self, message_obj, file_id, id, author, in_reply_to, created,
                  updated, parent, commit_id, original_commit_id, line,
-                 original_line, message, draft=False, robot_id=None,
-                 robot_run_id=None, url=None):
+                 original_line, message, draft=False, url=None):
         self.message_key = message_obj.key
         self.file_key = file_id
         self.account_key = author.key
@@ -494,8 +490,6 @@ class Comment(object):
         self.original_line = original_line
         self.message = message
         self.draft = draft
-        self.robot_id = robot_id
-        self.robot_run_id = robot_run_id
         self.url = url
 
 class Approval(object):
