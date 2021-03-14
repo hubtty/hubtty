@@ -38,7 +38,7 @@ project_table = Table(
     Column('name', String(255), index=True, unique=True, nullable=False),
     Column('subscribed', Boolean, index=True, default=False),
     Column('description', Text, nullable=False, default=''),
-    Column('updated', DateTime, index=True),
+    Column('updated', DateTime),
     )
 branch_table = Table(
     'branch', metadata,
@@ -67,7 +67,7 @@ change_table = Table(
     Column('id', String(255), index=True, unique=True, nullable=False),
     Column('number', Integer, index=True, nullable=False),
     Column('branch', String(255), index=True, nullable=False),
-    Column('change_id', String(255), index=True, nullable=False),
+    Column('change_id', String(255), index=True, unique=True, nullable=False),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
     Column('title', Text, nullable=False),
     Column('body', Text, nullable=False),
@@ -105,6 +105,7 @@ commit_table = Table(
     Column('sha', String(255), index=True, nullable=False),
     Column('parent', String(255), index=True, nullable=False),
     Column('pending_message', Boolean, index=True, nullable=False),
+    # TODO(mandre) this needs to move to change
     Column('can_submit', Boolean, nullable=False),
     )
 message_table = Table(
@@ -126,13 +127,13 @@ comment_table = Table(
     Column('file_key', Integer, ForeignKey("file.key"), index=True),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
     Column('id', String(255), index=True), #, unique=True, nullable=False),
-    Column('in_reply_to', String(255)),
+    Column('in_reply_to', String(255), index=True),
     Column('created', DateTime, index=True, nullable=False),
-    Column('updated', DateTime, index=True, nullable=False),
+    Column('updated', DateTime, nullable=False),
     Column('parent', Boolean, nullable=False),
-    Column('commit_id', String(255), index=True, nullable=False),
-    Column('original_commit_id', String(255), index=True, nullable=False),
-    Column('line', Integer),
+    Column('commit_id', String(255), nullable=False),
+    Column('original_commit_id', String(255), nullable=False),
+    Column('line', Integer, index=True),
     Column('original_line', Integer),
     Column('message', Text, nullable=False),
     Column('draft', Boolean, index=True, nullable=False),
@@ -145,9 +146,10 @@ approval_table = Table(
     Column('key', Integer, primary_key=True),
     Column('change_key', Integer, ForeignKey("change.key"), index=True),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
-    Column('state', String(255), nullable=False),
-    Column('sha', String(255), index=True, nullable=False),
+    Column('state', String(255), index=True, nullable=False),
+    Column('sha', String(255), nullable=False),
     Column('draft', Boolean, index=True, nullable=False),
+    UniqueConstraint('change_key', 'account_key', 'sha', name='approval_change_key_account_key_sha_const'),
     )
 account_table = Table(
     'account', metadata,
@@ -170,7 +172,7 @@ sync_query_table = Table(
     'sync_query', metadata,
     Column('key', Integer, primary_key=True),
     Column('name', String(255), index=True, unique=True, nullable=False),
-    Column('updated', DateTime, index=True),
+    Column('updated', DateTime),
     )
 file_table = Table(
     'file', metadata,
@@ -180,7 +182,8 @@ file_table = Table(
     Column('old_path', Text, index=True),
     Column('inserted', Integer),
     Column('deleted', Integer),
-    Column('status', String(1), nullable=False),
+    # TODO(mandre) reflect status length change in DB
+    Column('status', String(255), index=True, nullable=False),
     )
 server_table = Table(
     'server', metadata,
@@ -192,13 +195,13 @@ check_table = Table(
     Column('key', Integer, primary_key=True),
     Column('commit_key', Integer, ForeignKey("commit.key"), index=True),
     Column('state', String(255), nullable=False),
-    Column('name', String(255)),
+    Column('name', String(255), index=True),
     Column('url', Text),
     Column('message', Text),
     Column('started', DateTime),
     Column('finished', DateTime),
-    Column('created', DateTime, index=True, nullable=False),
-    Column('updated', DateTime, index=True, nullable=False),
+    Column('created', DateTime, nullable=False),
+    Column('updated', DateTime, nullable=False),
     )
 
 
