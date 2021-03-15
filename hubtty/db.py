@@ -630,6 +630,7 @@ mapper(Commit, commit_table, properties=dict(
         pending_cherry_picks=relationship(PendingCherryPick, backref='commit',
                                           cascade='all, delete-orphan'),
         checks=relationship(Check, backref='commit',
+                            order_by=check_table.c.name,
                             cascade='all, delete-orphan'),
 
         ))
