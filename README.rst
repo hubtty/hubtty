@@ -169,4 +169,4 @@ contents of the CONTRIBUTING.rst file.
 Bugs
 ----
 
-Bugs are handled at: https://storyboard.openstack.org/#!/project/ttygroup/hubtty
+Bugs are handled at: https://github.com/hubtty/hubtty/issues
