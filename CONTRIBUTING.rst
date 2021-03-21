@@ -41,9 +41,3 @@ to the program:
   lists, but also supports linking from change to change (via commit
   messages or comments) and navigating back intuitive (it matches
   expectations set by the web browsers).
-
-* Support a wide variety of Github installations.  The initial
-  development of Hubtty is against the OpenDev Github, and many of the
-  features are intended to help its users with their workflow,
-  however, those features should be implemented in a generic way so
-  that the system does not require a specific Github configuration.
