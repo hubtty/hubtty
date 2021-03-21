@@ -1,19 +1,10 @@
 Contributing
 ============
 
-To browse the latest code, see: https://opendev.org/ttygroup/hubtty/src/branch/master/
-To clone the latest code, use `git clone https://opendev.org/ttygroup/hubtty`
+To browse the latest code, see: https://github.com/hubtty/hubtty
+To clone the latest code, use `git clone https://github.com/hubtty/hubtty.git`
 
-Bugs are handled at: https://storyboard.openstack.org/#!/project/ttygroup/hubtty
-
-Code reviews are handled by github at: https://review.opendev.org
-
-Use `git review` to submit patches (after creating a Github account
-that links to your launchpad account). Example::
-
-    # Do your commits
-    $ git review
-    # Enter your username if prompted
+Bugs are handled at: https://github.com/hubtty/hubtty/issues
 
 Philosophy
 ----------
