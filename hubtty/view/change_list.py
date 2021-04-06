@@ -736,6 +736,13 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
 
     def closeReview(self, dialog, rows, upload, submit):
         approval, message = dialog.getValues()
+        # Ensure approval has the expected value for upload to github
+        if approval == 'APPROVED':
+            approval = 'APPROVE'
+        elif approval == 'CHANGES_REQUESTED':
+            approval = 'REQUEST_CHANGES'
+        elif approval == 'COMMENTED':
+            approval = 'COMMENT'
         commit_keys = [row.current_commit_key for row in rows]
         message_keys = self.app.saveReviews(commit_keys, approval,
                                             message, upload, submit)
