@@ -241,27 +241,33 @@ class SyncProjectListTask(Task):
     def run(self, sync):
         app = sync.app
 
-        remote_keys = set(sync.app.config.additional_repositories)
-        remote_desc = dict()
-        for r in sync.get('user/repos?per_page=100'):
-            remote_keys.add(r['full_name'])
-            remote_desc[r['full_name']] = (r.get('description', '') or '').replace('\r','')
+        remote_repos = sync.get('user/repos?per_page=100')
+        remote_repos_names = [r['full_name'] for r in remote_repos]
+
+        # Add additional repos
+        for additional_repo in sync.app.config.additional_repositories:
+            if additional_repo not in remote_repos_names:
+                remote_repo = sync.get('repos/%s' % additional_repo)
+                remote_repos.append(remote_repo)
+                remote_repos_names.append(additional_repo)
 
         with app.db.getSession() as session:
-            local = {}
+            for remote_repo in remote_repos:
+                repo_name = remote_repo['full_name']
+                repo_desc = (remote_repo.get('description', '') or '').replace('\r','')
+                project = session.getProjectByName(repo_name)
+                if not project:
+                    project = session.createProject(repo_name,
+                                                    description=repo_desc)
+                    self.log.info("Created project %s", repo_name)
+                    self.results.append(ProjectAddedEvent(project))
+                # TODO(mandre) Update description and can_push
+                self.log.info("Can push %s: %s" % (repo_name, remote_repo['permissions']['push']))
+
             for p in session.getProjects():
-                local[p.name] = p
-            local_keys = set(local.keys())
-
-            for name in local_keys-remote_keys:
-                self.log.info("Deleted project %s", name)
-                session.delete(local[name])
-
-            for name in remote_keys-local_keys:
-                project = session.createProject(name,
-                                                description=remote_desc.get(name))
-                self.log.info("Created project %s", project.name)
-                self.results.append(ProjectAddedEvent(project))
+                if p.name not in remote_repos_names:
+                    self.log.info("Deleted project %s", p.name)
+                    session.delete(p)
 
 class SyncSubscribedProjectBranchesTask(Task):
     def __repr__(self):
