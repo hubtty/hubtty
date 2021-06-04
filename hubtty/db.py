@@ -318,6 +318,12 @@ class Change(object):
             return 'COMMENTED'
         return ''
 
+    def getCommitBySha(self, sha):
+        for commit in self.commits:
+            if commit.sha == sha:
+                return commit
+        return None
+
     def createCommit(self, *args, **kw):
         session = Session.object_session(self)
         args = [self] + list(args)
@@ -878,9 +884,9 @@ class DatabaseSession(object):
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
-    def getCommitBySha(self, sha):
+    def getCommitsBySha(self, sha):
         try:
-            return self.session().query(Commit).filter_by(sha=sha).one()
+            return self.session().query(Commit).filter_by(sha=sha).all()
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 

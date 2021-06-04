@@ -124,7 +124,7 @@ class UpdateEvent(object):
         related_change_keys = set()
         related_change_keys.add(change.key)
         for commit in change.commits:
-            parent = session.getCommitBySha(commit.parent)
+            parent = change.getCommitBySha(commit.parent)
             if parent:
                 related_change_keys.add(parent.change.key)
             for child in session.getCommitsByParent(commit.commit):
@@ -722,7 +722,7 @@ class SyncChangeTask(Task):
             repo = gitrepo.get_repo(change.project.name, app.config)
             new_commit = False
             for remote_commit in remote_commits:
-                commit = session.getCommitBySha(remote_commit['sha'])
+                commit = change.getCommitBySha(remote_commit['sha'])
                 # TODO: handle multiple parents
                 url = sync.app.config.git_url + change.project.name
                 ref = "pull/%s/head" % (change.number,)
@@ -739,7 +739,7 @@ class SyncChangeTask(Task):
             #     commit.can_submit = 'submit' in actions
             #     # TODO: handle multiple parents
             #     if commit.parent not in parent_commits:
-            #         parent_commit = session.getCommitBySha(commit.parent)
+            #         parent_commit = change.getCommitBySha(commit.parent)
             #         if not parent_commit and change.state != 'closed':
             #             sync._syncChangeByCommit(commit.parent, self.priority)
             #             self.log.debug("Change %s needs parent commit %s synced" %
@@ -794,7 +794,7 @@ class SyncChangeTask(Task):
 
                 associated_commit_id = None
                 if remote_review.get('commit_id'):
-                    associated_commit = session.getCommitBySha(remote_review['commit_id'])
+                    associated_commit = change.getCommitBySha(remote_review['commit_id'])
                     if associated_commit:
                         associated_commit_id = associated_commit.key
 
@@ -828,7 +828,7 @@ class SyncChangeTask(Task):
                 comment = session.getCommentByID(remote_comment['id'])
 
                 file_id = None
-                associated_commit = session.getCommitBySha(remote_comment['commit_id'])
+                associated_commit = change.getCommitBySha(remote_comment['commit_id'])
                 if associated_commit:
                     fileobj = associated_commit.getFile(remote_comment['path'])
                     if fileobj is None:
