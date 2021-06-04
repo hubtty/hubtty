@@ -83,6 +83,8 @@ if __name__ == '__main__':
 
     app = Dummy()
     app.config = Dummy()
-    search = SearchCompiler('bob')
+    def my_account():
+      return 1
+    search = SearchCompiler(my_account)
     x = search.parse(query)
     print(x)
