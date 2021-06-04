@@ -831,7 +831,7 @@ class ChangeView(urwid.WidgetWrap):
 
         # Handle depends-on
         parents = {}
-        parent = session.getCommitBySha(commit.parent)
+        parent = change.getCommitBySha(commit.parent)
         if parent:
             title = parent.change.title
             show_merged = False
