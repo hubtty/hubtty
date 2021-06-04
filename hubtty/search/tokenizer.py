@@ -115,12 +115,12 @@ def SearchTokenizer():
         return t
 
     def t_INTEGER(t):
-        r'[+-]\d+'
+        r'[+-]\d+\b'
         t.value = int(t.value)
         return t
 
     def t_NUMBER(t):
-        r'\d+'
+        r'\d+\b'
         t.value = int(t.value)
         return t
 
