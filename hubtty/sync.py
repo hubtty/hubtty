@@ -707,7 +707,7 @@ class SyncChangeTask(Task):
                                               remote_change['deletions'],
                                               remote_change['html_url'],
                                               remote_change['merged'],
-                                              (remote_change['mergeable'] or True),
+                                              (remote_change['mergeable'] or False),
                                               )
                 self.log.info("Created new change %s in local DB.", change.change_id)
                 result = ChangeAddedEvent(change)
@@ -729,7 +729,7 @@ class SyncChangeTask(Task):
             change.additions = remote_change['additions']
             change.deletions = remote_change['deletions']
             change.merged = remote_change['merged']
-            change.mergeable = remote_change.get('mergeable') or True
+            change.mergeable = remote_change.get('mergeable') or False
 
             # Delete commits that no longer belong to the change
             remote_commits_sha = [c['sha'] for c in remote_commits]
@@ -1115,14 +1115,16 @@ class ChangeStatusTask(Task):
             change.pending_status = False
             change.pending_status_message = None
             # Inside db session for rollback
-            if change.state == 'ABANDONED':
-                sync.post('changes/%s/abandon' % (change.id,),
-                          data)
-            elif change.state == 'NEW':
-                sync.post('changes/%s/restore' % (change.id,),
-                          data)
-            elif change.state == 'SUBMITTED':
-                sync.post('changes/%s/submit' % (change.id,), {})
+            if change.state == 'SUBMITTED':
+                sync.put('repos/%s/merge' % (change.change_id,), {})
+            # if change.state == 'ABANDONED':
+            #     sync.post('changes/%s/abandon' % (change.id,),
+            #               data)
+            # elif change.state == 'NEW':
+            #     sync.post('changes/%s/restore' % (change.id,),
+            #               data)
+            # elif change.state == 'SUBMITTED':
+            #     sync.post('changes/%s/submit' % (change.id,), {})
             sync.submitTask(SyncChangeTask(change.id, priority=self.priority))
 
 class SendCherryPickTask(Task):

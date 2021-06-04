@@ -224,7 +224,11 @@ class CommitRow(urwid.WidgetWrap):
         self.commit_key = commit.key
         self.project_name = commit.change.project.name
         self.commit_sha = commit.sha
-        self.can_submit = commit.can_submit
+        #self.can_submit = commit.can_submit
+        # TODO: we need to figure out how we know if the user has the rights
+        # to merge a PR, probably with something like:
+        # https://docs.github.com/en/rest/reference/projects#get-project-permission-for-a-user
+        self.can_submit = True
         self.title = mywid.TextButton(u'', on_press = self.expandContract)
         table = mywid.Table(columns=3)
         total_added = 0
@@ -254,9 +258,9 @@ class CommitRow(urwid.WidgetWrap):
                                      on_press=self.checkout),
                    mywid.FixedButton(('commit-button', "Local Cherry-Pick"),
                                      on_press=self.cherryPick)]
-        # if self.can_submit:
-        #     buttons.append(mywid.FixedButton(('commit-button', "Submit"),
-        #                                      on_press=lambda x: self.change_view.doSubmitChange()))
+        if self.can_submit:
+            buttons.append(mywid.FixedButton(('commit-button', "Submit"),
+                                             on_press=lambda x: self.change_view.doSubmitChange()))
 
         buttons = [('pack', urwid.AttrMap(b, None, focus_map=focus_map)) for b in buttons]
         buttons = urwid.Columns(buttons + [urwid.Text('')], dividechars=2)
@@ -485,8 +489,8 @@ class ChangeView(urwid.WidgetWrap):
              "Refresh this change"),
             (keymap.EDIT_HASHTAGS,
              "Edit the hashtags of this change"),
-            # (keymap.SUBMIT_CHANGE,
-            #  "Submit this change"),
+            (keymap.SUBMIT_CHANGE,
+             "Submit this change"),
             (keymap.CHERRY_PICK_CHANGE,
              "Propose this change to another branch"),
             ]
@@ -958,9 +962,9 @@ class ChangeView(urwid.WidgetWrap):
                 sync.SyncChangeTask(self.change_rest_id, priority=sync.HIGH_PRIORITY))
             self.app.status.update()
             return None
-        # if keymap.SUBMIT_CHANGE in commands:
-        #     self.doSubmitChange()
-        #     return None
+        if keymap.SUBMIT_CHANGE in commands:
+            self.doSubmitChange()
+            return None
         if keymap.EDIT_HASHTAGS in commands:
             self.editHashtags()
             return None
@@ -1086,17 +1090,17 @@ class ChangeView(urwid.WidgetWrap):
         self.app.backScreen()
         self.refresh()
 
-    # def doSubmitChange(self):
-    #     change_key = None
-    #     with self.app.db.getSession() as session:
-    #         change = session.getChange(self.change_key)
-    #         change.state = 'SUBMITTED'
-    #         change.pending_status = True
-    #         change.pending_status_message = None
-    #         change_key = change.key
-    #     self.app.sync.submitTask(
-    #         sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
-    #     self.refresh()
+    def doSubmitChange(self):
+        change_key = None
+        with self.app.db.getSession() as session:
+            change = session.getChange(self.change_key)
+            change.state = 'SUBMITTED'
+            change.pending_status = True
+            change.pending_status_message = None
+            change_key = change.key
+        self.app.sync.submitTask(
+            sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
+        self.refresh()
 
     def editHashtags(self):
         dialog = EditHashtagsDialog(self.app, self.hashtags)
