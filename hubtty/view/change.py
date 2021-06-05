@@ -126,7 +126,7 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             commit = session.getCommit(self.commit_key)
             change = commit.change
             buttons = [('pack', save_button)]
-            if commit.can_submit:
+            if commit.change.mergeable and commit.change.project.can_push:
                 buttons.append(('pack', submit_button))
             buttons.append(('pack', cancel_button))
             buttons = urwid.Columns(buttons, dividechars=2)
@@ -224,11 +224,7 @@ class CommitRow(urwid.WidgetWrap):
         self.commit_key = commit.key
         self.project_name = commit.change.project.name
         self.commit_sha = commit.sha
-        #self.can_submit = commit.can_submit
-        # TODO: we need to figure out how we know if the user has the rights
-        # to merge a PR, probably with something like:
-        # https://docs.github.com/en/rest/reference/projects#get-project-permission-for-a-user
-        self.can_submit = True
+        self.can_submit = commit.change.mergeable and commit.change.project.can_push
         self.title = mywid.TextButton(u'', on_press = self.expandContract)
         table = mywid.Table(columns=3)
         total_added = 0
@@ -1092,12 +1088,23 @@ class ChangeView(urwid.WidgetWrap):
 
     def doSubmitChange(self):
         change_key = None
+        can_merge = False
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
+            can_merge = change.mergeable and change.project.can_push
+
+            if not can_merge:
+                dialog = mywid.MessageDialog('Error', 'You cannot merge this change.')
+                urwid.connect_signal(dialog, 'close',
+                    lambda button: self.app.backScreen())
+                self.app.popup(dialog)
+                return
+
             change.state = 'SUBMITTED'
             change.pending_status = True
             change.pending_status_message = None
             change_key = change.key
+
         self.app.sync.submitTask(
             sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
         self.refresh()
