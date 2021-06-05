@@ -274,8 +274,8 @@ class SyncProjectListTask(Task):
                                                     description=repo_desc)
                     self.log.info("Created project %s", repo_name)
                     self.results.append(ProjectAddedEvent(project))
-                # TODO(mandre) Update description and can_push
-                self.log.info("Can push %s: %s" % (repo_name, remote_repo['permissions']['push']))
+                project.description = repo_desc
+                project.can_push = remote_repo['permissions']['push']
 
             for p in session.getProjects():
                 if p.name not in remote_repos_names:
