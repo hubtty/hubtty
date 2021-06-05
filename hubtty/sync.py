@@ -244,12 +244,25 @@ class SyncProjectListTask(Task):
         remote_repos = sync.get('user/repos?per_page=100')
         remote_repos_names = [r['full_name'] for r in remote_repos]
 
+        def checkResponse(response):
+            self.log.debug('HTTP status code: %d', response.status_code)
+            if response.status_code == 503:
+                raise OfflineError("Received 503 status code")
+            elif response.status_code == 404:
+                self.log.error('Project %s does not exist or you do not have '
+                        'the permissions to view it.' % additional_repo)
+            elif response.status_code > 400:
+                raise Exception("Received %s status code: %s"
+                                % (response.status_code, response.text))
+
         # Add additional repos
         for additional_repo in sync.app.config.additional_repositories:
             if additional_repo not in remote_repos_names:
-                remote_repo = sync.get('repos/%s' % additional_repo)
-                remote_repos.append(remote_repo)
-                remote_repos_names.append(additional_repo)
+                remote_repo = sync.get('repos/%s' % additional_repo,
+                        response_callback=checkResponse)
+                if remote_repo:
+                    remote_repos.append(remote_repo)
+                    remote_repos_names.append(additional_repo)
 
         with app.db.getSession() as session:
             for remote_repo in remote_repos:
@@ -1419,10 +1432,13 @@ class Sync(object):
             raise Exception("Received %s status code: %s"
                             % (response.status_code, response.text))
 
-    def get(self, path):
+    def get(self, path, response_callback=None):
         url = self.url(path)
         ret = None
         done = False
+
+        if not response_callback:
+            response_callback = self.checkResponse
 
         while not done:
             self.log.debug('GET: %s' % (url,))
@@ -1431,7 +1447,7 @@ class Sync(object):
                                  headers = {'Accept': 'application/vnd.github.v3+json',
                                             'Accept-Encoding': 'gzip',
                                             'User-Agent': self.user_agent})
-            self.checkResponse(r)
+            response_callback(r)
             if int(r.headers.get('X-RateLimit-Remaining', 1)) < 1:
                 if r.headers.get('X-RateLimit-Reset'):
                     sleep = int(r.headers.get('X-RateLimit-Reset')) - int(time.time())
