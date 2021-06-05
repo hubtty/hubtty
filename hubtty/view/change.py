@@ -224,7 +224,7 @@ class CommitRow(urwid.WidgetWrap):
         self.commit_key = commit.key
         self.project_name = commit.change.project.name
         self.commit_sha = commit.sha
-        self.can_submit = commit.change.mergeable and commit.change.project.can_push
+        self.can_merge = commit.change.mergeable and commit.change.project.can_push
         self.title = mywid.TextButton(u'', on_press = self.expandContract)
         table = mywid.Table(columns=3)
         total_added = 0
@@ -254,9 +254,9 @@ class CommitRow(urwid.WidgetWrap):
                                      on_press=self.checkout),
                    mywid.FixedButton(('commit-button', "Local Cherry-Pick"),
                                      on_press=self.cherryPick)]
-        if self.can_submit:
-            buttons.append(mywid.FixedButton(('commit-button', "Submit"),
-                                             on_press=lambda x: self.change_view.doSubmitChange()))
+        if self.can_merge:
+            buttons.append(mywid.FixedButton(('commit-button', "Merge"),
+                                             on_press=lambda x: self.change_view.doMergeChange()))
 
         buttons = [('pack', urwid.AttrMap(b, None, focus_map=focus_map)) for b in buttons]
         buttons = urwid.Columns(buttons + [urwid.Text('')], dividechars=2)
@@ -485,8 +485,8 @@ class ChangeView(urwid.WidgetWrap):
              "Refresh this change"),
             (keymap.EDIT_HASHTAGS,
              "Edit the hashtags of this change"),
-            (keymap.SUBMIT_CHANGE,
-             "Submit this change"),
+            (keymap.MERGE_CHANGE,
+             "Merge this change"),
             (keymap.CHERRY_PICK_CHANGE,
              "Propose this change to another branch"),
             ]
@@ -958,8 +958,8 @@ class ChangeView(urwid.WidgetWrap):
                 sync.SyncChangeTask(self.change_rest_id, priority=sync.HIGH_PRIORITY))
             self.app.status.update()
             return None
-        if keymap.SUBMIT_CHANGE in commands:
-            self.doSubmitChange()
+        if keymap.MERGE_CHANGE in commands:
+            self.doMergeChange()
             return None
         if keymap.EDIT_HASHTAGS in commands:
             self.editHashtags()
@@ -1086,7 +1086,7 @@ class ChangeView(urwid.WidgetWrap):
         self.app.backScreen()
         self.refresh()
 
-    def doSubmitChange(self):
+    def doMergeChange(self):
         change_key = None
         can_merge = False
         with self.app.db.getSession() as session:

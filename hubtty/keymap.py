@@ -60,7 +60,7 @@ CHERRY_PICK_CHANGE = 'cherry pick change'
 REFRESH = 'refresh'
 EDIT_HASHTAGS = 'edit hashtags'
 EDIT_COMMIT_MESSAGE = 'edit commit message'
-SUBMIT_CHANGE = 'submit change'
+MERGE_CHANGE = 'merge change'
 SORT_BY_NUMBER = 'sort by number'
 SORT_BY_UPDATED = 'sort by updated'
 SORT_BY_LAST_SEEN = 'sort by last seen'
@@ -128,7 +128,7 @@ DEFAULT_KEYMAP = {
     REFRESH: 'ctrl r',
     EDIT_HASHTAGS: '#',
     EDIT_COMMIT_MESSAGE: 'ctrl d',
-    SUBMIT_CHANGE: 'ctrl u',
+    MERGE_CHANGE: 'ctrl m',
     SORT_BY_NUMBER: [['S', 'n']],
     SORT_BY_UPDATED: [['S', 'u']],
     SORT_BY_LAST_SEEN: [['S', 's']],
@@ -161,7 +161,6 @@ VI_KEYMAP = {
     CURSOR_DOWN: ['j', 'down'],
     CURSOR_UP: ['k', 'up'],
     CURSOR_RIGHT: ['l', 'right'],
-    # 'ctrl u' mapping conflicts with SUBMIT_CHANGE
     CURSOR_PAGE_UP: ['ctrl u', 'page up'],
     # 'ctrl d' mapping conflicts with EDIT_COMMIT_MESSAGE
     CURSOR_PAGE_DOWN: ['ctrl d', 'page down'],
@@ -174,7 +173,6 @@ VI_KEYMAP = {
     TOGGLE_LIST_REVIEWED: [['t', 'R']],
     TOGGLE_LIST_SUBSCRIBED: 'L',
 
-    SUBMIT_CHANGE: 'ctrl s',
     EDIT_COMMIT_MESSAGE: 'ctrl c',
 }
 
