@@ -754,8 +754,6 @@ class SyncChangeTask(Task):
                     self.log.info("Created new commit %s for change %s in local DB.",
                                   commit.key, self.change_id)
                     new_commit = True
-            #     actions = remote_commit.get('actions', {})
-            #     commit.can_submit = 'submit' in actions
             #     # TODO: handle multiple parents
             #     if commit.parent not in parent_commits:
             #         parent_commit = change.getCommitBySha(commit.parent)

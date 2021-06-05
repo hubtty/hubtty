@@ -106,8 +106,6 @@ commit_table = Table(
     Column('sha', String(64), index=True, nullable=False),
     Column('parent', String(64), index=True, nullable=False),
     Column('pending_message', Boolean, index=True, nullable=False),
-    # TODO(mandre) this needs to move to change
-    Column('can_submit', Boolean, nullable=False),
     )
 message_table = Table(
     'message', metadata,
@@ -390,14 +388,12 @@ class Change(object):
         return author_name
 
 class Commit(object):
-    def __init__(self, change, message, sha, parent, pending_message=False,
-                 can_submit=False):
+    def __init__(self, change, message, sha, parent, pending_message=False):
         self.change_key = change.key
         self.message = message
         self.sha = sha
         self.parent = parent
         self.pending_message = pending_message
-        self.can_submit = can_submit
 
     def createPendingCherryPick(self, *args, **kw):
         session = Session.object_session(self)
