@@ -128,7 +128,7 @@ DEFAULT_KEYMAP = {
     REFRESH: 'ctrl r',
     EDIT_HASHTAGS: '#',
     EDIT_COMMIT_MESSAGE: 'ctrl d',
-    MERGE_CHANGE: 'ctrl m',
+    MERGE_CHANGE: 'meta m',
     SORT_BY_NUMBER: [['S', 'n']],
     SORT_BY_UPDATED: [['S', 'u']],
     SORT_BY_LAST_SEEN: [['S', 's']],
