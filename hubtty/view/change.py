@@ -224,7 +224,7 @@ class CommitRow(urwid.WidgetWrap):
         self.commit_key = commit.key
         self.project_name = commit.change.project.name
         self.commit_sha = commit.sha
-        self.can_merge = commit.change.mergeable and commit.change.project.can_push
+        self.can_merge = commit.change.canMerge()
         self.title = mywid.TextButton(u'', on_press = self.expandContract)
         table = mywid.Table(columns=3)
         total_added = 0
@@ -1088,12 +1088,10 @@ class ChangeView(urwid.WidgetWrap):
 
     def doMergeChange(self):
         change_key = None
-        can_merge = False
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
-            can_merge = change.mergeable and change.project.can_push
 
-            if not can_merge:
+            if not change.canMerge():
                 dialog = mywid.MessageDialog('Error', 'You cannot merge this change.')
                 urwid.connect_signal(dialog, 'close',
                     lambda button: self.app.backScreen())

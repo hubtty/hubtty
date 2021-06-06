@@ -375,6 +375,9 @@ class Change(object):
         # or the connection dropped
         return len(self.commits) > 0
 
+    def canMerge(self):
+        return self.mergeable and self.project.can_push
+
     @property
     def author_name(self):
         author_name = 'Anonymous Coward'
