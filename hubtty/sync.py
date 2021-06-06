@@ -1123,7 +1123,7 @@ class ChangeStatusTask(Task):
             #               data)
             # elif change.state == 'SUBMITTED':
             #     sync.post('changes/%s/submit' % (change.id,), {})
-            sync.submitTask(SyncChangeTask(change.id, priority=self.priority))
+            sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
 
 class SendCherryPickTask(Task):
     def __init__(self, cp_key, priority=NORMAL_PRIORITY):
