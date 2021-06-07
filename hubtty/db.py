@@ -38,6 +38,7 @@ project_table = Table(
     Column('name', String(255), index=True, unique=True, nullable=False),
     Column('subscribed', Boolean, index=True, default=False),
     Column('description', Text, nullable=False, default=''),
+    Column('can_push', Boolean, default=False),
     Column('updated', DateTime),
     )
 branch_table = Table(
@@ -210,10 +211,11 @@ class Account(object):
         self.email = email
 
 class Project(object):
-    def __init__(self, name, subscribed=False, description=''):
+    def __init__(self, name, subscribed=False, description='', can_push=False):
         self.name = name
         self.subscribed = subscribed
         self.description = description
+        self.can_push = can_push
 
     def createChange(self, *args, **kw):
         session = Session.object_session(self)

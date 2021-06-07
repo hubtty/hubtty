@@ -241,27 +241,46 @@ class SyncProjectListTask(Task):
     def run(self, sync):
         app = sync.app
 
-        remote_keys = set(sync.app.config.additional_repositories)
-        remote_desc = dict()
-        for r in sync.get('user/repos?per_page=100'):
-            remote_keys.add(r['full_name'])
-            remote_desc[r['full_name']] = (r.get('description', '') or '').replace('\r','')
+        remote_repos = sync.get('user/repos?per_page=100')
+        remote_repos_names = [r['full_name'] for r in remote_repos]
+
+        def checkResponse(response):
+            self.log.debug('HTTP status code: %d', response.status_code)
+            if response.status_code == 503:
+                raise OfflineError("Received 503 status code")
+            elif response.status_code == 404:
+                self.log.error('Project %s does not exist or you do not have '
+                        'the permissions to view it.' % additional_repo)
+            elif response.status_code >= 400:
+                raise Exception("Received %s status code: %s"
+                                % (response.status_code, response.text))
+
+        # Add additional repos
+        for additional_repo in sync.app.config.additional_repositories:
+            if additional_repo not in remote_repos_names:
+                remote_repo = sync.get('repos/%s' % additional_repo,
+                        response_callback=checkResponse)
+                if remote_repo:
+                    remote_repos.append(remote_repo)
+                    remote_repos_names.append(additional_repo)
 
         with app.db.getSession() as session:
-            local = {}
+            for remote_repo in remote_repos:
+                repo_name = remote_repo['full_name']
+                repo_desc = (remote_repo.get('description', '') or '').replace('\r','')
+                project = session.getProjectByName(repo_name)
+                if not project:
+                    project = session.createProject(repo_name,
+                                                    description=repo_desc)
+                    self.log.info("Created project %s", repo_name)
+                    self.results.append(ProjectAddedEvent(project))
+                project.description = repo_desc
+                project.can_push = remote_repo['permissions']['push']
+
             for p in session.getProjects():
-                local[p.name] = p
-            local_keys = set(local.keys())
-
-            for name in local_keys-remote_keys:
-                self.log.info("Deleted project %s", name)
-                session.delete(local[name])
-
-            for name in remote_keys-local_keys:
-                project = session.createProject(name,
-                                                description=remote_desc.get(name))
-                self.log.info("Created project %s", project.name)
-                self.results.append(ProjectAddedEvent(project))
+                if p.name not in remote_repos_names:
+                    self.log.info("Deleted project %s", p.name)
+                    session.delete(p)
 
 class SyncSubscribedProjectBranchesTask(Task):
     def __repr__(self):
@@ -1409,14 +1428,17 @@ class Sync(object):
         self.log.debug('HTTP status code: %d', response.status_code)
         if response.status_code == 503:
             raise OfflineError("Received 503 status code")
-        elif response.status_code > 400:
+        elif response.status_code >= 400:
             raise Exception("Received %s status code: %s"
                             % (response.status_code, response.text))
 
-    def get(self, path):
+    def get(self, path, response_callback=None):
         url = self.url(path)
         ret = None
         done = False
+
+        if not response_callback:
+            response_callback = self.checkResponse
 
         while not done:
             self.log.debug('GET: %s' % (url,))
@@ -1425,7 +1447,7 @@ class Sync(object):
                                  headers = {'Accept': 'application/vnd.github.v3+json',
                                             'Accept-Encoding': 'gzip',
                                             'User-Agent': self.user_agent})
-            self.checkResponse(r)
+            response_callback(r)
             if int(r.headers.get('X-RateLimit-Remaining', 1)) < 1:
                 if r.headers.get('X-RateLimit-Reset'):
                     sleep = int(r.headers.get('X-RateLimit-Reset')) - int(time.time())
@@ -1465,7 +1487,7 @@ class Sync(object):
         self.checkResponse(r)
         self.log.debug('Received: %s' % (r.text,))
         ret = None
-        if r.status_code > 400:
+        if r.status_code >= 400:
             raise Exception("POST to %s failed with http code %s (%s)",
                             path, r.status_code, r.text)
         if r.text and len(r.text)>0:
