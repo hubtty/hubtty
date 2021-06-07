@@ -251,7 +251,7 @@ class SyncProjectListTask(Task):
             elif response.status_code == 404:
                 self.log.error('Project %s does not exist or you do not have '
                         'the permissions to view it.' % additional_repo)
-            elif response.status_code > 400:
+            elif response.status_code >= 400:
                 raise Exception("Received %s status code: %s"
                                 % (response.status_code, response.text))
 
@@ -1428,7 +1428,7 @@ class Sync(object):
         self.log.debug('HTTP status code: %d', response.status_code)
         if response.status_code == 503:
             raise OfflineError("Received 503 status code")
-        elif response.status_code > 400:
+        elif response.status_code >= 400:
             raise Exception("Received %s status code: %s"
                             % (response.status_code, response.text))
 
@@ -1487,7 +1487,7 @@ class Sync(object):
         self.checkResponse(r)
         self.log.debug('Received: %s' % (r.text,))
         ret = None
-        if r.status_code > 400:
+        if r.status_code >= 400:
             raise Exception("POST to %s failed with http code %s (%s)",
                             path, r.status_code, r.text)
         if r.text and len(r.text)>0:
