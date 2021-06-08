@@ -232,7 +232,8 @@ dashboards:
 # review; otherwise an empty review will be left.
 # Approval must be one of REQUEST_CHANGES, COMMENT, or APPROVE.
 # To keep the review as a draft and not submit it right away, include 'draft:
-# True' with the reviewkey.  Reviewkeys appear in the help text for the change
+# True' with the reviewkey.  Add 'merge: true' to merge the change directly.
+# Reviewkeys appear in the help text for the change
 # screen. Use the 'description' parameter to change the help message for the
 # reviewkey.
 # reviewkeys:
@@ -245,6 +246,11 @@ dashboards:
 #     message: ":shipit:"
 #     description: 'Approve change'
 #   - key: 'meta 2'
+#     approval: 'APPROVE'
+#     message: ":shipit:"
+#     description: 'Approve change and merge'
+#     merge: true
+#   - key: 'meta 3'
 #     approval: 'REQUEST_CHANGES'
 #     message: "Please add unit tests"
 #     description: 'Request unit tests'

@@ -366,6 +366,9 @@ Reviewkeys appear in the help text for the change screen.
   **draft**
     Optional, keep the review as a draft and don't submit it right away.
 
+  **merge**
+    Optional, merge the change directly.
+
 
 The following example includes a reviewkey that leaves a "/retest" message on
 a review, one that approves the PR, and another one that creates a draft message
@@ -382,6 +385,11 @@ requesting for changes.
         message: ":shipit:"
         description: 'Approve change'
       - key: 'meta 2'
+        approval: 'APPROVE'
+        message: ":shipit:"
+        merge: true
+        description: 'Approve change and merge'
+      - key: 'meta 3'
         approval: 'REQUEST_CHANGES'
         message: "Please add unit tests"
         description: 'Request unit tests'
