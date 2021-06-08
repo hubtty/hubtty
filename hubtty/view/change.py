@@ -99,17 +99,17 @@ class CherryPickDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                                                              'Propose Change to Branch'))
 
 class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
-    signals = ['submit', 'save', 'cancel']
+    signals = ['merge', 'save', 'cancel']
     def __init__(self, app, commit_key, message=''):
         self.commit_key = commit_key
         self.app = app
         save_button = mywid.FixedButton(u'Save')
-        submit_button = mywid.FixedButton(u'Save and Submit')
+        merge_button = mywid.FixedButton(u'Save and Merge')
         cancel_button = mywid.FixedButton(u'Cancel')
         urwid.connect_signal(save_button, 'click',
             lambda button:self._emit('save'))
-        urwid.connect_signal(submit_button, 'click',
-            lambda button:self._emit('submit'))
+        urwid.connect_signal(merge_button, 'click',
+            lambda button:self._emit('merge'))
         urwid.connect_signal(cancel_button, 'click',
             lambda button:self._emit('cancel'))
 
@@ -127,7 +127,7 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             change = commit.change
             buttons = [('pack', save_button)]
             if commit.change.mergeable and commit.change.project.can_push:
-                buttons.append(('pack', submit_button))
+                buttons.append(('pack', merge_button))
             buttons.append(('pack', cancel_button))
             buttons = urwid.Columns(buttons, dividechars=2)
             if commit == change.commits[-1]:
@@ -195,7 +195,7 @@ class ReviewButton(mywid.FixedButton):
                                    message=message)
         urwid.connect_signal(self.dialog, 'save',
             lambda button: self.closeReview(True, False))
-        urwid.connect_signal(self.dialog, 'submit',
+        urwid.connect_signal(self.dialog, 'merge',
             lambda button: self.closeReview(True, True))
         urwid.connect_signal(self.dialog, 'cancel',
             lambda button: self.closeReview(False, False))
@@ -203,10 +203,10 @@ class ReviewButton(mywid.FixedButton):
                                    relative_width=50, relative_height=75,
                                    min_width=60, min_height=20)
 
-    def closeReview(self, upload, submit):
+    def closeReview(self, upload, merge):
         approval, message = self.dialog.getValues()
         self.change_view.saveReview(self.commit_row.commit_key, approval,
-                                    message, upload, submit)
+                                    message, upload, merge)
         self.change_view.app.backScreen()
 
 class CommitRow(urwid.WidgetWrap):
@@ -1145,13 +1145,13 @@ class ChangeView(urwid.WidgetWrap):
                            (reviewkey['key'], approval))
         row = self.commit_rows[self.last_commit_key]
         message = reviewkey.get('message', '')
-        submit = reviewkey.get('submit', False)
+        merge = reviewkey.get('merge', False)
         upload = not reviewkey.get('draft', False)
-        self.saveReview(row.commit_key, approval, message, upload, submit)
+        self.saveReview(row.commit_key, approval, message, upload, merge)
 
-    def saveReview(self, commit_key, approval, message, upload, submit):
+    def saveReview(self, commit_key, approval, message, upload, merge):
         message_keys = self.app.saveReviews([commit_key], approval,
-                                            message, upload, submit)
+                                            message, upload, merge)
         if upload:
             for message_key in message_keys:
                 self.app.sync.submitTask(

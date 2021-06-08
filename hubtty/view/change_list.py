@@ -726,7 +726,7 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
         dialog = view_change.ReviewDialog(self.app, rows[0].current_commit_key)
         urwid.connect_signal(dialog, 'save',
             lambda button: self.closeReview(dialog, rows, True, False))
-        urwid.connect_signal(dialog, 'submit',
+        urwid.connect_signal(dialog, 'merge',
             lambda button: self.closeReview(dialog, rows, True, True))
         urwid.connect_signal(dialog, 'cancel',
             lambda button: self.closeReview(dialog, rows, False, False))
@@ -734,7 +734,7 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
                        relative_width=50, relative_height=75,
                        min_width=60, min_height=20)
 
-    def closeReview(self, dialog, rows, upload, submit):
+    def closeReview(self, dialog, rows, upload, merge):
         approval, message = dialog.getValues()
         # Ensure approval has the expected value for upload to github
         if approval == 'APPROVED':
@@ -745,7 +745,7 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             approval = 'COMMENT'
         commit_keys = [row.current_commit_key for row in rows]
         message_keys = self.app.saveReviews(commit_keys, approval,
-                                            message, upload, submit)
+                                            message, upload, merge)
         if upload:
             for message_key in message_keys:
                 self.app.sync.submitTask(

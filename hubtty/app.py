@@ -808,19 +808,19 @@ class App(object):
             lambda button: self.backScreen())
         self.popup(dialog, min_height=min_height)
 
-    def saveReviews(self, commit_keys, approval, message, upload, submit):
+    def saveReviews(self, commit_keys, approval, message, upload, merge):
         message_keys = []
         with self.db.getSession() as session:
             account = session.getOwnAccount()
             for commit_key in commit_keys:
                 k = self._saveReview(session, account, commit_key,
-                                     approval, message, upload, submit)
+                                     approval, message, upload, merge)
                 if k:
                     message_keys.append(k)
         return message_keys
 
     def _saveReview(self, session, account, commit_key,
-                    approval, message, upload, submit):
+                    approval, message, upload, merge):
         message_key = None
         commit = session.getCommit(commit_key)
         change = commit.change
@@ -847,11 +847,10 @@ class App(object):
         if upload:
             change.reviewed = True
             self.project_cache.clear(change.project)
-        # TODO(mandre) figure out if `submit` action makes sense for github workflow
-        # if submit:
-        #     change.status = 'SUBMITTED'
-        #     change.pending_status = True
-        #     change.pending_status_message = None
+        if merge:
+            change.status = 'SUBMITTED'
+            change.pending_status = True
+            change.pending_status_message = None
         return message_key
 
 

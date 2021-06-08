@@ -93,7 +93,7 @@ class ConfigSchema(object):
                  v.Optional('message'): str,
                  v.Optional('description'): str,
                  v.Optional('draft'): bool,
-                 'submit': bool,
+                 v.Optional('merge'): bool,
                  v.Required('key'): str}
 
     reviewkeys = [reviewkey]
