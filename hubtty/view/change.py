@@ -126,7 +126,7 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             commit = session.getCommit(self.commit_key)
             change = commit.change
             buttons = [('pack', save_button)]
-            if commit.change.mergeable and commit.change.project.can_push:
+            if commit.change.canMerge():
                 buttons.append(('pack', merge_button))
             buttons.append(('pack', cancel_button))
             buttons = urwid.Columns(buttons, dividechars=2)
