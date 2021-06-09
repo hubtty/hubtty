@@ -707,7 +707,7 @@ class SyncChangeTask(Task):
                                               remote_change['deletions'],
                                               remote_change['html_url'],
                                               remote_change['merged'],
-                                              (remote_change['mergeable'] or True),
+                                              (remote_change['mergeable'] or False),
                                               )
                 self.log.info("Created new change %s in local DB.", change.change_id)
                 result = ChangeAddedEvent(change)
@@ -729,7 +729,7 @@ class SyncChangeTask(Task):
             change.additions = remote_change['additions']
             change.deletions = remote_change['deletions']
             change.merged = remote_change['merged']
-            change.mergeable = remote_change.get('mergeable') or True
+            change.mergeable = remote_change.get('mergeable') or False
 
             # Delete commits that no longer belong to the change
             remote_commits_sha = [c['sha'] for c in remote_commits]
@@ -754,8 +754,6 @@ class SyncChangeTask(Task):
                     self.log.info("Created new commit %s for change %s in local DB.",
                                   commit.key, self.change_id)
                     new_commit = True
-            #     actions = remote_commit.get('actions', {})
-            #     commit.can_submit = 'submit' in actions
             #     # TODO: handle multiple parents
             #     if commit.parent not in parent_commits:
             #         parent_commit = change.getCommitBySha(commit.parent)
@@ -1115,15 +1113,17 @@ class ChangeStatusTask(Task):
             change.pending_status = False
             change.pending_status_message = None
             # Inside db session for rollback
-            if change.state == 'ABANDONED':
-                sync.post('changes/%s/abandon' % (change.id,),
-                          data)
-            elif change.state == 'NEW':
-                sync.post('changes/%s/restore' % (change.id,),
-                          data)
-            elif change.state == 'SUBMITTED':
-                sync.post('changes/%s/submit' % (change.id,), {})
-            sync.submitTask(SyncChangeTask(change.id, priority=self.priority))
+            if change.state == 'SUBMITTED':
+                sync.put('repos/%s/merge' % (change.change_id,), {})
+            # if change.state == 'ABANDONED':
+            #     sync.post('changes/%s/abandon' % (change.id,),
+            #               data)
+            # elif change.state == 'NEW':
+            #     sync.post('changes/%s/restore' % (change.id,),
+            #               data)
+            # elif change.state == 'SUBMITTED':
+            #     sync.post('changes/%s/submit' % (change.id,), {})
+            sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
 
 class SendCherryPickTask(Task):
     def __init__(self, cp_key, priority=NORMAL_PRIORITY):
@@ -1200,7 +1200,7 @@ class UploadReviewTask(Task):
     def run(self, sync):
         app = sync.app
 
-        submit = False
+        merge = False
         with app.db.getSession() as session:
             message = session.getMessage(self.message_key)
             if message is None:
@@ -1208,9 +1208,8 @@ class UploadReviewTask(Task):
                     self.message_key))
                 return
             change = message.commit.change
-            # TODO(mandre) figure out if `submit` action makes sense for github workflow
-            # if change.pending_status and change.state == 'SUBMITTED':
-            #     submit = True
+            if change.pending_status and change.state == 'SUBMITTED':
+                merge = True
         if not change.held:
             self.log.debug("Syncing %s to find out if it should be held" % (change.change_id,))
             t = SyncChangeTask(change.change_id)
@@ -1250,15 +1249,14 @@ class UploadReviewTask(Task):
             # Inside db session for rollback
             sync.post('repos/%s/reviews' % (change_id,),
                       data)
-        # TODO(mandre) figure out if `submit` action makes sense for github workflow
-        # if submit:
-        #     # In another db session in case submit fails after posting
-        #     # the message succeeds
-        #     with app.db.getSession() as session:
-        #         change = session.getChangeByChangeID(change_id)
-        #         change.pending_status = False
-        #         change.pending_status_message = None
-        #         sync.post('changes/%s/submit' % (change_id,), {})
+        if merge:
+            # In another db session in case merge fails after posting
+            # the message succeeds
+            with app.db.getSession() as session:
+                change = session.getChangeByChangeID(change_id)
+                change.pending_status = False
+                change.pending_status_message = None
+                sync.put('repos/%s/merge' % (change_id,), {})
         sync.submitTask(SyncChangeTask(change_id, priority=self.priority))
 
 class PruneDatabaseTask(Task):
