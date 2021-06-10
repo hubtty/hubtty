@@ -13,7 +13,7 @@
 # under the License.
 
 import sqlalchemy.sql.expression
-from sqlalchemy.sql.expression import and_, select, func
+from sqlalchemy.sql.expression import and_
 
 from hubtty.search import tokenizer, parser
 import hubtty.db

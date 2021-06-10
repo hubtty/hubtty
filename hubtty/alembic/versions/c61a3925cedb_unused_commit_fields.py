@@ -10,9 +10,6 @@ Create Date: 2021-03-06 11:58:51.626667
 revision = 'c61a3925cedb'
 down_revision = 'f3ceef330b1b'
 
-from alembic import op
-import sqlalchemy as sa
-
 from hubtty.dbsupport import sqlite_drop_columns
 
 
