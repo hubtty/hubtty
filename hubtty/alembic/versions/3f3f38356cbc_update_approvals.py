@@ -13,7 +13,7 @@ down_revision = '9ea887cbb620'
 from alembic import op
 import sqlalchemy as sa
 
-from hubtty.dbsupport import sqlite_alter_columns, sqlite_drop_columns
+from hubtty.dbsupport import sqlite_drop_columns
 
 def upgrade():
     sqlite_drop_columns('approval', ['value'])

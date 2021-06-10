@@ -13,7 +13,7 @@ down_revision = '3f3f38356cbc'
 from alembic import op
 import sqlalchemy as sa
 
-from hubtty.dbsupport import sqlite_alter_columns, sqlite_drop_columns
+from hubtty.dbsupport import sqlite_drop_columns
 
 
 def upgrade():

@@ -12,9 +12,6 @@ from hubtty.dbsupport import sqlite_drop_columns
 revision = '439753e172a0'
 down_revision = '4a2afc48dd09'
 
-from alembic import op
-import sqlalchemy as sa
-
 
 def upgrade():
     sqlite_drop_columns('commit', ['can_submit'])

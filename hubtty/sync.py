@@ -18,12 +18,10 @@ import errno
 import logging
 import math
 import os
-import re
 import threading
 import json
 import time
 import datetime
-import itertools
 
 import dateutil.parser
 try:
@@ -34,7 +32,6 @@ import requests
 import requests.utils
 import six
 from six.moves import queue
-from six.moves.urllib import parse as urlparse
 
 import hubtty.version
 from hubtty import gitrepo
@@ -224,10 +221,10 @@ class SyncAccountTask(Task):
         app = sync.app
         with app.db.getSession() as session:
             remote = sync.get('users/' + self.username)
-            account = session.getAccountByID(remote['id'],
-                                             remote.get('name'),
-                                             remote.get('login'),
-                                             remote.get('email'))
+            session.getAccountByID(remote['id'],
+                                   remote.get('name'),
+                                   remote.get('login'),
+                                   remote.get('email'))
 
 class SyncProjectListTask(Task):
     def __repr__(self):
@@ -676,7 +673,6 @@ class SyncChangeTask(Task):
             remote_commits[-1]['_hubtty_remote_checks_data'] = remote_checks_data
 
         fetches = collections.defaultdict(list)
-        parent_commits = set()
         with app.db.getSession() as session:
             change = session.getChangeByChangeID(self.change_id)
             account = session.getAccountByID(remote_change['user']['id'],
@@ -739,7 +735,6 @@ class SyncChangeTask(Task):
                     session.delete(commit)
 
             repo = gitrepo.get_repo(change.project.name, app.config)
-            new_commit = False
             for remote_commit in remote_commits:
                 commit = change.getCommitBySha(remote_commit['sha'])
                 # TODO: handle multiple parents
@@ -753,7 +748,6 @@ class SyncChangeTask(Task):
                                                  remote_commit['parents'][0]['sha'])
                     self.log.info("Created new commit %s for change %s in local DB.",
                                   commit.key, self.change_id)
-                    new_commit = True
             #     # TODO: handle multiple parents
             #     if commit.parent not in parent_commits:
             #         parent_commit = change.getCommitBySha(commit.parent)
@@ -792,7 +786,6 @@ class SyncChangeTask(Task):
             # change.setHashtags(remote_hashtags)
 
             # Commit reviews
-            new_message = False
             remote_pr_reviews.extend(remote_issue_comments)
             for remote_review in remote_pr_reviews:
 
@@ -804,8 +797,6 @@ class SyncChangeTask(Task):
                 if 'user' in remote_review:
                     account = session.getAccountByID(remote_review['user']['id'],
                                                      username=remote_review['user'].get('login'))
-                    if not app.isOwnAccount(account):
-                        new_message = True
                 else:
                     account = session.getSystemAccount()
 
@@ -1106,10 +1097,6 @@ class ChangeStatusTask(Task):
         app = sync.app
         with app.db.getSession() as session:
             change = session.getChange(self.change_key)
-            if change.pending_status_message:
-                data = dict(message=change.pending_status_message)
-            else:
-                data = {}
             change.pending_status = False
             change.pending_status_message = None
             # Inside db session for rollback

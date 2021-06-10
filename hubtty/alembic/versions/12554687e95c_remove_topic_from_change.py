@@ -11,7 +11,6 @@ revision = '12554687e95c'
 down_revision = '45d33eccc7a7'
 
 from alembic import op
-import sqlalchemy as sa
 
 from hubtty.dbsupport import sqlite_drop_columns
 
