@@ -994,6 +994,8 @@ class UploadReviewsTask(Task):
             #     sync.submitTask(SendCherryPickTask(c.key, self.priority))
             # for r in session.getPendingCommitMessages():
             #     sync.submitTask(ChangeCommitMessageTask(r.key, self.priority))
+            for c in session.getPendingMerges():
+                sync.submitTask(SendMergeTask(c.key, self.priority))
             for m in session.getPendingMessages():
                 sync.submitTask(UploadReviewTask(m.key, self.priority))
 
@@ -1113,16 +1115,12 @@ class ChangeStatusTask(Task):
             change.pending_status = False
             change.pending_status_message = None
             # Inside db session for rollback
-            if change.state == 'SUBMITTED':
-                sync.put('repos/%s/merge' % (change.change_id,), {})
-            # if change.state == 'ABANDONED':
-            #     sync.post('changes/%s/abandon' % (change.id,),
-            #               data)
-            # elif change.state == 'NEW':
-            #     sync.post('changes/%s/restore' % (change.id,),
-            #               data)
-            # elif change.state == 'SUBMITTED':
-            #     sync.post('changes/%s/submit' % (change.id,), {})
+            if change.state == 'ABANDONED':
+                sync.post('changes/%s/abandon' % (change.id,),
+                          data)
+            elif change.state == 'NEW':
+                sync.post('changes/%s/restore' % (change.id,),
+                          data)
             sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
 
 class SendCherryPickTask(Task):
@@ -1200,7 +1198,6 @@ class UploadReviewTask(Task):
     def run(self, sync):
         app = sync.app
 
-        merge = False
         with app.db.getSession() as session:
             message = session.getMessage(self.message_key)
             if message is None:
@@ -1208,8 +1205,6 @@ class UploadReviewTask(Task):
                     self.message_key))
                 return
             change = message.commit.change
-            if change.pending_status and change.state == 'SUBMITTED':
-                merge = True
         if not change.held:
             self.log.debug("Syncing %s to find out if it should be held" % (change.change_id,))
             t = SyncChangeTask(change.change_id)
@@ -1249,14 +1244,37 @@ class UploadReviewTask(Task):
             # Inside db session for rollback
             sync.post('repos/%s/reviews' % (change_id,),
                       data)
-        if merge:
-            # In another db session in case merge fails after posting
-            # the message succeeds
-            with app.db.getSession() as session:
-                change = session.getChangeByChangeID(change_id)
-                change.pending_status = False
-                change.pending_status_message = None
-                sync.put('repos/%s/merge' % (change_id,), {})
+        sync.submitTask(SyncChangeTask(change_id, priority=self.priority))
+
+class SendMergeTask(Task):
+    def __init__(self, pending_merge_key, priority=NORMAL_PRIORITY):
+        super(SendMergeTask, self).__init__(priority)
+        self.pending_merge_key = pending_merge_key
+
+    def __repr__(self):
+        return '<SendMergeTask %s>' % (self.pending_merge_key,)
+
+    def __eq__(self, other):
+        if (other.__class__ == self.__class__ and
+            other.pending_merge_key == self.pending_merge_key):
+            return True
+        return False
+
+    def run(self, sync):
+        app = sync.app
+        change_id = None
+        with app.db.getSession() as session:
+            pm = session.getPendingMerge(self.pending_merge_key)
+            data = dict(sha=pm.sha, merge_method=pm.merge_method)
+            if pm.commit_title:
+                data['commit_title'] = pm.commit_title
+            if pm.commit_message:
+                data['commit_message'] = pm.commit_message
+            change_id = pm.change.change_id
+            session.delete(pm)
+            # Inside db session for rollback
+            sync.put('repos/%s/merge' % (change_id,), data)
+
         sync.submitTask(SyncChangeTask(change_id, priority=self.priority))
 
 class PruneDatabaseTask(Task):

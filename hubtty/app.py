@@ -848,9 +848,10 @@ class App(object):
             change.reviewed = True
             self.project_cache.clear(change.project)
         if merge:
-            change.status = 'SUBMITTED'
-            change.pending_status = True
-            change.pending_status_message = None
+            sha = change.commits[-1].sha
+            pending_merge = change.createPendingMerge(sha,'merge')
+            self.sync.submitTask(
+                    sync.SendMergeTask(pending_merge.key, sync.HIGH_PRIORITY))
         return message_key
 
 

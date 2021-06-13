@@ -1087,7 +1087,7 @@ class ChangeView(urwid.WidgetWrap):
         self.refresh()
 
     def doMergeChange(self):
-        change_key = None
+        pending_merge = None
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
 
@@ -1098,13 +1098,12 @@ class ChangeView(urwid.WidgetWrap):
                 self.app.popup(dialog)
                 return
 
-            change.state = 'SUBMITTED'
-            change.pending_status = True
-            change.pending_status_message = None
-            change_key = change.key
+            sha = change.commits[-1].sha
+            pending_merge = change.createPendingMerge(sha,'merge')
 
-        self.app.sync.submitTask(
-            sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
+        if pending_merge:
+            self.app.sync.submitTask(
+                    sync.SendMergeTask(pending_merge.key, sync.HIGH_PRIORITY))
         self.refresh()
 
     def editHashtags(self):
