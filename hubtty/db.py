@@ -165,6 +165,15 @@ pending_cherry_pick_table = Table(
     Column('branch', String(255), nullable=False),
     Column('message', Text, nullable=False),
     )
+pending_merge_table = Table(
+    'pending_merge', metadata,
+    Column('key', Integer, primary_key=True),
+    Column('change_key', Integer, ForeignKey("change.key"), index=True),
+    Column('commit_title', String(255)),
+    Column('commit_message', Text),
+    Column('sha', String(255), nullable=False),
+    Column('merge_method', String(255), nullable=False),
+    )
 sync_query_table = Table(
     'sync_query', metadata,
     Column('key', Integer, primary_key=True),
@@ -370,6 +379,15 @@ class Change(object):
             if hashtag not in current_hashtags:
                 self.createHashtag(hashtag)
 
+    def createPendingMerge(self, *args, **kw):
+        session = Session.object_session(self)
+        args = [self] + list(args)
+        pm = PendingMerge(*args, **kw)
+        self.pending_merge.append(pm)
+        session.add(pm)
+        session.flush()
+        return pm
+
     def isValid(self):
         # This might happen when the sync was partial, i.e. we hit rate limit
         # or the connection dropped
@@ -525,6 +543,15 @@ class PendingCherryPick(object):
         self.branch = branch
         self.message = message
 
+class PendingMerge(object):
+    def __init__(self, change, sha, merge_method, commit_title=None,
+            commit_message=None):
+        self.change_key = change.key
+        self.commit_title = commit_title
+        self.commit_message = commit_message
+        self.sha = sha
+        self.merge_method = merge_method
+
 class SyncQuery(object):
     def __init__(self, name):
         self.name = name
@@ -623,6 +650,8 @@ mapper(Change, change_table, properties=dict(
         approvals=relationship(Approval, backref='change',
                                order_by=approval_table.c.state,
                                cascade='all, delete-orphan'),
+        pending_merge=relationship(PendingMerge, backref='change',
+                                   cascade='all, delete-orphan'),
         draft_approvals=relationship(Approval,
                                      primaryjoin=and_(change_table.c.key==approval_table.c.change_key,
                                                       approval_table.c.draft==True),
@@ -669,6 +698,7 @@ mapper(Comment, comment_table, properties=dict(
 mapper(Approval, approval_table, properties=dict(
         reviewer=relationship(Account)))
 mapper(PendingCherryPick, pending_cherry_pick_table)
+mapper(PendingMerge, pending_merge_table)
 mapper(SyncQuery, sync_query_table)
 mapper(Hashtag, hashtag_table)
 mapper(Server, server_table, properties=dict(
@@ -849,6 +879,12 @@ class DatabaseSession(object):
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
+    def getPendingMerge(self, key):
+        try:
+            return self.session().query(PendingMerge).filter_by(key=key).one()
+        except sqlalchemy.orm.exc.NoResultFound:
+            return None
+
     def getChanges(self, query, unreviewed=False, sort_by='number'):
         self.database.log.debug("Search query: %s sort: %s" % (query, sort_by))
         q = self.session().query(Change).filter(self.search.parse(query))
@@ -962,6 +998,9 @@ class DatabaseSession(object):
 
     def getPendingCommitMessages(self):
         return self.session().query(Commit).filter_by(pending_message=True).all()
+
+    def getPendingMerges(self):
+        return self.session().query(PendingMerge).all()
 
     def getAccounts(self):
         return self.session().query(Account).all()

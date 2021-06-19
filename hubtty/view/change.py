@@ -181,6 +181,71 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             return None
         return key
 
+class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
+    signals = ['merge', 'cancel']
+    def __init__(self, app, change, title='', message=''):
+        self.app = app
+        merge_button = mywid.FixedButton(u'Merge')
+        cancel_button = mywid.FixedButton(u'Cancel')
+        urwid.connect_signal(merge_button, 'click',
+            lambda button:self._emit('merge'))
+        urwid.connect_signal(cancel_button, 'click',
+            lambda button:self._emit('cancel'))
+
+        rows = []
+        merge_method = {
+            'merge': 'Create a merge commit',
+            'squash': 'Squash and merge',
+            'rebase': 'Rebase and merge'
+        }
+        self.button_group = []
+        buttons = []
+        if change.canMerge():
+            buttons.append(('pack', merge_button))
+        buttons.append(('pack', cancel_button))
+        buttons = urwid.Columns(buttons, dividechars=2)
+        default = 'merge'
+        rows.append(urwid.Text('Merge method:'))
+        for method in merge_method:
+            b = urwid.RadioButton(self.button_group, merge_method[method], state=(method == default))
+            b._value = method
+            rows.append(b)
+        rows.append(urwid.Divider())
+        self.commit_title = mywid.MyEdit(u"Commit title (Optional): \n", edit_text=title,
+                                    multiline=False, ring=app.ring)
+        rows.append(self.commit_title)
+        self.commit_message = mywid.MyEdit(u"Commit message (Optional): \n", edit_text=message,
+                                    multiline=True, ring=app.ring)
+        rows.append(self.commit_message)
+        rows.append(urwid.Divider())
+        rows.append(buttons)
+        pile = urwid.Pile(rows)
+        fill = urwid.Filler(pile, valign='top')
+        super(MergeDialog, self).__init__(urwid.LineBox(fill, 'Merge Change'))
+
+    def getValues(self):
+        strategy = ''
+        for button in self.button_group:
+            if button.state:
+                strategy = button._value
+        title = self.commit_title.edit_text.strip()
+        if title == '':
+            title = None
+        message = self.commit_message.edit_text.strip()
+        if message == '':
+            message = None
+        return (strategy, title, message)
+
+    def keypress(self, size, key):
+        if not self.app.input_buffer:
+            key = super(MergeDialog, self).keypress(size, key)
+        keys = self.app.input_buffer + [key]
+        commands = self.app.config.keymap.getCommands(keys)
+        if keymap.PREV_SCREEN in commands:
+            self._emit('cancel')
+            return None
+        return key
+
 class ReviewButton(mywid.FixedButton):
     def __init__(self, commit_row):
         super(ReviewButton, self).__init__(('commit-button', u'Review'))
@@ -206,8 +271,10 @@ class ReviewButton(mywid.FixedButton):
     def closeReview(self, upload, merge):
         approval, message = self.dialog.getValues()
         self.change_view.saveReview(self.commit_row.commit_key, approval,
-                                    message, upload, merge)
+                                    message, upload, False)
         self.change_view.app.backScreen()
+        if merge:
+            self.change_view.mergeChange()
 
 class CommitRow(urwid.WidgetWrap):
     commit_focus_map = {
@@ -254,9 +321,6 @@ class CommitRow(urwid.WidgetWrap):
                                      on_press=self.checkout),
                    mywid.FixedButton(('commit-button', "Local Cherry-Pick"),
                                      on_press=self.cherryPick)]
-        if self.can_merge:
-            buttons.append(mywid.FixedButton(('commit-button', "Merge"),
-                                             on_press=lambda x: self.change_view.doMergeChange()))
 
         buttons = [('pack', urwid.AttrMap(b, None, focus_map=focus_map)) for b in buttons]
         buttons = urwid.Columns(buttons + [urwid.Text('')], dividechars=2)
@@ -959,7 +1023,7 @@ class ChangeView(urwid.WidgetWrap):
             self.app.status.update()
             return None
         if keymap.MERGE_CHANGE in commands:
-            self.doMergeChange()
+            self.mergeChange()
             return None
         if keymap.EDIT_HASHTAGS in commands:
             self.editHashtags()
@@ -1086,25 +1150,42 @@ class ChangeView(urwid.WidgetWrap):
         self.app.backScreen()
         self.refresh()
 
-    def doMergeChange(self):
-        change_key = None
+    def mergeChange(self):
+        with self.app.db.getSession() as session:
+            change = session.getChange(self.change_key)
+            dialog = MergeDialog(self.app, change)
+        urwid.connect_signal(dialog, 'cancel',
+                    lambda button: self.app.backScreen())
+        urwid.connect_signal(dialog, 'merge', lambda button:
+                                 self.doMergeChange(dialog))
+        self.app.popup(dialog,
+                       relative_width=50, relative_height=75,
+                       min_width=60, min_height=20)
+
+    def doMergeChange(self, dialog):
+        pending_merge = None
+
+        strategy, title, message = dialog.getValues()
+
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
 
             if not change.canMerge():
-                dialog = mywid.MessageDialog('Error', 'You cannot merge this change.')
-                urwid.connect_signal(dialog, 'close',
+                error_dialog = mywid.MessageDialog('Error', 'You cannot merge this change.')
+                urwid.connect_signal(error_dialog, 'close',
                     lambda button: self.app.backScreen())
-                self.app.popup(dialog)
+                self.app.popup(error_dialog)
                 return
 
-            change.state = 'SUBMITTED'
-            change.pending_status = True
-            change.pending_status_message = None
-            change_key = change.key
+            sha = change.commits[-1].sha
+            pending_merge = change.createPendingMerge(sha, strategy,
+                    commit_title=title, commit_message=message)
 
-        self.app.sync.submitTask(
-            sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
+        if pending_merge:
+            self.app.sync.submitTask(
+                    sync.SendMergeTask(pending_merge.key, sync.HIGH_PRIORITY))
+
+        self.app.backScreen()
         self.refresh()
 
     def editHashtags(self):
