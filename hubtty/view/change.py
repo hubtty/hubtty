@@ -1170,10 +1170,10 @@ class ChangeView(urwid.WidgetWrap):
             change = session.getChange(self.change_key)
 
             if not change.canMerge():
-                dialog = mywid.MessageDialog('Error', 'You cannot merge this change.')
-                urwid.connect_signal(dialog, 'close',
+                error_dialog = mywid.MessageDialog('Error', 'You cannot merge this change.')
+                urwid.connect_signal(error_dialog, 'close',
                     lambda button: self.app.backScreen())
-                self.app.popup(dialog)
+                self.app.popup(error_dialog)
                 return
 
             sha = change.commits[-1].sha
