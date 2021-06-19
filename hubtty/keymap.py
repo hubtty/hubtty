@@ -121,7 +121,7 @@ DEFAULT_KEYMAP = {
     NEXT_CHANGE: 'n',
     PREV_CHANGE: 'p',
     TOGGLE_HIDDEN_COMMENTS: 't',
-    ABANDON_CHANGE: 'ctrl a',
+    ABANDON_CHANGE: 'meta c',
     RESTORE_CHANGE: 'ctrl e',
     REBASE_CHANGE: 'ctrl b',
     CHERRY_PICK_CHANGE: 'ctrl x',
