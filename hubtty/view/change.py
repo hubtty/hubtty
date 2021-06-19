@@ -321,9 +321,6 @@ class CommitRow(urwid.WidgetWrap):
                                      on_press=self.checkout),
                    mywid.FixedButton(('commit-button', "Local Cherry-Pick"),
                                      on_press=self.cherryPick)]
-        if self.can_merge:
-            buttons.append(mywid.FixedButton(('commit-button', "Merge"),
-                                             on_press=lambda x: self.change_view.mergeChange()))
 
         buttons = [('pack', urwid.AttrMap(b, None, focus_map=focus_map)) for b in buttons]
         buttons = urwid.Columns(buttons + [urwid.Text('')], dividechars=2)
