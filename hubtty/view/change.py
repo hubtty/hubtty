@@ -1154,7 +1154,8 @@ class ChangeView(urwid.WidgetWrap):
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
             dialog = MergeDialog(self.app, change)
-        urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
+        urwid.connect_signal(dialog, 'cancel',
+                    lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'merge', lambda button:
                                  self.doMergeChange(dialog))
         self.app.popup(dialog,
