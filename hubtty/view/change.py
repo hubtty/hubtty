@@ -712,7 +712,7 @@ class ChangeView(urwid.WidgetWrap):
             self.author_label.text.set_text(('change-data', author_string))
             self.project_label.text.set_text(('change-data', change.project.name))
             self.branch_label.set_text(('change-data', change.branch))
-            self.labels_label.set_text(('change-data', ' '.join([x.name for x in change.labels])))
+            self.labels_label.set_text(('change-data', self.labels))
             self.created_label.set_text(('change-data', str(self.app.time(change.created))))
             self.updated_label.set_text(('change-data', str(self.app.time(change.updated))))
             self.status_label.set_text(('change-data', change.state))
