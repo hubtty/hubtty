@@ -208,6 +208,15 @@ check_table = Table(
     Column('created', DateTime, nullable=False),
     Column('updated', DateTime, nullable=False),
     )
+label_table = Table(
+    'label', metadata,
+    Column('key', Integer, primary_key=True),
+    Column('project_key', Integer, ForeignKey("project.key"), index=True),
+    Column('id', Integer, nullable=False, index=True),
+    Column('name', String(length=255), nullable=False),
+    Column('color', String(length=8), nullable=False),
+    Column('description', Text),
+    )
 
 
 class Account(object):
@@ -241,6 +250,15 @@ class Project(object):
         session.add(b)
         session.flush()
         return b
+
+    def createLabel(self, *args, **kw):
+        session = Session.object_session(self)
+        args = [self] + list(args)
+        l = Label(*args, **kw)
+        self.labels.append(l)
+        session.add(l)
+        session.flush()
+        return l
 
 class Hashtag(object):
     def __init__(self, change, name):
@@ -280,6 +298,14 @@ class Topic(object):
                 session.delete(pt)
         self.projects.remove(project)
         session.flush()
+
+class Label(object):
+    def __init__(self, project, id, name, color, description=None):
+        self.project_key = project.key
+        self.id = id
+        self.name = name
+        self.color = color
+        self.description = description
 
 class Change(object):
     def __init__(self, project, id, author, number, branch, change_id,
@@ -612,6 +638,9 @@ mapper(Project, project_table, properties=dict(
     changes=relationship(Change, backref='project',
                          order_by=change_table.c.number,
                          cascade='all, delete-orphan'),
+    labels=relationship(Label, backref='project',
+                          order_by=label_table.c.name,
+                          cascade='all, delete-orphan'),
     topics=relationship(Topic,
                         secondary=project_topic_table,
                         order_by=topic_table.c.name,
@@ -705,6 +734,7 @@ mapper(Server, server_table, properties=dict(
     own_account=relationship(Account)
     ))
 mapper(Check, check_table)
+mapper(Label, label_table)
 
 
 def match(expr, item):
@@ -1049,6 +1079,12 @@ class DatabaseSession(object):
             self.database.own_account_key = server.own_account.key
         try:
             return self.session().query(Account).filter_by(key=self.database.own_account_key).one()
+        except sqlalchemy.orm.exc.NoResultFound:
+            return None
+
+    def getLabel(self, label_id):
+        try:
+            return self.session().query(Label).filter_by(id=label_id).one()
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 

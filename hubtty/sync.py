@@ -393,6 +393,27 @@ class SyncProjectTask(Task):
                 else:
                     full_sync.append(project.name)
 
+                # Sync repo labels
+                remote_labels = sync.get('repos/%s/labels' % (project.name,))
+                for remote_label in remote_labels:
+                    self.log.error("label %s", remote_label)
+                    label = session.getLabel(remote_label['id'])
+                    if not label:
+                        self.log.info("Created label %s for project %s", remote_label['name'], project.name)
+                        project.createLabel(remote_label['id'], remote_label['name'],
+                                remote_label['color'], remote_label['description'])
+                    else:
+                        label.name = remote_label['name']
+                        label.color = remote_label['color']
+                        label.description = remote_label['description']
+
+                # Delete old labels
+                remote_label_ids = [l['id'] for l in remote_labels]
+                for l in project.labels:
+                    if l.id not in remote_label_ids:
+                        self.log.info("Deleted label %s", l.name)
+                        session.delete(l)
+
             def sync_projects(projects, query):
                 for project_name in projects:
                     query += ' repo:%s' % project_name
