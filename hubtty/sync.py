@@ -752,6 +752,15 @@ class SyncChangeTask(Task):
             change.merged = remote_change['merged']
             change.mergeable = remote_change.get('mergeable') or False
 
+            for label in remote_change['labels']:
+                l = session.getLabel(label['id'])
+                if l and l not in change.labels:
+                    change.addLabel(l)
+            remote_label_ids = [l['id'] for l in remote_change['labels']]
+            for label in change.labels:
+                if label.id not in remote_label_ids:
+                    change.removeLabel(label)
+
             # Delete commits that no longer belong to the change
             remote_commits_sha = [c['sha'] for c in remote_commits]
             for commit in change.commits:

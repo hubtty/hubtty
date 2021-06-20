@@ -217,6 +217,13 @@ label_table = Table(
     Column('color', String(length=8), nullable=False),
     Column('description', Text),
     )
+change_label_table = Table(
+    'change_label', metadata,
+    Column('key', Integer, primary_key=True),
+    Column('change_key', Integer, ForeignKey("change.key"), index=True),
+    Column('label_key', Integer, ForeignKey("label.key"), index=True),
+    UniqueConstraint('change_key', 'label_key', name='change_key_label_key_const'),
+    )
 
 
 class Account(object):
@@ -306,6 +313,11 @@ class Label(object):
         self.name = name
         self.color = color
         self.description = description
+
+class ChangeLabel(object):
+    def __init__(self, change, label):
+        self.change_key = change.key
+        self.label_key = label.key
 
 class Change(object):
     def __init__(self, project, id, author, number, branch, change_id,
@@ -413,6 +425,24 @@ class Change(object):
         session.add(pm)
         session.flush()
         return pm
+
+    def addLabel(self, label):
+        session = Session.object_session(self)
+        cl = ChangeLabel(self, label)
+        self.change_labels.append(cl)
+        self.labels.append(label)
+        session.add(cl)
+        session.flush()
+
+    def removeLabel(self, label):
+        session = Session.object_session(self)
+
+        for cl in self.change_labels:
+            if cl.label_key == label.key:
+                self.change_labels.remove(cl)
+                session.delete(cl)
+        self.labels.remove(label)
+        session.flush()
 
     def isValid(self):
         # This might happen when the sync was partial, i.e. we hit rate limit
@@ -681,6 +711,11 @@ mapper(Change, change_table, properties=dict(
                                cascade='all, delete-orphan'),
         pending_merge=relationship(PendingMerge, backref='change',
                                    cascade='all, delete-orphan'),
+        labels=relationship(Label,
+                            secondary=change_label_table,
+                            order_by=label_table.c.name,
+                            viewonly=True),
+        change_labels=relationship(ChangeLabel),
         draft_approvals=relationship(Approval,
                                      primaryjoin=and_(change_table.c.key==approval_table.c.change_key,
                                                       approval_table.c.draft==True),
@@ -735,6 +770,7 @@ mapper(Server, server_table, properties=dict(
     ))
 mapper(Check, check_table)
 mapper(Label, label_table)
+mapper(ChangeLabel, change_label_table)
 
 
 def match(expr, item):
