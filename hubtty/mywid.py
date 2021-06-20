@@ -61,6 +61,13 @@ class FixedRadioButton(urwid.RadioButton):
     def pack(self, size, focus=False):
         return (len(self.get_label())+4, 1)
 
+class FixedCheckBox(urwid.CheckBox):
+    def sizing(self):
+        return frozenset([urwid.FIXED])
+
+    def pack(self, size, focus=False):
+        return (len(self.get_label())+4, 1)
+
 class TableColumn(urwid.Pile):
     def pack(self, size, focus=False):
         maxcol = size[0]

@@ -85,18 +85,12 @@ change_table = Table(
     Column('pending_rebase', Boolean, index=True, nullable=False),
     Column('pending_starred', Boolean, index=True, nullable=False),
     Column('pending_status', Boolean, index=True, nullable=False),
-    Column('pending_hashtags', Boolean, index=True, nullable=False),
+    Column('pending_labels', Boolean, index=True, nullable=False),
     Column('pending_status_message', Text),
     Column('last_seen', DateTime, index=True),
     Column('outdated', Boolean, index=True, nullable=False),
     Column('merged', Boolean, index=True, nullable=False),
     Column('mergeable', Boolean, index=True, nullable=False),
-    )
-hashtag_table = Table(
-    'hashtag', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('change_key', Integer, ForeignKey("change.key"), index=True),
-    Column('name', String(length=255), index=True, nullable=False),
     )
 commit_table = Table(
     'commit', metadata,
@@ -267,11 +261,6 @@ class Project(object):
         session.flush()
         return l
 
-class Hashtag(object):
-    def __init__(self, change, name):
-        self.change_key = change.key
-        self.name = name
-
 class Branch(object):
     def __init__(self, project, name):
         self.project_key = project.key
@@ -325,7 +314,7 @@ class Change(object):
                  html_url, merged, mergeable, hidden=False, reviewed=False,
                  starred=False, held=False, pending_rebase=False,
                  pending_starred=False, pending_status=False,
-                 pending_status_message=None, pending_hashtags=False,
+                 pending_status_message=None, pending_labels=False,
                  outdated=False):
         self.project_key = project.key
         self.account_key = author.key
@@ -346,7 +335,7 @@ class Change(object):
         self.starred = starred
         self.held = held
         self.pending_rebase = pending_rebase
-        self.pending_hashtags = pending_hashtags
+        self.pending_labels = pending_labels
         self.pending_starred = pending_starred
         self.pending_status = pending_status
         self.pending_status_message = pending_status_message
@@ -397,25 +386,6 @@ class Change(object):
         session.add(l)
         session.flush()
         return l
-
-    def createHashtag(self, *args, **kw):
-        session = Session.object_session(self)
-        args = [self] + list(args)
-        h = Hashtag(*args, **kw)
-        self.hashtags.append(h)
-        session.add(h)
-        session.flush()
-        return h
-
-    def setHashtags(self, tags):
-        session = Session.object_session(self)
-        current_hashtags = [h.name for h in self.hashtags]
-        for hashtag in self.hashtags:
-            if hashtag.name not in tags:
-                session.delete(hashtag)
-        for hashtag in tags:
-            if hashtag not in current_hashtags:
-                self.createHashtag(hashtag)
 
     def createPendingMerge(self, *args, **kw):
         session = Session.object_session(self)
@@ -699,8 +669,6 @@ mapper(Topic, topic_table, properties=dict(
 mapper(ProjectTopic, project_topic_table)
 mapper(Change, change_table, properties=dict(
         author=relationship(Account),
-        hashtags=relationship(Hashtag, backref='change',
-                               cascade='all, delete-orphan'),
         commits=relationship(Commit, backref='change',
                              cascade='all, delete-orphan'),
         messages=relationship(Message, backref='change',
@@ -764,7 +732,6 @@ mapper(Approval, approval_table, properties=dict(
 mapper(PendingCherryPick, pending_cherry_pick_table)
 mapper(PendingMerge, pending_merge_table)
 mapper(SyncQuery, sync_query_table)
-mapper(Hashtag, hashtag_table)
 mapper(Server, server_table, properties=dict(
     own_account=relationship(Account)
     ))
@@ -1047,8 +1014,8 @@ class DatabaseSession(object):
     def getPendingMessages(self):
         return self.session().query(Message).filter_by(pending=True).all()
 
-    def getPendingHashtags(self):
-        return self.session().query(Change).filter_by(pending_hashtags=True).all()
+    def getPendingLabels(self):
+        return self.session().query(Change).filter_by(pending_labels=True).all()
 
     def getPendingRebases(self):
         return self.session().query(Change).filter_by(pending_rebase=True).all()

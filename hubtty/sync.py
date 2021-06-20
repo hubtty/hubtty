@@ -396,7 +396,6 @@ class SyncProjectTask(Task):
                 # Sync repo labels
                 remote_labels = sync.get('repos/%s/labels' % (project.name,))
                 for remote_label in remote_labels:
-                    self.log.error("label %s", remote_label)
                     label = session.getLabel(remote_label['id'])
                     if not label:
                         self.log.info("Created label %s for project %s", remote_label['name'], project.name)
@@ -818,9 +817,6 @@ class SyncChangeTask(Task):
                 if remote_commit.get('_hubtty_remote_checks_data'):
                     self._updateChecks(session, commit, remote_commit['_hubtty_remote_checks_data'])
 
-            # remote_hashtags = remote_change.get('hashtags', [])
-            # change.setHashtags(remote_hashtags)
-
             # Commit reviews
             new_message = False
             remote_pr_reviews.extend(remote_issue_comments)
@@ -1012,8 +1008,8 @@ class UploadReviewsTask(Task):
         app = sync.app
         with app.db.getSession() as session:
             # TODO(mandre) Uncomment when implemented
-            # for c in session.getPendingHashtags():
-            #     sync.submitTask(SetHashtagsTask(c.key, self.priority))
+            for c in session.getPendingLabels():
+                sync.submitTask(SetLabelsTask(c.key, self.priority))
             # for c in session.getPendingRebases():
             #     sync.submitTask(RebaseChangeTask(c.key, self.priority))
             # for c in session.getPendingStatusChanges():
@@ -1029,13 +1025,13 @@ class UploadReviewsTask(Task):
             for m in session.getPendingMessages():
                 sync.submitTask(UploadReviewTask(m.key, self.priority))
 
-class SetHashtagsTask(Task):
+class SetLabelsTask(Task):
     def __init__(self, change_key, priority=NORMAL_PRIORITY):
-        super(SetHashtagsTask, self).__init__(priority)
+        super(SetLabelsTask, self).__init__(priority)
         self.change_key = change_key
 
     def __repr__(self):
-        return '<SetHashtagsTask %s>' % (self.change_key,)
+        return '<SetLabelsTask %s>' % (self.change_key,)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -1046,29 +1042,17 @@ class SetHashtagsTask(Task):
     def run(self, sync):
         app = sync.app
 
+        # Set labels using local ones as source of truth
         with app.db.getSession() as session:
             change = session.getChange(self.change_key)
-            local_hashtags = [h.name for h in change.hashtags]
+            local_labels = [l.name for l in change.labels]
 
-        remote_change = sync.get('changes/%s' % change.id)
-        remote_hashtags = remote_change.get('hashtags', [])
-
-        with app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            remove = []
-            add = []
-            for hashtag in change.hashtags:
-                if hashtag.name not in remote_hashtags:
-                    add.append(hashtag.name)
-            for hashtag in remote_hashtags:
-                if hashtag not in local_hashtags:
-                    remove.append(hashtag)
-            data = dict(add=add, remove=remove)
-            change.pending_hashtags = False
+            data = dict(labels=local_labels)
+            change.pending_labels = False
             # Inside db session for rollback
-            sync.post('changes/%s/hashtags' % (change.id,),
-                     data)
-            sync.submitTask(SyncChangeTask(change.id, priority=self.priority))
+            sync.put(('repos/%s/labels' % change.change_id).replace('/pulls/', '/issues/'),
+                    data)
+            sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
 
 class RebaseChangeTask(Task):
     def __init__(self, change_key, priority=NORMAL_PRIORITY):
