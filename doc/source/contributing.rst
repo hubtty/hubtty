@@ -7,4 +7,4 @@ contents of the CONTRIBUTING.rst file.
 Bugs
 ~~~~
 
-Bugs are handled at: https://storyboard.openstack.org/#!/project/698
+Bugs are handled at: https://github.com/hubtty/hubtty/issues
