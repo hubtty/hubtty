@@ -53,8 +53,8 @@ SEARCH_RESULTS = 'search results'
 NEXT_CHANGE = 'next change'
 PREV_CHANGE = 'previous change'
 TOGGLE_HIDDEN_COMMENTS = 'toggle hidden comments'
-ABANDON_CHANGE = 'abandon change'
-RESTORE_CHANGE = 'restore change'
+CLOSE_CHANGE = 'close change'
+REOPEN_CHANGE = 'reopen change'
 REBASE_CHANGE = 'rebase change'
 CHERRY_PICK_CHANGE = 'cherry pick change'
 REFRESH = 'refresh'
@@ -121,8 +121,8 @@ DEFAULT_KEYMAP = {
     NEXT_CHANGE: 'n',
     PREV_CHANGE: 'p',
     TOGGLE_HIDDEN_COMMENTS: 't',
-    ABANDON_CHANGE: 'meta c',
-    RESTORE_CHANGE: 'ctrl e',
+    CLOSE_CHANGE: 'meta c',
+    REOPEN_CHANGE: 'ctrl e',
     REBASE_CHANGE: 'ctrl b',
     CHERRY_PICK_CHANGE: 'ctrl x',
     REFRESH: 'ctrl r',

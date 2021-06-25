@@ -1129,9 +1129,9 @@ class ChangeStatusTask(Task):
             change.pending_status = False
             change.pending_status_message = None
             # Inside db session for rollback
-            if change.state == 'ABANDONED':
+            if change.state == 'closed':
                 sync.patch('repos/%s' % (change.change_id,), {'state': 'close'})
-            elif change.state == 'NEW':
+            elif change.state == 'open':
                 sync.patch('repos/%s' % (change.change_id,), {'state': 'open'})
             sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
 
