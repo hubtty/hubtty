@@ -318,10 +318,10 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
              "Toggle the process mark for the currently selected change"),
             (keymap.REFINE_CHANGE_SEARCH,
              "Refine the current search query"),
-            # (keymap.ABANDON_CHANGE,
-            #  "Abandon the marked changes"),
-            # (keymap.RESTORE_CHANGE,
-            #  "Restore the marked changes"),
+            (keymap.CLOSE_CHANGE,
+             "Close the marked pull requests"),
+            (keymap.REOPEN_CHANGE,
+             "Reopen the marked pull requests"),
             (keymap.REFRESH,
              refresh_help),
             (keymap.REVIEW,
@@ -704,12 +704,12 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             default = self.getQueryString()
             self.app.searchDialog(default)
             return True
-        # if keymap.ABANDON_CHANGE in commands:
-        #     self.abandonChange()
-        #     return True
-        # if keymap.RESTORE_CHANGE in commands:
-        #     self.restoreChange()
-        #     return True
+        if keymap.CLOSE_CHANGE in commands:
+            self.closeChange()
+            return True
+        if keymap.REOPEN_CHANGE in commands:
+            self.reopenChange()
+            return True
         if keymap.INTERACTIVE_SEARCH in commands:
             self.searchStart()
             return True
@@ -753,35 +753,35 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
         self.refresh()
         self.app.backScreen()
 
-    # def abandonChange(self):
-    #     dialog = mywid.TextEditDialog(u'Abandon Change', u'Abandon message:',
-    #                                   u'Abandon Change', u'')
-    #     urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
-    #     urwid.connect_signal(dialog, 'save', lambda button:
-    #                              self.doAbandonRestoreChange(dialog, 'ABANDONED'))
-    #     self.app.popup(dialog)
+    def closeChange(self):
+        dialog = mywid.TextEditDialog(u'Close pull request', u'Message:',
+                                      u'Close pull request', u'')
+        urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
+        urwid.connect_signal(dialog, 'save', lambda button:
+                                 self.doCloseReopenChange(dialog, 'closed'))
+        self.app.popup(dialog)
 
-    # def restoreChange(self):
-    #     dialog = mywid.TextEditDialog(u'Restore Change', u'Restore message:',
-    #                                   u'Restore Change', u'')
-    #     urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
-    #     urwid.connect_signal(dialog, 'save', lambda button:
-    #                          self.doAbandonRestoreChange(dialog, 'NEW'))
-    #     self.app.popup(dialog)
+    def reopenChange(self):
+        dialog = mywid.TextEditDialog(u'Reopen pull request', u'Message:',
+                                      u'Reopen pull request', u'')
+        urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
+        urwid.connect_signal(dialog, 'save', lambda button:
+                             self.doCloseReopenChange(dialog, 'open'))
+        self.app.popup(dialog)
 
-    # def doAbandonRestoreChange(self, dialog, state):
-    #     rows = [row for row in self.change_rows.values() if row.mark]
-    #     if not rows:
-    #         pos = self.listbox.focus_position
-    #         rows = [self.listbox.body[pos]]
-    #     change_keys = [row.change_key for row in rows]
-    #     with self.app.db.getSession() as session:
-    #         for change_key in change_keys:
-    #             change = session.getChange(change_key)
-    #             change.state = state
-    #             change.pending_status = True
-    #             change.pending_status_message = dialog.entry.edit_text
-    #             self.app.sync.submitTask(
-    #                 sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
-    #     self.app.backScreen()
-    #     self.refresh()
+    def doCloseReopenChange(self, dialog, state):
+        rows = [row for row in self.change_rows.values() if row.mark]
+        if not rows:
+            pos = self.listbox.focus_position
+            rows = [self.listbox.body[pos]]
+        change_keys = [row.change_key for row in rows]
+        with self.app.db.getSession() as session:
+            for change_key in change_keys:
+                change = session.getChange(change_key)
+                change.state = state
+                change.pending_status = True
+                change.pending_status_message = dialog.entry.edit_text
+                self.app.sync.submitTask(
+                    sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
+        self.app.backScreen()
+        self.refresh()

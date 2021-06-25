@@ -1123,18 +1123,16 @@ class ChangeStatusTask(Task):
         with app.db.getSession() as session:
             change = session.getChange(self.change_key)
             if change.pending_status_message:
-                data = dict(message=change.pending_status_message)
-            else:
-                data = {}
+                sync.post(('repos/%s/comments' % change.change_id).replace('/pulls/', '/issues/'),
+                        {'body': change.pending_status_message})
+
             change.pending_status = False
             change.pending_status_message = None
             # Inside db session for rollback
-            if change.state == 'ABANDONED':
-                sync.post('changes/%s/abandon' % (change.id,),
-                          data)
-            elif change.state == 'NEW':
-                sync.post('changes/%s/restore' % (change.id,),
-                          data)
+            if change.state == 'closed':
+                sync.patch('repos/%s' % (change.change_id,), {'state': 'close'})
+            elif change.state == 'open':
+                sync.patch('repos/%s' % (change.change_id,), {'state': 'open'})
             sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
 
 class SendCherryPickTask(Task):
@@ -1534,6 +1532,17 @@ class Sync(object):
         self.log.debug('PUT: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.put(url, data=json.dumps(data).encode('utf8'),
+                             timeout=TIMEOUT,
+                             headers = {'Content-Type': 'application/json;charset=UTF-8',
+                                        'User-Agent': self.user_agent})
+        self.checkResponse(r)
+        self.log.debug('Received: %s' % (r.text,))
+
+    def patch(self, path, data):
+        url = self.url(path)
+        self.log.debug('PATCH: %s' % (url,))
+        self.log.debug('data: %s' % (data,))
+        r = self.session.patch(url, data=json.dumps(data).encode('utf8'),
                              timeout=TIMEOUT,
                              headers = {'Content-Type': 'application/json;charset=UTF-8',
                                         'User-Agent': self.user_agent})

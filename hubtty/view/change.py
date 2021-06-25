@@ -538,14 +538,14 @@ class ChangeView(urwid.WidgetWrap):
              "Toggle the starred flag for the current change"),
             (keymap.LOCAL_CHERRY_PICK,
              "Cherry-pick the most recent commit onto the local repo"),
-            # (keymap.ABANDON_CHANGE,
-            #  "Abandon this change"),
+            (keymap.CLOSE_CHANGE,
+             "Close this change"),
             (keymap.EDIT_COMMIT_MESSAGE,
              "Edit the commit message of this change"),
             (keymap.REBASE_CHANGE,
              "Rebase this change (remotely)"),
-            # (keymap.RESTORE_CHANGE,
-            #  "Restore this change"),
+            (keymap.REOPEN_CHANGE,
+             "Reopen pull request"),
             (keymap.REFRESH,
              "Refresh this change"),
             (keymap.EDIT_LABELS,
@@ -904,7 +904,7 @@ class ChangeView(urwid.WidgetWrap):
                 title += ' [OUTDATED]'
                 show_merged = True
             if parent.change.state == 'closed' and not parent.change.merged:
-                title += ' [ABANDONED]'
+                title += ' [CLOSED]'
             if show_merged or parent.change.merged:
                 parents[parent.change.key] = title
         self._updateDependenciesWidget(parents,
@@ -1006,18 +1006,18 @@ class ChangeView(urwid.WidgetWrap):
             self.hide_comments = not self.hide_comments
             self.refresh()
             return None
-        # if keymap.ABANDON_CHANGE in commands:
-        #     self.abandonChange()
-        #     return None
+        if keymap.CLOSE_CHANGE in commands:
+            self.closeChange()
+            return None
         if keymap.EDIT_COMMIT_MESSAGE in commands:
             self.editCommitMessage()
             return None
         if keymap.REBASE_CHANGE in commands:
             self.rebaseChange()
             return None
-        # if keymap.RESTORE_CHANGE in commands:
-        #     self.restoreChange()
-        #     return None
+        if keymap.REOPEN_CHANGE in commands:
+            self.reopenChange()
+            return None
         if keymap.REFRESH in commands:
             self.app.sync.submitTask(
                 sync.SyncChangeTask(self.change_rest_id, priority=sync.HIGH_PRIORITY))
@@ -1044,36 +1044,36 @@ class ChangeView(urwid.WidgetWrap):
             screen = view_side_diff.SideDiffView(self.app, commit_key)
         self.app.changeScreen(screen)
 
-    # def abandonChange(self):
-    #     dialog = mywid.TextEditDialog(u'Abandon Change', u'Abandon message:',
-    #                                   u'Abandon Change',
-    #                                   self.pending_status_message)
-    #     urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
-    #     urwid.connect_signal(dialog, 'save', lambda button:
-    #                              self.doAbandonRestoreChange(dialog, 'ABANDONED'))
-    #     self.app.popup(dialog)
+    def closeChange(self):
+        dialog = mywid.TextEditDialog(u'Close pull request', u'Message:',
+                                      u'Close pull request',
+                                      self.pending_status_message)
+        urwid.connect_signal(dialog, 'cancel', lambda button: self.app.backScreen())
+        urwid.connect_signal(dialog, 'save', lambda button:
+                                 self.doCloseReopenChange(dialog, 'closed'))
+        self.app.popup(dialog)
 
-    # def restoreChange(self):
-    #     dialog = mywid.TextEditDialog(u'Restore Change', u'Restore message:',
-    #                                   u'Restore Change',
-    #                                   self.pending_status_message)
-    #     urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
-    #     urwid.connect_signal(dialog, 'save', lambda button:
-    #                              self.doAbandonRestoreChange(dialog, 'NEW'))
-    #     self.app.popup(dialog)
+    def reopenChange(self):
+        dialog = mywid.TextEditDialog(u'Reopen pull request', u'Message:',
+                                      u'Reopen pull request',
+                                      self.pending_status_message)
+        urwid.connect_signal(dialog, 'cancel', lambda button: self.app.backScreen())
+        urwid.connect_signal(dialog, 'save', lambda button:
+                                 self.doCloseReopenChange(dialog, 'open'))
+        self.app.popup(dialog)
 
-    # def doAbandonRestoreChange(self, dialog, state):
-    #     change_key = None
-    #     with self.app.db.getSession() as session:
-    #         change = session.getChange(self.change_key)
-    #         change.state = state
-    #         change.pending_status = True
-    #         change.pending_status_message = dialog.entry.edit_text
-    #         change_key = change.key
-    #     self.app.sync.submitTask(
-    #         sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
-    #     self.app.backScreen()
-    #     self.refresh()
+    def doCloseReopenChange(self, dialog, state):
+        change_key = None
+        with self.app.db.getSession() as session:
+            change = session.getChange(self.change_key)
+            change.state = state
+            change.pending_status = True
+            change.pending_status_message = dialog.entry.edit_text
+            change_key = change.key
+        self.app.sync.submitTask(
+            sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
+        self.app.backScreen()
+        self.refresh()
 
     def editCommitMessage(self):
         with self.app.db.getSession() as session:
