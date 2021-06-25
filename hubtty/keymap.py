@@ -58,7 +58,7 @@ RESTORE_CHANGE = 'restore change'
 REBASE_CHANGE = 'rebase change'
 CHERRY_PICK_CHANGE = 'cherry pick change'
 REFRESH = 'refresh'
-EDIT_HASHTAGS = 'edit hashtags'
+EDIT_LABELS = 'edit labels'
 EDIT_COMMIT_MESSAGE = 'edit commit message'
 MERGE_CHANGE = 'merge change'
 SORT_BY_NUMBER = 'sort by number'
@@ -126,7 +126,7 @@ DEFAULT_KEYMAP = {
     REBASE_CHANGE: 'ctrl b',
     CHERRY_PICK_CHANGE: 'ctrl x',
     REFRESH: 'ctrl r',
-    EDIT_HASHTAGS: '#',
+    EDIT_LABELS: 'meta l',
     EDIT_COMMIT_MESSAGE: 'ctrl d',
     MERGE_CHANGE: 'meta m',
     SORT_BY_NUMBER: [['S', 'n']],

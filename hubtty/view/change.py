@@ -39,9 +39,9 @@ try:
 except AttributeError:
     OrderedDict = ordereddict.OrderedDict
 
-class EditHashtagsDialog(mywid.ButtonDialog):
+class EditLabelsDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
     signals = ['save', 'cancel']
-    def __init__(self, app, hashtags):
+    def __init__(self, app, change):
         self.app = app
         save_button = mywid.FixedButton('Save')
         cancel_button = mywid.FixedButton('Cancel')
@@ -49,23 +49,24 @@ class EditHashtagsDialog(mywid.ButtonDialog):
                              lambda button:self._emit('save'))
         urwid.connect_signal(cancel_button, 'click',
                              lambda button:self._emit('cancel'))
-        super(EditHashtagsDialog, self).__init__("Edit Hashtags",
-                                                 "Edit the change hashtags.",
-                                                 entry_prompt="Hashtags: ",
-                                                 entry_text=hashtags,
-                                                 buttons=[save_button,
-                                                          cancel_button],
-                                                 ring=app.ring)
 
-    def keypress(self, size, key):
-        if not self.app.input_buffer:
-            key = super(EditHashtagsDialog, self).keypress(size, key)
-        keys = self.app.input_buffer + [key]
-        commands = self.app.config.keymap.getCommands(keys)
-        if keymap.ACTIVATE in commands:
-            self._emit('save')
-            return None
-        return key
+        button_widgets = [('pack', save_button),
+                          ('pack', cancel_button)]
+        button_columns = urwid.Columns(button_widgets, dividechars=2)
+        rows = []
+        self.labels_checkboxes = []
+
+        rows.append(urwid.Text(u"Labels:"))
+        for label in change.project.labels:
+            b = mywid.FixedCheckBox(label.name, state=(label in change.labels))
+            rows.append(b)
+            self.labels_checkboxes.append(b)
+        rows.append(urwid.Divider())
+        rows.append(button_columns)
+        pile = urwid.Pile(rows)
+        fill = urwid.Filler(pile, valign='top')
+        super(EditLabelsDialog, self).__init__(urwid.LineBox(fill,
+                                                             'Set pull request labels'))
 
 class CherryPickDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
     signals = ['save', 'cancel']
@@ -547,8 +548,8 @@ class ChangeView(urwid.WidgetWrap):
             #  "Restore this change"),
             (keymap.REFRESH,
              "Refresh this change"),
-            (keymap.EDIT_HASHTAGS,
-             "Edit the hashtags of this change"),
+            (keymap.EDIT_LABELS,
+             "Edit the labels of this change"),
             (keymap.MERGE_CHANGE,
              "Merge this change"),
             (keymap.CHERRY_PICK_CHANGE,
@@ -583,7 +584,7 @@ class ChangeView(urwid.WidgetWrap):
         self.author_label = mywid.TextButton(u'', on_press=self.searchAuthor)
         self.project_label = mywid.TextButton(u'', on_press=self.searchProject)
         self.branch_label = urwid.Text(u'', wrap='clip')
-        self.hashtags_label = urwid.Text(u'', wrap='clip')
+        self.labels_label = urwid.Text(u'', wrap='clip')
         self.created_label = urwid.Text(u'', wrap='clip')
         self.updated_label = urwid.Text(u'', wrap='clip')
         self.status_label = urwid.Text(u'', wrap='clip')
@@ -597,7 +598,7 @@ class ChangeView(urwid.WidgetWrap):
                                                            focus_map=change_info_map),
                                              width='pack')),
                      ("Branch", self.branch_label),
-                     ("Hashtags", self.hashtags_label),
+                     ("Labels", self.labels_label),
                      ("Created", self.created_label),
                      ("Updated", self.updated_label),
                      ("Status", self.status_label),
@@ -681,7 +682,7 @@ class ChangeView(urwid.WidgetWrap):
             if not self.marked_seen:
                 change.last_seen = datetime.datetime.utcnow()
                 self.marked_seen = True
-            self.hashtags = ', '.join([h.name for h in change.hashtags])
+            self.labels = ', '.join([l.name for l in change.labels])
             self.pending_status_message = change.pending_status_message or ''
             reviewed = hidden = starred = held = ''
             if change.reviewed:
@@ -711,7 +712,7 @@ class ChangeView(urwid.WidgetWrap):
             self.author_label.text.set_text(('change-data', author_string))
             self.project_label.text.set_text(('change-data', change.project.name))
             self.branch_label.set_text(('change-data', change.branch))
-            self.hashtags_label.set_text(('change-data', ' '.join([x.name for x in change.hashtags])))
+            self.labels_label.set_text(('change-data', self.labels))
             self.created_label.set_text(('change-data', str(self.app.time(change.created))))
             self.updated_label.set_text(('change-data', str(self.app.time(change.updated))))
             self.status_label.set_text(('change-data', change.state))
@@ -1025,8 +1026,8 @@ class ChangeView(urwid.WidgetWrap):
         if keymap.MERGE_CHANGE in commands:
             self.mergeChange()
             return None
-        if keymap.EDIT_HASHTAGS in commands:
-            self.editHashtags()
+        if keymap.EDIT_LABELS in commands:
+            self.editLabels()
             return None
         if keymap.CHERRY_PICK_CHANGE in commands:
             self.cherryPickChange()
@@ -1188,25 +1189,31 @@ class ChangeView(urwid.WidgetWrap):
         self.app.backScreen()
         self.refresh()
 
-    def editHashtags(self):
-        dialog = EditHashtagsDialog(self.app, self.hashtags)
+    def editLabels(self):
+        with self.app.db.getSession() as session:
+            change = session.getChange(self.change_key)
+            dialog = EditLabelsDialog(self.app, change)
         urwid.connect_signal(dialog, 'save',
-            lambda button: self.closeEditHashtags(dialog, True))
+            lambda button: self.closeEditLabels(dialog, True))
         urwid.connect_signal(dialog, 'cancel',
-            lambda button: self.closeEditHashtags(dialog, False))
+            lambda button: self.closeEditLabels(dialog, False))
         self.app.popup(dialog)
 
-    def closeEditHashtags(self, dialog, save):
+    def closeEditLabels(self, dialog, save):
         if save:
             change_key = None
+            labels_to_set = [ cb.label for cb in dialog.labels_checkboxes if cb.state ]
             with self.app.db.getSession() as session:
                 change = session.getChange(self.change_key)
-                change.setHashtags([x.strip() for x in dialog.entry.edit_text.split(',')])
-                change.pending_hashtags = True
+                for label in change.project.labels:
+                    if label.name in labels_to_set and label not in change.labels:
+                        change.addLabel(label)
+                    if label.name not in labels_to_set and label in change.labels:
+                        change.removeLabel(label)
+                change.pending_labels = True
                 change_key = change.key
-            # TODO(mandre) Uncomment when implemented
-            # self.app.sync.submitTask(
-            #     sync.SetHashtagsTask(change_key, sync.HIGH_PRIORITY))
+            self.app.sync.submitTask(
+                sync.SetLabelsTask(change_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
