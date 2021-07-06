@@ -699,8 +699,12 @@ class SyncChangeTask(Task):
         parent_commits = set()
         with app.db.getSession() as session:
             change = session.getChangeByChangeID(self.change_id)
-            account = session.getAccountByID(remote_change['user']['id'],
-                                             username=remote_change['user'].get('login'))
+            if (remote_change.get('user') or {}).get('id'):
+                account = session.getAccountByID(remote_change['user']['id'],
+                                                 username=remote_change['user'].get('login'))
+            else:
+                account = session.getSystemAccount()
+
             if not change:
                 project = session.getProjectByName(project_name)
                 if not project:
@@ -827,7 +831,7 @@ class SyncChangeTask(Task):
                     continue
 
                 self.log.info("New review comment %s", remote_review)
-                if 'user' in remote_review:
+                if (remote_review.get('user') or {}).get('id'):
                     account = session.getAccountByID(remote_review['user']['id'],
                                                      username=remote_review['user'].get('login'))
                     if not app.isOwnAccount(account):
@@ -866,8 +870,11 @@ class SyncChangeTask(Task):
 
             # Inline comments
             for remote_comment in remote_pr_comments:
-                account = session.getAccountByID(remote_comment['user']['id'],
-                                                 username=remote_comment['user'].get('login'))
+                if (remote_comment.get('user') or {}).get('id'):
+                    account = session.getAccountByID(remote_comment['user']['id'],
+                                                     username=remote_comment['user'].get('login'))
+                else:
+                    account = session.getSystemAccount()
                 comment = session.getCommentByID(remote_comment['id'])
 
                 file_id = None
