@@ -630,6 +630,48 @@ class SyncChangeTask(Task):
         # Called from run inside of db transaction
 
         # Delete outdated checks
+        remote_check_names = [c['name'] for c in remote_checks_data['check_runs']]
+        for check in commit.checks:
+            if check.name not in remote_check_names:
+                self.log.info("Deleted check %s", check.key)
+                session.delete(check)
+
+        local_checks = {c.name: c for c in commit.checks}
+        for checks_data in remote_checks_data['check_runs']:
+            uuid = checks_data['id']
+            name = checks_data['name']
+            if checks_data['status'] == 'completed':
+                state = checks_data['conclusion']
+            else:
+                state = 'pending'
+            # TODO(mandre) how do we get this from GH API?
+            # check.blocking = ' '.join(checks_data['blocking'])
+            check = local_checks.get(name)
+            updated = dateutil.parser.parse(checks_data['started_at'])
+            if check is None:
+                created = dateutil.parser.parse(checks_data['started_at'])
+                self.log.info("Creating check %s on commit %s", uuid, commit.key)
+                check = commit.createCheck(name, state, created, updated)
+            check.updated = updated
+            check.state = state
+            check.url = checks_data.get('html_url', '')
+            if state == 'success':
+                check.message = 'Job succeeded'
+            elif state == 'failure':
+                check.message = 'Job failed'
+            else:
+                check.message = 'Job triggered'
+            started = checks_data.get('started_at')
+            if started:
+                check.started = dateutil.parser.parse(started)
+            finished = checks_data.get('completed_at')
+            if finished:
+                check.finished = dateutil.parser.parse(finished)
+
+    def _updateChecksFromStatus(self, session, commit, remote_checks_data):
+        # Called from run inside of db transaction
+
+        # Delete outdated checks
         remote_check_names = [c['context'] for c in remote_checks_data['statuses']]
         for check in commit.checks:
             if check.name not in remote_check_names:
@@ -692,7 +734,9 @@ class SyncChangeTask(Task):
 
         # PR might have been rebased and no longer contain commits
         if len(remote_commits) > 0:
-            remote_checks_data = sync.get('repos/%s/commits/%s/status' % (project_name, remote_commits[-1]['sha']))
+            remote_checks_from_status_data = sync.get('repos/%s/commits/%s/status' % (project_name, remote_commits[-1]['sha']))
+            remote_commits[-1]['_hubtty_remote_checks_from_status_data'] = remote_checks_from_status_data
+            remote_checks_data = sync.get('repos/%s/commits/%s/check-runs' % (project_name, remote_commits[-1]['sha']))
             remote_commits[-1]['_hubtty_remote_checks_data'] = remote_checks_data
 
         fetches = collections.defaultdict(list)
@@ -820,6 +864,8 @@ class SyncChangeTask(Task):
                 # Commit checks
                 if remote_commit.get('_hubtty_remote_checks_data'):
                     self._updateChecks(session, commit, remote_commit['_hubtty_remote_checks_data'])
+                if remote_commit.get('_hubtty_remote_checks_from_status_data'):
+                    self._updateChecksFromStatus(session, commit, remote_commit['_hubtty_remote_checks_from_status_data'])
 
             # Commit reviews
             new_message = False
