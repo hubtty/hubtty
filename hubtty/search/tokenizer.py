@@ -43,6 +43,7 @@ operators = {
     'is': 'OP_IS',
     'state': 'OP_STATE',
     'limit': 'OP_LIMIT',
+    'label': 'OP_LABEL',
     }
 
 reserved = {

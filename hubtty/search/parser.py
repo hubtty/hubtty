@@ -98,6 +98,7 @@ def SearchParser():
                 | file_term
                 | path_term
                 | limit_term
+                | label_term
                 | op_term'''
         p[0] = p[1]
 
@@ -438,6 +439,16 @@ def SearchParser():
         # not as important in hubtty, make this a no-op for now so
         # that it does not produce a syntax error.
         p[0] = (True == True)
+
+    def p_label_term(p):
+        '''label_term : OP_LABEL string'''
+        labels_select = select([hubtty.db.label_table.c.key], correlate=False).where(
+                hubtty.db.label_table.c.name == p[2])
+
+        filters = []
+        filters.append(hubtty.db.change_label_table.c.label_key.in_(labels_select))
+        s = select([hubtty.db.change_label_table.c.change_key], correlate=False).where(and_(*filters))
+        p[0] = hubtty.db.change_table.c.key.in_(s)
 
     def p_op_term(p):
         'op_term : OP'
