@@ -219,8 +219,8 @@ class SyncAccountTask(Task):
 
     def run(self, sync):
         app = sync.app
+        remote = sync.get('users/' + self.username)
         with app.db.getSession() as session:
-            remote = sync.get('users/' + self.username)
             session.getAccountByID(remote['id'],
                                    remote.get('name'),
                                    remote.get('login'),
