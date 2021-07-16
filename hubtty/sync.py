@@ -1056,8 +1056,8 @@ class UploadReviewsTask(Task):
                 sync.submitTask(SetLabelsTask(c.key, self.priority))
             # for c in session.getPendingRebases():
             #     sync.submitTask(RebaseChangeTask(c.key, self.priority))
-            # for c in session.getPendingStatusChanges():
-            #     sync.submitTask(ChangeStatusTask(c.key, self.priority))
+            for c in session.getPendingStatusChanges():
+                sync.submitTask(ChangeStatusTask(c.key, self.priority))
             # for c in session.getPendingStarred():
             #     sync.submitTask(ChangeStarredTask(c.key, self.priority))
             # for c in session.getPendingCherryPicks():
