@@ -428,10 +428,10 @@ class SyncProjectTask(Task):
     def run(self, sync):
         app = sync.app
         now = datetime.datetime.utcnow()
+        full_sync = []
+        partial_sync = []
+        sync_from = now
         with app.db.getSession() as session:
-            full_sync = []
-            partial_sync = []
-            sync_from = now
             for project_key in self.project_keys:
                 project = session.getProject(project_key)
                 if project.updated:
@@ -444,21 +444,21 @@ class SyncProjectTask(Task):
                 else:
                     full_sync.append(project.name)
 
-            def sync_projects(projects, query):
-                for project_name in projects:
-                    query += ' repo:%s' % project_name
-                changes = sync.query(query)
-                for c in changes:
-                    sync.submitTask(SyncChangeTask(c['pull_request']['url'].split('repos/')[1], priority=self.priority))
+        def sync_projects(projects, query):
+            for project_name in projects:
+                query += ' repo:%s' % project_name
+            changes = sync.query(query)
+            for c in changes:
+                sync.submitTask(SyncChangeTask(c['pull_request']['url'].split('repos/')[1], priority=self.priority))
 
-            if full_sync:
-                query = 'type:pr state:open'
-                sync_projects(full_sync, query)
+        if full_sync:
+            query = 'type:pr state:open'
+            sync_projects(full_sync, query)
 
-            if partial_sync:
-                # Allow 4 seconds for request time, etc.
-                query = 'type:pr updated:>%s' % ((sync_from - datetime.timedelta(seconds=4)).replace(microsecond=0).isoformat(),)
-                sync_projects(partial_sync, query)
+        if partial_sync:
+            # Allow 4 seconds for request time, etc.
+            query = 'type:pr updated:>%s' % ((sync_from - datetime.timedelta(seconds=4)).replace(microsecond=0).isoformat(),)
+            sync_projects(partial_sync, query)
 
         for key in self.project_keys:
             sync.submitTask(SetProjectUpdatedTask(key, now, priority=self.priority))
