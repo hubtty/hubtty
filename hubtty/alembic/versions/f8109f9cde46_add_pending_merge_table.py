@@ -13,7 +13,6 @@ down_revision = '439753e172a0'
 from alembic import op
 import sqlalchemy as sa
 
-from hubtty.dbsupport import sqlite_drop_columns
 
 def upgrade():
     op.create_table('pending_merge',

@@ -22,7 +22,6 @@ except:
     pass
 import textwrap
 
-from six.moves.urllib import parse as urlparse
 import urwid
 
 from hubtty import gitrepo
@@ -120,8 +119,6 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             'COMMENT': 'Comment',
             'APPROVE': 'Approve'
         }
-        values = {}
-        descriptions = {}
         self.button_group = []
         with self.app.db.getSession() as session:
             commit = session.getCommit(self.commit_key)
@@ -1088,13 +1085,13 @@ class ChangeView(urwid.WidgetWrap):
                        min_width=60, min_height=20)
 
     def doEditCommitMessage(self, dialog):
-        commit_key = None
+        # commit_key = None
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
             commit = change.commits[-1]
             commit.message = dialog.entry.edit_text
             commit.pending_message = True
-            commit_key = commit.key
+            # commit_key = commit.key
         # TODO(mandre) Uncomment when implemented
         # self.app.sync.submitTask(
         #     sync.ChangeCommitMessageTask(commit_key, sync.HIGH_PRIORITY))
@@ -1109,11 +1106,11 @@ class ChangeView(urwid.WidgetWrap):
         self.app.popup(dialog)
 
     def doRebaseChange(self, button=None):
-        change_key = None
+        # change_key = None
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
             change.pending_rebase = True
-            change_key = change.key
+            # change_key = change.key
         # TODO(mandre) Uncomment when implemented
         # self.app.sync.submitTask(
         #     sync.RebaseChangeTask(change_key, sync.HIGH_PRIORITY))
@@ -1133,18 +1130,18 @@ class ChangeView(urwid.WidgetWrap):
 
 
     def doCherryPickChange(self, dialog):
-        cp_key = None
+        # cp_key = None
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
             branch = None
             for button in dialog.branch_buttons:
                 if button.state:
                     branch = button.get_label()
-            message = dialog.entry.edit_text
+            # message = dialog.entry.edit_text
             self.app.log.debug("Creating pending cherry-pick of %s to %s" %
                                (change.commits[-1].sha, branch))
-            cp = change.commits[-1].createPendingCherryPick(branch, message)
-            cp_key = cp.key
+            # cp = change.commits[-1].createPendingCherryPick(branch, message)
+            # cp_key = cp.key
         # TODO(mandre) Uncomment when implemented
         # self.app.sync.submitTask(
         #     sync.SendCherryPickTask(cp_key, sync.HIGH_PRIORITY))

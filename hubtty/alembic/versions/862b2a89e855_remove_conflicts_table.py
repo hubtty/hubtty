@@ -11,7 +11,6 @@ revision = '862b2a89e855'
 down_revision = '175ea25b42d5'
 
 from alembic import op
-import sqlalchemy as sa
 
 
 def upgrade():
