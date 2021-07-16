@@ -330,6 +330,60 @@ class SyncProjectBranchesTask(Task):
                 project.createBranch(name)
                 self.log.info("Added branch %s to project %s in local DB.", name, project.name)
 
+class SyncSubscribedProjectLabelsTask(Task):
+    def __repr__(self):
+        return '<SyncSubscribedProjectLabelsTask>'
+
+    def __eq__(self, other):
+        if other.__class__ == self.__class__:
+            return True
+        return False
+
+    def run(self, sync):
+        app = sync.app
+        with app.db.getSession() as session:
+            projects = session.getProjects(subscribed=True)
+        for p in projects:
+            sync.submitTask(SyncProjectLabelsTask(p.name, self.priority))
+
+class SyncProjectLabelsTask(Task):
+    def __init__(self, project_name, priority=NORMAL_PRIORITY):
+        super(SyncProjectLabelsTask, self).__init__(priority)
+        self.project_name = project_name
+
+    def __repr__(self):
+        return '<SyncProjectLabelsTask %s>' % (self.project_name,)
+
+    def __eq__(self, other):
+        if (other.__class__ == self.__class__ and
+            other.project_name == self.project_name):
+            return True
+        return False
+
+    def run(self, sync):
+        app = sync.app
+        remote_labels = sync.get('repos/%s/labels' % (self.project_name,))
+        with app.db.getSession() as session:
+            project = session.getProjectByName(self.project_name)
+
+            for remote_label in remote_labels:
+                label = session.getLabel(remote_label['id'])
+                if not label:
+                    self.log.info("Created label %s for project %s", remote_label['name'], project.name)
+                    project.createLabel(remote_label['id'], remote_label['name'],
+                            remote_label['color'], remote_label['description'])
+                else:
+                    label.name = remote_label['name']
+                    label.color = remote_label['color']
+                    label.description = remote_label['description']
+
+            # Delete old labels
+            remote_label_ids = [l['id'] for l in remote_labels]
+            for l in project.labels:
+                if l.id not in remote_label_ids:
+                    self.log.info("Deleted label %s", l.name)
+                    session.delete(l)
+
 class SyncSubscribedProjectsTask(Task):
     def __repr__(self):
         return '<SyncSubscribedProjectsTask>'
@@ -389,26 +443,6 @@ class SyncProjectTask(Task):
                         sync_from = project.updated
                 else:
                     full_sync.append(project.name)
-
-                # Sync repo labels
-                remote_labels = sync.get('repos/%s/labels' % (project.name,))
-                for remote_label in remote_labels:
-                    label = session.getLabel(remote_label['id'])
-                    if not label:
-                        self.log.info("Created label %s for project %s", remote_label['name'], project.name)
-                        project.createLabel(remote_label['id'], remote_label['name'],
-                                remote_label['color'], remote_label['description'])
-                    else:
-                        label.name = remote_label['name']
-                        label.color = remote_label['color']
-                        label.description = remote_label['description']
-
-                # Delete old labels
-                remote_label_ids = [l['id'] for l in remote_labels]
-                for l in project.labels:
-                    if l.id not in remote_label_ids:
-                        self.log.info("Deleted label %s", l.name)
-                        session.delete(l)
 
             def sync_projects(projects, query):
                 for project_name in projects:
@@ -757,6 +791,7 @@ class SyncChangeTask(Task):
                         self.log.info("Created project %s", project.name)
                         self.results.append(ProjectAddedEvent(project))
                         sync.submitTask(SyncProjectBranchesTask(project.name, self.priority))
+                        sync.submitTask(SyncProjectLabelsTask(project.name, self.priority))
                 created = dateutil.parser.parse(remote_change['created_at'])
                 updated = dateutil.parser.parse(remote_change['updated_at'])
                 change = project.createChange(remote_change['id'], account,
@@ -1429,6 +1464,7 @@ class Sync(object):
             self.submitTask(SyncProjectListTask(HIGH_PRIORITY))
             self.submitTask(SyncSubscribedProjectsTask(NORMAL_PRIORITY))
             self.submitTask(SyncSubscribedProjectBranchesTask(LOW_PRIORITY))
+            self.submitTask(SyncSubscribedProjectLabelsTask(LOW_PRIORITY))
             self.submitTask(SyncOutdatedChangesTask(LOW_PRIORITY))
             self.submitTask(PruneDatabaseTask(self.app.config.expire_age, LOW_PRIORITY))
             self.periodic_thread = threading.Thread(target=self.periodicSync)
