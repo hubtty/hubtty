@@ -763,6 +763,12 @@ class SyncChangeTask(Task):
 
         project_name = remote_change['base']['repo']['full_name']
 
+        # Get commit details
+        for commit in remote_commits:
+            remote_commit_details = sync.get('repos/%s/commits/%s'
+                    % (project_name, commit['sha']))
+            commit['_hubtty_remote_commit_details'] = remote_commit_details
+
         # PR might have been rebased and no longer contain commits
         if len(remote_commits) > 0:
             remote_checks_from_status_data = sync.get('repos/%s/commits/%s/status' % (project_name, remote_commits[-1]['sha']))
@@ -875,9 +881,7 @@ class SyncChangeTask(Task):
             #         f = commit.createFile('/COMMIT_MSG', None,
             #                                 None, None, None)
 
-                remote_commit_details = sync.get('repos/%s/commits/%s'
-                                                 % (change.project.name,
-                                                    remote_commit['sha']))
+                remote_commit_details = remote_commit.get('_hubtty_remote_commit_details', {})
                 for file in remote_commit_details['files']:
                     f = commit.getFile(file['filename'])
                     if f is None:
