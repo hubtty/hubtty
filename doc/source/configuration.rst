@@ -63,6 +63,12 @@ line.
     The URL of the Github API server.  HTTPS should be preferred.
     Defaults to https://api.github.com/.
 
+  **git-url**
+    The URL to clone git repos. By default, <url> is used. For a list
+    of valid URLs, see:
+    https://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS
+    Set git-url to ssh://git@github.com in order to clone private repos.
+
   **git-root (required)**
     A location where Hubtty should store its git repositories.  These
     can be the same git repositories where you do your own work --
