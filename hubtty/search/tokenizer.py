@@ -43,6 +43,7 @@ operators = {
     'is': 'OP_IS',
     'state': 'OP_STATE',
     'limit': 'OP_LIMIT',
+    'label': 'OP_LABEL',
     }
 
 reserved = {
@@ -86,12 +87,16 @@ def SearchTokenizer():
 
     def t_SSTRING(t):
         r"'([^\\']+|\\'|\\\\)*'"
-        t.value=t.value[1:-1].decode("string-escape")
+        t.value = t.value[1:-1]
+        if not isinstance(t.value, six.text_type):
+            t.value = t.value.decode('string-escape')
         return t
 
     def t_DSTRING(t):
         r'"([^\\"]+|\\"|\\\\)*"'
-        t.value=t.value[1:-1].decode("string-escape")
+        t.value = t.value[1:-1]
+        if not isinstance(t.value, six.text_type):
+            t.value = t.value.decode('string-escape')
         return t
 
     def t_DATE(t):
