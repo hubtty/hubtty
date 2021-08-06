@@ -581,7 +581,7 @@ class ChangeView(urwid.WidgetWrap):
         self.author_label = mywid.TextButton(u'', on_press=self.searchAuthor)
         self.project_label = mywid.TextButton(u'', on_press=self.searchProject)
         self.branch_label = urwid.Text(u'', wrap='clip')
-        self.labels_label = urwid.Text(u'', wrap='clip')
+        self.labels_label = mywid.HyperText(u'')
         self.created_label = urwid.Text(u'', wrap='clip')
         self.updated_label = urwid.Text(u'', wrap='clip')
         self.status_label = urwid.Text(u'', wrap='clip')
@@ -679,7 +679,6 @@ class ChangeView(urwid.WidgetWrap):
             if not self.marked_seen:
                 change.last_seen = datetime.datetime.utcnow()
                 self.marked_seen = True
-            self.labels = ', '.join([l.name for l in change.labels])
             self.pending_status_message = change.pending_status_message or ''
             reviewed = hidden = starred = held = ''
             if change.reviewed:
@@ -709,7 +708,16 @@ class ChangeView(urwid.WidgetWrap):
             self.author_label.text.set_text(('change-data', author_string))
             self.project_label.text.set_text(('change-data', change.project.name))
             self.branch_label.set_text(('change-data', change.branch))
-            self.labels_label.set_text(('change-data', self.labels))
+            label_buttons = []
+            for x in change.labels:
+                if label_buttons:
+                    label_buttons.append(', ')
+                link = mywid.Link(x.name, 'change-data', 'focused-change-data')
+                urwid.connect_signal(
+                    link, 'selected',
+                    lambda link, x=x: self.searchLabel(x.name))
+                label_buttons.append(link)
+            self.labels_label.set_text(('change-data', label_buttons or u''))
             self.created_label.set_text(('change-data', str(self.app.time(change.created))))
             self.updated_label.set_text(('change-data', str(self.app.time(change.updated))))
             self.status_label.set_text(('change-data', change.state))
@@ -1223,6 +1231,9 @@ class ChangeView(urwid.WidgetWrap):
 
     def searchProject(self, widget):
         self.app.doSearch("state:open repo:%s" % (self.project_name,))
+
+    def searchLabel(self, name):
+        self.app.doSearch("state:open repo:%s label:%s" % (self.project_name, name,))
 
     def reviewKey(self, reviewkey):
         approval = reviewkey.get('approval', 'COMMENT')
