@@ -16,7 +16,6 @@
 import collections
 import errno
 import logging
-import math
 import os
 import threading
 import json
@@ -402,12 +401,6 @@ class SyncSubscribedProjectsTask(Task):
             t = SyncProjectTask(keys[i:i+10], self.priority)
             self.tasks.append(t)
             sync.submitTask(t)
-        # t = SyncQueriedChangesTask('author', 'is:author', self.priority)
-        # self.tasks.append(t)
-        # sync.submitTask(t)
-        # t = SyncQueriedChangesTask('starred', 'is:starred', self.priority)
-        # self.tasks.append(t)
-        # sync.submitTask(t)
 
 class SyncProjectTask(Task):
     def __init__(self, project_keys, priority=NORMAL_PRIORITY):
@@ -484,89 +477,6 @@ class SetProjectUpdatedTask(Task):
         with app.db.getSession() as session:
             project = session.getProject(self.project_key)
             project.updated = self.updated
-
-class SyncQueriedChangesTask(Task):
-    def __init__(self, query_name, query, priority=NORMAL_PRIORITY):
-        super(SyncQueriedChangesTask, self).__init__(priority)
-        self.query_name = query_name
-        self.query = query
-
-    def __repr__(self):
-        return '<SyncQueriedChangesTask %s>' % self.query_name
-
-    def __eq__(self, other):
-        if (other.__class__ == self.__class__ and
-            other.query_name == self.query_name and
-            other.query == self.query):
-            return True
-        return False
-
-    def run(self, sync):
-        app = sync.app
-        now = datetime.datetime.utcnow()
-        with app.db.getSession() as session:
-            sync_query = session.getSyncQueryByName(self.query_name)
-            query = 'q=%s' % self.query
-            if sync_query.updated:
-                # Allow 4 seconds for request time, etc.
-                query += ' -age:%ss' % (int(math.ceil((now-sync_query.updated).total_seconds())) + 4,)
-            else:
-                query += ' status:open'
-            for project in session.getProjects(subscribed=True):
-                query += ' -project:%s' % project.name
-        changes = []
-        sortkey = ''
-        done = False
-        offset = 0
-        while not done:
-            # We don't actually want to limit to 500, but that's the server-side default, and
-            # if we don't specify this, we won't get a _more_changes flag.
-            q = 'changes/?n=500%s&%s' % (sortkey, query)
-            self.log.debug('Query: %s ' % (q,))
-            batch = sync.get(q)
-            done = True
-            if batch:
-                changes += batch
-                if '_more_changes' in batch[-1]:
-                    done = False
-                    if '_sortkey' in batch[-1]:
-                        sortkey = '&N=%s' % (batch[-1]['_sortkey'],)
-                    else:
-                        offset += len(batch)
-                        sortkey = '&start=%s' % (offset,)
-        change_ids = [c['id'] for c in changes]
-        with app.db.getSession() as session:
-            # Winnow the list of IDs to only the ones in the local DB.
-            change_ids = session.getChangeIDs(change_ids)
-
-        for c in changes:
-            # For now, just sync open changes or changes already
-            # in the db optionally we could sync all changes ever
-            if c['id'] in change_ids or (c['state'] != 'closed'):
-                sync.submitTask(SyncChangeTask(c['id'], priority=self.priority))
-        sync.submitTask(SetSyncQueryUpdatedTask(self.query_name, now, priority=self.priority))
-
-class SetSyncQueryUpdatedTask(Task):
-    def __init__(self, query_name, updated, priority=NORMAL_PRIORITY):
-        super(SetSyncQueryUpdatedTask, self).__init__(priority)
-        self.query_name = query_name
-        self.updated = updated
-
-    def __repr__(self):
-        return '<SetSyncQueryUpdatedTask %s %s>' % (self.query_name, self.updated)
-
-    def __eq__(self, other):
-        if (other.__class__ == self.__class__ and
-            other.query_name == self.query_name and
-            other.updated == self.updated):
-            return True
-        return False
-
-    def run(self, sync):
-        app = sync.app
-        with app.db.getSession() as session:
-            sync_query = session.getSyncQueryByName(self.query_name)
-            sync_query.updated = self.updated
 
 class SyncChangesByCommitsTask(Task):
     def __init__(self, commits, priority=NORMAL_PRIORITY):
