@@ -1144,6 +1144,19 @@ class RebaseChangeTask(Task):
 
     def run(self, sync):
         app = sync.app
+
+        def checkResponse(response):
+            self.log.debug('HTTP status code: %d', response.status_code)
+            if response.status_code == 503:
+                raise OfflineError("Received 503 status code")
+            elif response.status_code == 422:
+                error_msg = 'Failed to rebase change %s: %s' % (change.change_id, response.json()['message'])
+                app.error(error_msg)
+                self.log.error(error_msg)
+            elif response.status_code >= 400:
+                raise Exception("Received %s status code: %s"
+                                % (response.status_code, response.text))
+
         with app.db.getSession() as session:
             change = session.getChange(self.change_key)
             change.pending_rebase = False
@@ -1153,7 +1166,7 @@ class RebaseChangeTask(Task):
                 # Inside db session for rollback
                 sync.put('repos/%s/update-branch' % (change.change_id,), {
                     'expected_head_sha': latest_commit.sha,
-                    }, headers=headers)
+                    }, headers=headers, response_callback=checkResponse)
                 sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
 
 class ChangeStatusTask(Task):
