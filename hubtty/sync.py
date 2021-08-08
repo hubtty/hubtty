@@ -1561,24 +1561,24 @@ class Sync(object):
                 done = True
         return ret
 
-    def post(self, path, data, headers={}):
+    def post(self, path, data, headers={}, response_callback=None):
         url = self.url(path)
         default_headers = {
                 'Accept': 'application/vnd.github.v3+json',
                 'Content-Type': 'application/json;charset=UTF-8',
                 'User-Agent': self.user_agent
                 }
+        if not response_callback:
+            response_callback = self.checkResponse
+
         self.log.debug('POST: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.post(url, data=json.dumps(data).encode('utf8'),
                               timeout=TIMEOUT,
                               headers = {**default_headers, **headers})
-        self.checkResponse(r)
+        response_callback(r)
         self.log.debug('Received: %s' % (r.text,))
         ret = None
-        if r.status_code >= 400:
-            raise Exception("POST to %s failed with http code %s (%s)",
-                            path, r.status_code, r.text)
         if r.text and len(r.text)>0:
             try:
                 ret = json.loads(r.text)
@@ -1588,46 +1588,55 @@ class Sync(object):
                 raise
         return ret
 
-    def put(self, path, data, headers={}):
+    def put(self, path, data, headers={}, response_callback=None):
         url = self.url(path)
         default_headers = {
                 'Content-Type': 'application/json;charset=UTF-8',
                 'User-Agent': self.user_agent
                 }
+        if not response_callback:
+            response_callback = self.checkResponse
+
         self.log.debug('PUT: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.put(url, data=json.dumps(data).encode('utf8'),
                              timeout=TIMEOUT,
                              headers = {**default_headers, **headers})
-        self.checkResponse(r)
+        response_callback(r)
         self.log.debug('Received: %s' % (r.text,))
 
-    def patch(self, path, data, headers={}):
+    def patch(self, path, data, headers={}, response_callback=None):
         url = self.url(path)
         default_headers = {
                 'Content-Type': 'application/json;charset=UTF-8',
                 'User-Agent': self.user_agent
                 }
+        if not response_callback:
+            response_callback = self.checkResponse
+
         self.log.debug('PATCH: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.patch(url, data=json.dumps(data).encode('utf8'),
                              timeout=TIMEOUT,
                              headers = {**default_headers, **headers})
-        self.checkResponse(r)
+        response_callback(r)
         self.log.debug('Received: %s' % (r.text,))
 
-    def delete(self, path, data, headers={}):
+    def delete(self, path, data, headers={}, response_callback=None):
         url = self.url(path)
         default_headers = {
                 'Content-Type': 'application/json;charset=UTF-8',
                 'User-Agent': self.user_agent
                 }
+        if not response_callback:
+            response_callback = self.checkResponse
+
         self.log.debug('DELETE: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.delete(url, data=json.dumps(data).encode('utf8'),
                                 timeout=TIMEOUT,
                                 headers = {**default_headers, **headers})
-        self.checkResponse(r)
+        response_callback(r)
         self.log.debug('Received: %s' % (r.text,))
 
     def syncSubscribedProjects(self):
