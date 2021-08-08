@@ -1111,14 +1111,13 @@ class ChangeView(urwid.WidgetWrap):
         self.app.popup(dialog)
 
     def doRebaseChange(self, button=None):
-        # change_key = None
+        change_key = None
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
             change.pending_rebase = True
-            # change_key = change.key
-        # TODO(mandre) Uncomment when implemented
-        # self.app.sync.submitTask(
-        #     sync.RebaseChangeTask(change_key, sync.HIGH_PRIORITY))
+            change_key = change.key
+        self.app.sync.submitTask(
+            sync.RebaseChangeTask(change_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 

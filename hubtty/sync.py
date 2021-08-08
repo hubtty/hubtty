@@ -1086,8 +1086,8 @@ class UploadReviewsTask(Task):
             # TODO(mandre) Uncomment when implemented
             for c in session.getPendingLabels():
                 sync.submitTask(SetLabelsTask(c.key, self.priority))
-            # for c in session.getPendingRebases():
-            #     sync.submitTask(RebaseChangeTask(c.key, self.priority))
+            for c in session.getPendingRebases():
+                sync.submitTask(RebaseChangeTask(c.key, self.priority))
             for c in session.getPendingStatusChanges():
                 sync.submitTask(ChangeStatusTask(c.key, self.priority))
             # for c in session.getPendingCherryPicks():
@@ -1147,9 +1147,14 @@ class RebaseChangeTask(Task):
         with app.db.getSession() as session:
             change = session.getChange(self.change_key)
             change.pending_rebase = False
-            # Inside db session for rollback
-            sync.post('changes/%s/rebase' % (change.id,), {})
-            sync.submitTask(SyncChangeTask(change.id, priority=self.priority))
+            latest_commit = change.commits[-1]
+            if latest_commit:
+                headers = {'Accept': 'application/vnd.github.lydian-preview+json'}
+                # Inside db session for rollback
+                sync.put('repos/%s/update-branch' % (change.change_id,), {
+                    'expected_head_sha': latest_commit.sha,
+                    }, headers=headers)
+                sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
 
 class ChangeStatusTask(Task):
     def __init__(self, change_key, priority=NORMAL_PRIORITY):
