@@ -823,10 +823,6 @@ class SyncChangeTask(Task):
             if change.state != remote_change['state']:
                 change.state = remote_change['state']
                 result.state_changed = True
-            if remote_change.get('starred'):
-                change.starred = True
-            else:
-                change.starred = False
             change.title = remote_change['title']
             change.body = (remote_change.get('body','') or '').replace('\r','')
             change.updated = dateutil.parser.parse(remote_change['updated_at'])
@@ -1094,8 +1090,6 @@ class UploadReviewsTask(Task):
             #     sync.submitTask(RebaseChangeTask(c.key, self.priority))
             for c in session.getPendingStatusChanges():
                 sync.submitTask(ChangeStatusTask(c.key, self.priority))
-            # for c in session.getPendingStarred():
-            #     sync.submitTask(ChangeStarredTask(c.key, self.priority))
             # for c in session.getPendingCherryPicks():
             #     sync.submitTask(SendCherryPickTask(c.key, self.priority))
             # for r in session.getPendingCommitMessages():
@@ -1155,33 +1149,6 @@ class RebaseChangeTask(Task):
             change.pending_rebase = False
             # Inside db session for rollback
             sync.post('changes/%s/rebase' % (change.id,), {})
-            sync.submitTask(SyncChangeTask(change.id, priority=self.priority))
-
-class ChangeStarredTask(Task):
-    def __init__(self, change_key, priority=NORMAL_PRIORITY):
-        super(ChangeStarredTask, self).__init__(priority)
-        self.change_key = change_key
-
-    def __repr__(self):
-        return '<ChangeStarredTask %s>' % (self.change_key,)
-
-    def __eq__(self, other):
-        if (other.__class__ == self.__class__ and
-            other.change_key == self.change_key):
-            return True
-        return False
-
-    def run(self, sync):
-        app = sync.app
-        with app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            if change.starred:
-                sync.put('accounts/self/starred.changes/%s' % (change.id,),
-                         data={})
-            else:
-                sync.delete('accounts/self/starred.changes/%s' % (change.id,),
-                            data={})
-            change.pending_starred = False
             sync.submitTask(SyncChangeTask(change.id, priority=self.priority))
 
 class ChangeStatusTask(Task):
