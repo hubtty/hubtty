@@ -942,10 +942,7 @@ class ChangeView(urwid.WidgetWrap):
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
             change.starred = not change.starred
-            change.pending_starred = True
-        # TODO(mandre) Uncomment when implemented
-        # self.app.sync.submitTask(
-        #     sync.ChangeStarredTask(self.change_key, sync.HIGH_PRIORITY))
+            self.app.project_cache.clear(change.project)
 
     def toggleHeld(self):
         return self.app.toggleHeldChange(self.change_key)

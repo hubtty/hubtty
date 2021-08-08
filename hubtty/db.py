@@ -83,7 +83,6 @@ change_table = Table(
     Column('starred', Boolean, index=True, nullable=False),
     Column('held', Boolean, index=True, nullable=False),
     Column('pending_rebase', Boolean, index=True, nullable=False),
-    Column('pending_starred', Boolean, index=True, nullable=False),
     Column('pending_status', Boolean, index=True, nullable=False),
     Column('pending_labels', Boolean, index=True, nullable=False),
     Column('pending_status_message', Text),
@@ -313,9 +312,8 @@ class Change(object):
                  title, body, created, updated, state, additions, deletions,
                  html_url, merged, mergeable, hidden=False, reviewed=False,
                  starred=False, held=False, pending_rebase=False,
-                 pending_starred=False, pending_status=False,
-                 pending_status_message=None, pending_labels=False,
-                 outdated=False):
+                 pending_status=False, pending_status_message=None,
+                 pending_labels=False, outdated=False):
         self.project_key = project.key
         self.account_key = author.key
         self.id = id
@@ -336,7 +334,6 @@ class Change(object):
         self.held = held
         self.pending_rebase = pending_rebase
         self.pending_labels = pending_labels
-        self.pending_starred = pending_starred
         self.pending_status = pending_status
         self.pending_status_message = pending_status_message
         self.outdated = outdated
@@ -1019,9 +1016,6 @@ class DatabaseSession(object):
 
     def getPendingRebases(self):
         return self.session().query(Change).filter_by(pending_rebase=True).all()
-
-    def getPendingStarred(self):
-        return self.session().query(Change).filter_by(pending_starred=True).all()
 
     def getPendingStatusChanges(self):
         return self.session().query(Change).filter_by(pending_status=True).all()
