@@ -1508,21 +1508,26 @@ class Sync(object):
             raise Exception("Received %s status code: %s"
                             % (response.status_code, response.text))
 
-    def get(self, path, response_callback=None):
+    def get(self, path, headers={}, response_callback=None):
         url = self.url(path)
         ret = None
         done = False
+
+        default_headers = {
+                'Accept': 'application/vnd.github.v3+json',
+                'Accept-Encoding': 'gzip',
+                'User-Agent': self.user_agent
+                }
 
         if not response_callback:
             response_callback = self.checkResponse
 
         while not done:
             self.log.debug('GET: %s' % (url,))
+
             r = self.session.get(url,
                                  timeout=TIMEOUT,
-                                 headers = {'Accept': 'application/vnd.github.v3+json',
-                                            'Accept-Encoding': 'gzip',
-                                            'User-Agent': self.user_agent})
+                                 headers = {**default_headers, **headers})
             response_callback(r)
             if int(r.headers.get('X-RateLimit-Remaining', 1)) < 1:
                 if r.headers.get('X-RateLimit-Reset'):
@@ -1551,15 +1556,18 @@ class Sync(object):
                 done = True
         return ret
 
-    def post(self, path, data):
+    def post(self, path, data, headers={}):
         url = self.url(path)
+        default_headers = {
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json;charset=UTF-8',
+                'User-Agent': self.user_agent
+                }
         self.log.debug('POST: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.post(url, data=json.dumps(data).encode('utf8'),
                               timeout=TIMEOUT,
-                              headers = {'Accept': 'application/vnd.github.v3+json',
-                                         'Content-Type': 'application/json;charset=UTF-8',
-                                         'User-Agent': self.user_agent})
+                              headers = {**default_headers, **headers})
         self.checkResponse(r)
         self.log.debug('Received: %s' % (r.text,))
         ret = None
@@ -1575,36 +1583,45 @@ class Sync(object):
                 raise
         return ret
 
-    def put(self, path, data):
+    def put(self, path, data, headers={}):
         url = self.url(path)
+        default_headers = {
+                'Content-Type': 'application/json;charset=UTF-8',
+                'User-Agent': self.user_agent
+                }
         self.log.debug('PUT: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.put(url, data=json.dumps(data).encode('utf8'),
                              timeout=TIMEOUT,
-                             headers = {'Content-Type': 'application/json;charset=UTF-8',
-                                        'User-Agent': self.user_agent})
+                             headers = {**default_headers, **headers})
         self.checkResponse(r)
         self.log.debug('Received: %s' % (r.text,))
 
-    def patch(self, path, data):
+    def patch(self, path, data, headers={}):
         url = self.url(path)
+        default_headers = {
+                'Content-Type': 'application/json;charset=UTF-8',
+                'User-Agent': self.user_agent
+                }
         self.log.debug('PATCH: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.patch(url, data=json.dumps(data).encode('utf8'),
                              timeout=TIMEOUT,
-                             headers = {'Content-Type': 'application/json;charset=UTF-8',
-                                        'User-Agent': self.user_agent})
+                             headers = {**default_headers, **headers})
         self.checkResponse(r)
         self.log.debug('Received: %s' % (r.text,))
 
-    def delete(self, path, data):
+    def delete(self, path, data, headers={}):
         url = self.url(path)
+        default_headers = {
+                'Content-Type': 'application/json;charset=UTF-8',
+                'User-Agent': self.user_agent
+                }
         self.log.debug('DELETE: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.delete(url, data=json.dumps(data).encode('utf8'),
                                 timeout=TIMEOUT,
-                                headers = {'Content-Type': 'application/json;charset=UTF-8',
-                                           'User-Agent': self.user_agent})
+                                headers = {**default_headers, **headers})
         self.checkResponse(r)
         self.log.debug('Received: %s' % (r.text,))
 
