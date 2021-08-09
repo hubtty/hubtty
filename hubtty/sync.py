@@ -1083,15 +1083,12 @@ class UploadReviewsTask(Task):
     def run(self, sync):
         app = sync.app
         with app.db.getSession() as session:
-            # TODO(mandre) Uncomment when implemented
             for c in session.getPendingLabels():
                 sync.submitTask(SetLabelsTask(c.key, self.priority))
             for c in session.getPendingRebases():
                 sync.submitTask(RebaseChangeTask(c.key, self.priority))
             for c in session.getPendingPullRequestEdits():
                 sync.submitTask(EditPullRequestTask(c.key, self.priority))
-            # for c in session.getPendingCherryPicks():
-            #     sync.submitTask(SendCherryPickTask(c.key, self.priority))
             for c in session.getPendingMerges():
                 sync.submitTask(SendMergeTask(c.key, self.priority))
             for m in session.getPendingMessages():
@@ -1203,34 +1200,6 @@ class EditPullRequestTask(Task):
             # Inside db session for rollback
             sync.patch('repos/%s' % (change.change_id,), edit_params)
             sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
-
-class SendCherryPickTask(Task):
-    def __init__(self, cp_key, priority=NORMAL_PRIORITY):
-        super(SendCherryPickTask, self).__init__(priority)
-        self.cp_key = cp_key
-
-    def __repr__(self):
-        return '<SendCherryPickTask %s>' % (self.cp_key,)
-
-    def __eq__(self, other):
-        if (other.__class__ == self.__class__ and
-            other.cp_key == self.cp_key):
-            return True
-        return False
-
-    def run(self, sync):
-        app = sync.app
-        with app.db.getSession() as session:
-            cp = session.getPendingCherryPick(self.cp_key)
-            data = dict(message=cp.message,
-                        destination=cp.branch)
-            session.delete(cp)
-            # Inside db session for rollback
-            ret = sync.post('changes/%s/revisions/%s/cherrypick' %
-                            (cp.commit.change.change_id, cp.commit.sha),
-                            data)
-        if ret and 'id' in ret:
-            sync.submitTask(SyncChangeTask(ret['id'], priority=self.priority))
 
 class UploadReviewTask(Task):
     def __init__(self, message_key, priority=NORMAL_PRIORITY):

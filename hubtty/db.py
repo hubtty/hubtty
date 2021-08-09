@@ -148,15 +148,6 @@ account_table = Table(
     Column('username', String(255), index=True),
     Column('email', String(255), index=True),
     )
-pending_cherry_pick_table = Table(
-    'pending_cherry_pick', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('commit_key', Integer, ForeignKey("commit.key"), index=True),
-    # Branch is a str here to avoid FK complications if the branch
-    # entry is removed.
-    Column('branch', String(255), nullable=False),
-    Column('message', Text, nullable=False),
-    )
 pending_merge_table = Table(
     'pending_merge', metadata,
     Column('key', Integer, primary_key=True),
@@ -437,15 +428,6 @@ class Commit(object):
         self.sha = sha
         self.parent = parent
 
-    def createPendingCherryPick(self, *args, **kw):
-        session = Session.object_session(self)
-        args = [self] + list(args)
-        c = PendingCherryPick(*args, **kw)
-        self.pending_cherry_picks.append(c)
-        session.add(c)
-        session.flush()
-        return c
-
     def createFile(self, *args, **kw):
         session = Session.object_session(self)
         args = [self] + list(args)
@@ -557,12 +539,6 @@ class Approval(object):
             elif self.reviewer.email:
                 reviewer_name = self.reviewer.email
         return reviewer_name
-
-class PendingCherryPick(object):
-    def __init__(self, commit, branch, message):
-        self.commit_key = commit.key
-        self.branch = branch
-        self.message = message
 
 class PendingMerge(object):
     def __init__(self, change, sha, merge_method, commit_title=None,
@@ -690,8 +666,6 @@ mapper(Commit, commit_table, properties=dict(
                               cascade='all, delete-orphan'),
         files=relationship(File, backref='commit',
                            cascade='all, delete-orphan'),
-        pending_cherry_picks=relationship(PendingCherryPick, backref='commit',
-                                          cascade='all, delete-orphan'),
         checks=relationship(Check, backref='commit',
                             order_by=check_table.c.name,
                             cascade='all, delete-orphan'),
@@ -724,7 +698,6 @@ mapper(Comment, comment_table, properties=dict(
         author=relationship(Account)))
 mapper(Approval, approval_table, properties=dict(
         reviewer=relationship(Account)))
-mapper(PendingCherryPick, pending_cherry_pick_table)
 mapper(PendingMerge, pending_merge_table)
 mapper(SyncQuery, sync_query_table)
 mapper(Server, server_table, properties=dict(
@@ -901,12 +874,6 @@ class DatabaseSession(object):
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
-    def getPendingCherryPick(self, key):
-        try:
-            return self.session().query(PendingCherryPick).filter_by(key=key).one()
-        except sqlalchemy.orm.exc.NoResultFound:
-            return None
-
     def getPendingMerge(self, key):
         try:
             return self.session().query(PendingMerge).filter_by(key=key).one()
@@ -1017,9 +984,6 @@ class DatabaseSession(object):
 
     def getPendingPullRequestEdits(self):
         return self.session().query(Change).filter_by(pending_edit=True).all()
-
-    def getPendingCherryPicks(self):
-        return self.session().query(PendingCherryPick).all()
 
     def getPendingMerges(self):
         return self.session().query(PendingMerge).all()

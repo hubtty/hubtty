@@ -67,37 +67,6 @@ class EditLabelsDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         super(EditLabelsDialog, self).__init__(urwid.LineBox(fill,
                                                              'Set pull request labels'))
 
-class CherryPickDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
-    signals = ['save', 'cancel']
-    def __init__(self, app, change):
-        save_button = mywid.FixedButton('Propose Change')
-        cancel_button = mywid.FixedButton('Cancel')
-        urwid.connect_signal(save_button, 'click',
-                             lambda button:self._emit('save'))
-        urwid.connect_signal(cancel_button, 'click',
-                             lambda button:self._emit('cancel'))
-        button_widgets = [('pack', save_button),
-                          ('pack', cancel_button)]
-        button_columns = urwid.Columns(button_widgets, dividechars=2)
-        rows = []
-        self.entry = mywid.MyEdit(edit_text=change.commits[-1].message,
-                                  multiline=True, ring=app.ring)
-        self.branch_buttons = []
-        rows.append(urwid.Text(u"Branch:"))
-        for branch in change.project.branches:
-            b = mywid.FixedRadioButton(self.branch_buttons, branch.name,
-                                       state=(branch.name == change.branch))
-            rows.append(b)
-        rows.append(urwid.Divider())
-        rows.append(urwid.Text(u"Commit message:"))
-        rows.append(self.entry)
-        rows.append(urwid.Divider())
-        rows.append(button_columns)
-        pile = urwid.Pile(rows)
-        fill = urwid.Filler(pile, valign='top')
-        super(CherryPickDialog, self).__init__(urwid.LineBox(fill,
-                                                             'Propose Change to Branch'))
-
 class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
     signals = ['merge', 'save', 'cancel']
     def __init__(self, app, commit_key, message=''):
@@ -580,8 +549,6 @@ class ChangeView(urwid.WidgetWrap):
              "Edit the labels of this change"),
             (keymap.MERGE_CHANGE,
              "Merge this change"),
-            (keymap.CHERRY_PICK_CHANGE,
-             "Propose this change to another branch"),
             ]
 
     def help(self):
@@ -1062,9 +1029,6 @@ class ChangeView(urwid.WidgetWrap):
         if keymap.EDIT_LABELS in commands:
             self.editLabels()
             return None
-        if keymap.CHERRY_PICK_CHANGE in commands:
-            self.cherryPickChange()
-            return None
         if key in self.app.config.reviewkeys:
             self.reviewKey(self.app.config.reviewkeys[key])
             return None
@@ -1148,37 +1112,6 @@ class ChangeView(urwid.WidgetWrap):
             change_key = change.key
         self.app.sync.submitTask(
             sync.RebaseChangeTask(change_key, sync.HIGH_PRIORITY))
-        self.app.backScreen()
-        self.refresh()
-
-    def cherryPickChange(self):
-        with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            dialog = CherryPickDialog(self.app, change)
-        urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
-        urwid.connect_signal(dialog, 'save', lambda button:
-                                 self.doCherryPickChange(dialog))
-        self.app.popup(dialog,
-                       relative_width=50, relative_height=75,
-                       min_width=60, min_height=20)
-
-
-    def doCherryPickChange(self, dialog):
-        # cp_key = None
-        with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            branch = None
-            for button in dialog.branch_buttons:
-                if button.state:
-                    branch = button.get_label()
-            # message = dialog.entry.edit_text
-            self.app.log.debug("Creating pending cherry-pick of %s to %s" %
-                               (change.commits[-1].sha, branch))
-            # cp = change.commits[-1].createPendingCherryPick(branch, message)
-            # cp_key = cp.key
-        # TODO(mandre) Uncomment when implemented
-        # self.app.sync.submitTask(
-        #     sync.SendCherryPickTask(cp_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
