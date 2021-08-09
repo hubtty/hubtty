@@ -1092,8 +1092,6 @@ class UploadReviewsTask(Task):
                 sync.submitTask(ChangeStatusTask(c.key, self.priority))
             # for c in session.getPendingCherryPicks():
             #     sync.submitTask(SendCherryPickTask(c.key, self.priority))
-            # for r in session.getPendingCommitMessages():
-            #     sync.submitTask(ChangeCommitMessageTask(r.key, self.priority))
             for c in session.getPendingMerges():
                 sync.submitTask(SendMergeTask(c.key, self.priority))
             for m in session.getPendingMessages():
@@ -1169,6 +1167,7 @@ class RebaseChangeTask(Task):
                     }, headers=headers, response_callback=checkResponse)
                 sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
 
+# TODO(mandre) Rename this to EditPullRequestTask or something like that
 class ChangeStatusTask(Task):
     def __init__(self, change_key, priority=NORMAL_PRIORITY):
         super(ChangeStatusTask, self).__init__(priority)
@@ -1193,11 +1192,16 @@ class ChangeStatusTask(Task):
 
             change.pending_status = False
             change.pending_status_message = None
-            # Inside db session for rollback
+            edit_params = {
+                    'title': change.title,
+                    'body': change.body
+                    }
             if change.state == 'closed':
-                sync.patch('repos/%s' % (change.change_id,), {'state': 'close'})
+                edit_params['state'] = 'close'
             elif change.state == 'open':
-                sync.patch('repos/%s' % (change.change_id,), {'state': 'open'})
+                edit_params['state'] = 'open'
+            # Inside db session for rollback
+            sync.patch('repos/%s' % (change.change_id,), edit_params)
             sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
 
 class SendCherryPickTask(Task):
@@ -1227,36 +1231,6 @@ class SendCherryPickTask(Task):
                             data)
         if ret and 'id' in ret:
             sync.submitTask(SyncChangeTask(ret['id'], priority=self.priority))
-
-class ChangeCommitMessageTask(Task):
-    def __init__(self, commit_key, priority=NORMAL_PRIORITY):
-        super(ChangeCommitMessageTask, self).__init__(priority)
-        self.commit_key = commit_key
-
-    def __repr__(self):
-        return '<ChangeCommitMessageTask %s>' % (self.commit_key,)
-
-    def __eq__(self, other):
-        if (other.__class__ == self.__class__ and
-            other.commit_key == self.commit_key):
-            return True
-        return False
-
-    def run(self, sync):
-        app = sync.app
-        with app.db.getSession() as session:
-            commit = session.getCommit(self.commit_key)
-            commit.pending_message = False
-            data = dict(message=commit.message)
-            # Inside db session for rollback
-            edit = sync.get('changes/%s/edit' % commit.change.id)
-            if edit is not None:
-                raise Exception("Edit already in progress on change %s" %
-                                (commit.change.number,))
-            sync.put('changes/%s/edit:message' % (commit.change.id,), data)
-            sync.post('changes/%s/edit:publish' % (commit.change.id,), {})
-            change_id = commit.change.id
-        sync.submitTask(SyncChangeTask(change_id, priority=self.priority))
 
 class UploadReviewTask(Task):
     def __init__(self, message_key, priority=NORMAL_PRIORITY):

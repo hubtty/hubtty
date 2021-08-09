@@ -59,7 +59,7 @@ REBASE_CHANGE = 'rebase change'
 CHERRY_PICK_CHANGE = 'cherry pick change'
 REFRESH = 'refresh'
 EDIT_LABELS = 'edit labels'
-EDIT_COMMIT_MESSAGE = 'edit commit message'
+EDIT_PULL_REQUEST = 'edit pull request'
 MERGE_CHANGE = 'merge change'
 SORT_BY_NUMBER = 'sort by number'
 SORT_BY_UPDATED = 'sort by updated'
@@ -127,7 +127,7 @@ DEFAULT_KEYMAP = {
     CHERRY_PICK_CHANGE: 'ctrl x',
     REFRESH: 'ctrl r',
     EDIT_LABELS: 'meta l',
-    EDIT_COMMIT_MESSAGE: 'ctrl d',
+    EDIT_PULL_REQUEST: 'ctrl d',
     MERGE_CHANGE: 'meta m',
     SORT_BY_NUMBER: [['S', 'n']],
     SORT_BY_UPDATED: [['S', 'u']],
@@ -162,18 +162,18 @@ VI_KEYMAP = {
     CURSOR_UP: ['k', 'up'],
     CURSOR_RIGHT: ['l', 'right'],
     CURSOR_PAGE_UP: ['ctrl u', 'page up'],
-    # 'ctrl d' mapping conflicts with EDIT_COMMIT_MESSAGE
+    # 'ctrl d' mapping conflicts with EDIT_PULL_REQUEST
     CURSOR_PAGE_DOWN: ['ctrl d', 'page down'],
     # The `gg` repetition doesn't seem to work, we bind `g` instead
     CURSOR_MAX_LEFT: ['g', '^', 'home', 'ctrl a'],
-    CURSOR_MAX_RIGHT: ['G', '$', 'end', 'ctrl e'],
+    CURSOR_MAX_RIGHT: ['G', '$', 'end'],
     INTERACTIVE_SEARCH: '/',
     TOGGLE_REVIEWED: [['t', 'r']],
     TOGGLE_HIDDEN: [['t', 'h']],
     TOGGLE_LIST_REVIEWED: [['t', 'R']],
     TOGGLE_LIST_SUBSCRIBED: 'L',
 
-    EDIT_COMMIT_MESSAGE: 'ctrl c',
+    EDIT_PULL_REQUEST: 'ctrl e',
 }
 
 URWID_COMMANDS = frozenset((

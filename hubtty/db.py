@@ -98,7 +98,6 @@ commit_table = Table(
     Column('message', Text, nullable=False),
     Column('sha', String(64), index=True, nullable=False),
     Column('parent', String(64), index=True, nullable=False),
-    Column('pending_message', Boolean, index=True, nullable=False),
     )
 message_table = Table(
     'message', metadata,
@@ -432,12 +431,11 @@ class Change(object):
         return author_name
 
 class Commit(object):
-    def __init__(self, change, message, sha, parent, pending_message=False):
+    def __init__(self, change, message, sha, parent):
         self.change_key = change.key
         self.message = message
         self.sha = sha
         self.parent = parent
-        self.pending_message = pending_message
 
     def createPendingCherryPick(self, *args, **kw):
         session = Session.object_session(self)
@@ -1022,9 +1020,6 @@ class DatabaseSession(object):
 
     def getPendingCherryPicks(self):
         return self.session().query(PendingCherryPick).all()
-
-    def getPendingCommitMessages(self):
-        return self.session().query(Commit).filter_by(pending_message=True).all()
 
     def getPendingMerges(self):
         return self.session().query(PendingMerge).all()
