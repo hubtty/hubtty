@@ -777,9 +777,9 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             for change_key in change_keys:
                 change = session.getChange(change_key)
                 change.state = state
-                change.pending_status = True
-                change.pending_status_message = dialog.entry.edit_text
+                change.pending_edit = True
+                change.pending_edit_message = dialog.entry.edit_text
                 self.app.sync.submitTask(
-                    sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
+                    sync.EditPullRequestTask(change_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()

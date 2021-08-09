@@ -244,6 +244,37 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             return None
         return key
 
+class EditPullRequestDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
+    signals = ['save', 'cancel']
+    def __init__(self, app, change):
+        self.app = app
+        save_button = mywid.FixedButton(u'Save')
+        cancel_button = mywid.FixedButton(u'Cancel')
+        urwid.connect_signal(save_button, 'click',
+            lambda button:self._emit('save'))
+        urwid.connect_signal(cancel_button, 'click',
+            lambda button:self._emit('cancel'))
+
+        button_widgets = [('pack', save_button),
+                          ('pack', cancel_button)]
+        button_columns = urwid.Columns(button_widgets, dividechars=2)
+        rows = []
+
+        self.pr_title = mywid.MyEdit(edit_text=change.title, multiline=False,
+                ring=app.ring)
+        rows.append(urwid.Text(u"Title:"))
+        rows.append(self.pr_title)
+        rows.append(urwid.Divider())
+        self.pr_description = mywid.MyEdit(edit_text=change.body,
+                multiline=True, ring=app.ring)
+        rows.append(urwid.Text(u"Description:"))
+        rows.append(self.pr_description)
+        rows.append(urwid.Divider())
+        rows.append(button_columns)
+        pile = urwid.Pile(rows)
+        fill = urwid.Filler(pile, valign='top')
+        super(EditPullRequestDialog, self).__init__(urwid.LineBox(fill, 'Edit Pull Request'))
+
 class ReviewButton(mywid.FixedButton):
     def __init__(self, commit_row):
         super(ReviewButton, self).__init__(('commit-button', u'Review'))
@@ -537,7 +568,7 @@ class ChangeView(urwid.WidgetWrap):
              "Cherry-pick the most recent commit onto the local repo"),
             (keymap.CLOSE_CHANGE,
              "Close this change"),
-            (keymap.EDIT_COMMIT_MESSAGE,
+            (keymap.EDIT_PULL_REQUEST,
              "Edit the commit message of this change"),
             (keymap.REBASE_CHANGE,
              "Rebase this change (remotely)"),
@@ -679,7 +710,7 @@ class ChangeView(urwid.WidgetWrap):
             if not self.marked_seen:
                 change.last_seen = datetime.datetime.utcnow()
                 self.marked_seen = True
-            self.pending_status_message = change.pending_status_message or ''
+            self.pending_edit_message = change.pending_edit_message or ''
             reviewed = hidden = starred = held = ''
             if change.reviewed:
                 reviewed = ' (reviewed)'
@@ -1011,8 +1042,8 @@ class ChangeView(urwid.WidgetWrap):
         if keymap.CLOSE_CHANGE in commands:
             self.closeChange()
             return None
-        if keymap.EDIT_COMMIT_MESSAGE in commands:
-            self.editCommitMessage()
+        if keymap.EDIT_PULL_REQUEST in commands:
+            self.editPullRequest()
             return None
         if keymap.REBASE_CHANGE in commands:
             self.rebaseChange()
@@ -1049,7 +1080,7 @@ class ChangeView(urwid.WidgetWrap):
     def closeChange(self):
         dialog = mywid.TextEditDialog(u'Close pull request', u'Message:',
                                       u'Close pull request',
-                                      self.pending_status_message)
+                                      self.pending_edit_message)
         urwid.connect_signal(dialog, 'cancel', lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'save', lambda button:
                                  self.doCloseReopenChange(dialog, 'closed'))
@@ -1058,7 +1089,7 @@ class ChangeView(urwid.WidgetWrap):
     def reopenChange(self):
         dialog = mywid.TextEditDialog(u'Reopen pull request', u'Message:',
                                       u'Reopen pull request',
-                                      self.pending_status_message)
+                                      self.pending_edit_message)
         urwid.connect_signal(dialog, 'cancel', lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'save', lambda button:
                                  self.doCloseReopenChange(dialog, 'open'))
@@ -1069,37 +1100,36 @@ class ChangeView(urwid.WidgetWrap):
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
             change.state = state
-            change.pending_status = True
-            change.pending_status_message = dialog.entry.edit_text
+            change.pending_edit = True
+            change.pending_edit_message = dialog.entry.edit_text
             change_key = change.key
         self.app.sync.submitTask(
-            sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
+            sync.EditPullRequestTask(change_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
-    def editCommitMessage(self):
+    def editPullRequest(self):
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
-            dialog = mywid.TextEditDialog(u'Edit Commit Message', u'Commit message:',
-                                          u'Save', change.commits[-1].message)
-        urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
+            dialog = EditPullRequestDialog(self.app, change)
+        urwid.connect_signal(dialog, 'cancel',
+                    lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'save', lambda button:
-                                 self.doEditCommitMessage(dialog))
+                                 self.doEditPullRequest(dialog))
         self.app.popup(dialog,
                        relative_width=50, relative_height=75,
                        min_width=60, min_height=20)
 
-    def doEditCommitMessage(self, dialog):
-        # commit_key = None
+    def doEditPullRequest(self, dialog):
+        change_key = None
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
-            commit = change.commits[-1]
-            commit.message = dialog.entry.edit_text
-            commit.pending_message = True
-            # commit_key = commit.key
-        # TODO(mandre) Uncomment when implemented
-        # self.app.sync.submitTask(
-        #     sync.ChangeCommitMessageTask(commit_key, sync.HIGH_PRIORITY))
+            change.title = dialog.pr_title.edit_text
+            change.body = dialog.pr_description.edit_text
+            change.pending_edit = True
+            change_key = change.key
+        self.app.sync.submitTask(
+            sync.EditPullRequestTask(change_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
