@@ -710,7 +710,7 @@ class ChangeView(urwid.WidgetWrap):
             if not self.marked_seen:
                 change.last_seen = datetime.datetime.utcnow()
                 self.marked_seen = True
-            self.pending_status_message = change.pending_status_message or ''
+            self.pending_edit_message = change.pending_edit_message or ''
             reviewed = hidden = starred = held = ''
             if change.reviewed:
                 reviewed = ' (reviewed)'
@@ -1080,7 +1080,7 @@ class ChangeView(urwid.WidgetWrap):
     def closeChange(self):
         dialog = mywid.TextEditDialog(u'Close pull request', u'Message:',
                                       u'Close pull request',
-                                      self.pending_status_message)
+                                      self.pending_edit_message)
         urwid.connect_signal(dialog, 'cancel', lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'save', lambda button:
                                  self.doCloseReopenChange(dialog, 'closed'))
@@ -1089,7 +1089,7 @@ class ChangeView(urwid.WidgetWrap):
     def reopenChange(self):
         dialog = mywid.TextEditDialog(u'Reopen pull request', u'Message:',
                                       u'Reopen pull request',
-                                      self.pending_status_message)
+                                      self.pending_edit_message)
         urwid.connect_signal(dialog, 'cancel', lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'save', lambda button:
                                  self.doCloseReopenChange(dialog, 'open'))
@@ -1100,11 +1100,11 @@ class ChangeView(urwid.WidgetWrap):
         with self.app.db.getSession() as session:
             change = session.getChange(self.change_key)
             change.state = state
-            change.pending_status = True
-            change.pending_status_message = dialog.entry.edit_text
+            change.pending_edit = True
+            change.pending_edit_message = dialog.entry.edit_text
             change_key = change.key
         self.app.sync.submitTask(
-            sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
+            sync.EditPullRequestTask(change_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
@@ -1126,10 +1126,10 @@ class ChangeView(urwid.WidgetWrap):
             change = session.getChange(self.change_key)
             change.title = dialog.pr_title.edit_text
             change.body = dialog.pr_description.edit_text
-            change.pending_status = True
+            change.pending_edit = True
             change_key = change.key
         self.app.sync.submitTask(
-            sync.ChangeStatusTask(change_key, sync.HIGH_PRIORITY))
+            sync.EditPullRequestTask(change_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 

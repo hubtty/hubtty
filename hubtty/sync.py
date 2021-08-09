@@ -1088,8 +1088,8 @@ class UploadReviewsTask(Task):
                 sync.submitTask(SetLabelsTask(c.key, self.priority))
             for c in session.getPendingRebases():
                 sync.submitTask(RebaseChangeTask(c.key, self.priority))
-            for c in session.getPendingStatusChanges():
-                sync.submitTask(ChangeStatusTask(c.key, self.priority))
+            for c in session.getPendingPullRequestEdits():
+                sync.submitTask(EditPullRequestTask(c.key, self.priority))
             # for c in session.getPendingCherryPicks():
             #     sync.submitTask(SendCherryPickTask(c.key, self.priority))
             for c in session.getPendingMerges():
@@ -1168,13 +1168,13 @@ class RebaseChangeTask(Task):
                 sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
 
 # TODO(mandre) Rename this to EditPullRequestTask or something like that
-class ChangeStatusTask(Task):
+class EditPullRequestTask(Task):
     def __init__(self, change_key, priority=NORMAL_PRIORITY):
-        super(ChangeStatusTask, self).__init__(priority)
+        super(EditPullRequestTask, self).__init__(priority)
         self.change_key = change_key
 
     def __repr__(self):
-        return '<ChangeStatusTask %s>' % (self.change_key,)
+        return '<EditPullRequestTask %s>' % (self.change_key,)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -1186,12 +1186,12 @@ class ChangeStatusTask(Task):
         app = sync.app
         with app.db.getSession() as session:
             change = session.getChange(self.change_key)
-            if change.pending_status_message:
+            if change.pending_edit_message:
                 sync.post(('repos/%s/comments' % change.change_id).replace('/pulls/', '/issues/'),
-                        {'body': change.pending_status_message})
+                        {'body': change.pending_edit_message})
 
-            change.pending_status = False
-            change.pending_status_message = None
+            change.pending_edit = False
+            change.pending_edit_message = None
             edit_params = {
                     'title': change.title,
                     'body': change.body

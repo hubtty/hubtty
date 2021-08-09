@@ -83,9 +83,9 @@ change_table = Table(
     Column('starred', Boolean, index=True, nullable=False),
     Column('held', Boolean, index=True, nullable=False),
     Column('pending_rebase', Boolean, index=True, nullable=False),
-    Column('pending_status', Boolean, index=True, nullable=False),
+    Column('pending_edit', Boolean, index=True, nullable=False),
     Column('pending_labels', Boolean, index=True, nullable=False),
-    Column('pending_status_message', Text),
+    Column('pending_edit_message', Text),
     Column('last_seen', DateTime, index=True),
     Column('outdated', Boolean, index=True, nullable=False),
     Column('merged', Boolean, index=True, nullable=False),
@@ -311,7 +311,7 @@ class Change(object):
                  title, body, created, updated, state, additions, deletions,
                  html_url, merged, mergeable, hidden=False, reviewed=False,
                  starred=False, held=False, pending_rebase=False,
-                 pending_status=False, pending_status_message=None,
+                 pending_edit=False, pending_edit_message=None,
                  pending_labels=False, outdated=False):
         self.project_key = project.key
         self.account_key = author.key
@@ -333,8 +333,8 @@ class Change(object):
         self.held = held
         self.pending_rebase = pending_rebase
         self.pending_labels = pending_labels
-        self.pending_status = pending_status
-        self.pending_status_message = pending_status_message
+        self.pending_edit = pending_edit
+        self.pending_edit_message = pending_edit_message
         self.outdated = outdated
         self.merged = merged
         self.mergeable = mergeable
@@ -1015,8 +1015,8 @@ class DatabaseSession(object):
     def getPendingRebases(self):
         return self.session().query(Change).filter_by(pending_rebase=True).all()
 
-    def getPendingStatusChanges(self):
-        return self.session().query(Change).filter_by(pending_status=True).all()
+    def getPendingPullRequestEdits(self):
+        return self.session().query(Change).filter_by(pending_edit=True).all()
 
     def getPendingCherryPicks(self):
         return self.session().query(PendingCherryPick).all()
