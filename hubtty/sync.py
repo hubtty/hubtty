@@ -1086,8 +1086,8 @@ class UploadReviewsTask(Task):
             # TODO(mandre) Uncomment when implemented
             for c in session.getPendingLabels():
                 sync.submitTask(SetLabelsTask(c.key, self.priority))
-            # for c in session.getPendingRebases():
-            #     sync.submitTask(RebaseChangeTask(c.key, self.priority))
+            for c in session.getPendingRebases():
+                sync.submitTask(RebaseChangeTask(c.key, self.priority))
             for c in session.getPendingStatusChanges():
                 sync.submitTask(ChangeStatusTask(c.key, self.priority))
             # for c in session.getPendingCherryPicks():
@@ -1144,12 +1144,30 @@ class RebaseChangeTask(Task):
 
     def run(self, sync):
         app = sync.app
+
+        def checkResponse(response):
+            self.log.debug('HTTP status code: %d', response.status_code)
+            if response.status_code == 503:
+                raise OfflineError("Received 503 status code")
+            elif response.status_code == 422:
+                error_msg = 'Failed to rebase change %s: %s' % (change.change_id, response.json()['message'])
+                app.error(error_msg)
+                self.log.error(error_msg)
+            elif response.status_code >= 400:
+                raise Exception("Received %s status code: %s"
+                                % (response.status_code, response.text))
+
         with app.db.getSession() as session:
             change = session.getChange(self.change_key)
             change.pending_rebase = False
-            # Inside db session for rollback
-            sync.post('changes/%s/rebase' % (change.id,), {})
-            sync.submitTask(SyncChangeTask(change.id, priority=self.priority))
+            latest_commit = change.commits[-1]
+            if latest_commit:
+                headers = {'Accept': 'application/vnd.github.lydian-preview+json'}
+                # Inside db session for rollback
+                sync.put('repos/%s/update-branch' % (change.change_id,), {
+                    'expected_head_sha': latest_commit.sha,
+                    }, headers=headers, response_callback=checkResponse)
+                sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
 
 class ChangeStatusTask(Task):
     def __init__(self, change_key, priority=NORMAL_PRIORITY):
@@ -1508,21 +1526,26 @@ class Sync(object):
             raise Exception("Received %s status code: %s"
                             % (response.status_code, response.text))
 
-    def get(self, path, response_callback=None):
+    def get(self, path, headers={}, response_callback=None):
         url = self.url(path)
         ret = None
         done = False
+
+        default_headers = {
+                'Accept': 'application/vnd.github.v3+json',
+                'Accept-Encoding': 'gzip',
+                'User-Agent': self.user_agent
+                }
 
         if not response_callback:
             response_callback = self.checkResponse
 
         while not done:
             self.log.debug('GET: %s' % (url,))
+
             r = self.session.get(url,
                                  timeout=TIMEOUT,
-                                 headers = {'Accept': 'application/vnd.github.v3+json',
-                                            'Accept-Encoding': 'gzip',
-                                            'User-Agent': self.user_agent})
+                                 headers = {**default_headers, **headers})
             response_callback(r)
             if int(r.headers.get('X-RateLimit-Remaining', 1)) < 1:
                 if r.headers.get('X-RateLimit-Reset'):
@@ -1551,21 +1574,24 @@ class Sync(object):
                 done = True
         return ret
 
-    def post(self, path, data):
+    def post(self, path, data, headers={}, response_callback=None):
         url = self.url(path)
+        default_headers = {
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json;charset=UTF-8',
+                'User-Agent': self.user_agent
+                }
+        if not response_callback:
+            response_callback = self.checkResponse
+
         self.log.debug('POST: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.post(url, data=json.dumps(data).encode('utf8'),
                               timeout=TIMEOUT,
-                              headers = {'Accept': 'application/vnd.github.v3+json',
-                                         'Content-Type': 'application/json;charset=UTF-8',
-                                         'User-Agent': self.user_agent})
-        self.checkResponse(r)
+                              headers = {**default_headers, **headers})
+        response_callback(r)
         self.log.debug('Received: %s' % (r.text,))
         ret = None
-        if r.status_code >= 400:
-            raise Exception("POST to %s failed with http code %s (%s)",
-                            path, r.status_code, r.text)
         if r.text and len(r.text)>0:
             try:
                 ret = json.loads(r.text)
@@ -1575,37 +1601,55 @@ class Sync(object):
                 raise
         return ret
 
-    def put(self, path, data):
+    def put(self, path, data, headers={}, response_callback=None):
         url = self.url(path)
+        default_headers = {
+                'Content-Type': 'application/json;charset=UTF-8',
+                'User-Agent': self.user_agent
+                }
+        if not response_callback:
+            response_callback = self.checkResponse
+
         self.log.debug('PUT: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.put(url, data=json.dumps(data).encode('utf8'),
                              timeout=TIMEOUT,
-                             headers = {'Content-Type': 'application/json;charset=UTF-8',
-                                        'User-Agent': self.user_agent})
-        self.checkResponse(r)
+                             headers = {**default_headers, **headers})
+        response_callback(r)
         self.log.debug('Received: %s' % (r.text,))
 
-    def patch(self, path, data):
+    def patch(self, path, data, headers={}, response_callback=None):
         url = self.url(path)
+        default_headers = {
+                'Content-Type': 'application/json;charset=UTF-8',
+                'User-Agent': self.user_agent
+                }
+        if not response_callback:
+            response_callback = self.checkResponse
+
         self.log.debug('PATCH: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.patch(url, data=json.dumps(data).encode('utf8'),
                              timeout=TIMEOUT,
-                             headers = {'Content-Type': 'application/json;charset=UTF-8',
-                                        'User-Agent': self.user_agent})
-        self.checkResponse(r)
+                             headers = {**default_headers, **headers})
+        response_callback(r)
         self.log.debug('Received: %s' % (r.text,))
 
-    def delete(self, path, data):
+    def delete(self, path, data, headers={}, response_callback=None):
         url = self.url(path)
+        default_headers = {
+                'Content-Type': 'application/json;charset=UTF-8',
+                'User-Agent': self.user_agent
+                }
+        if not response_callback:
+            response_callback = self.checkResponse
+
         self.log.debug('DELETE: %s' % (url,))
         self.log.debug('data: %s' % (data,))
         r = self.session.delete(url, data=json.dumps(data).encode('utf8'),
                                 timeout=TIMEOUT,
-                                headers = {'Content-Type': 'application/json;charset=UTF-8',
-                                           'User-Agent': self.user_agent})
-        self.checkResponse(r)
+                                headers = {**default_headers, **headers})
+        response_callback(r)
         self.log.debug('Received: %s' % (r.text,))
 
     def syncSubscribedProjects(self):
