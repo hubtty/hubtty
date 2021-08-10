@@ -16,7 +16,6 @@
 import collections
 import errno
 import logging
-import math
 import os
 import threading
 import json
@@ -402,12 +401,6 @@ class SyncSubscribedProjectsTask(Task):
             t = SyncProjectTask(keys[i:i+10], self.priority)
             self.tasks.append(t)
             sync.submitTask(t)
-        # t = SyncQueriedChangesTask('author', 'is:author', self.priority)
-        # self.tasks.append(t)
-        # sync.submitTask(t)
-        # t = SyncQueriedChangesTask('starred', 'is:starred', self.priority)
-        # self.tasks.append(t)
-        # sync.submitTask(t)
 
 class SyncProjectTask(Task):
     def __init__(self, project_keys, priority=NORMAL_PRIORITY):
@@ -484,144 +477,6 @@ class SetProjectUpdatedTask(Task):
         with app.db.getSession() as session:
             project = session.getProject(self.project_key)
             project.updated = self.updated
-
-class SyncQueriedChangesTask(Task):
-    def __init__(self, query_name, query, priority=NORMAL_PRIORITY):
-        super(SyncQueriedChangesTask, self).__init__(priority)
-        self.query_name = query_name
-        self.query = query
-
-    def __repr__(self):
-        return '<SyncQueriedChangesTask %s>' % self.query_name
-
-    def __eq__(self, other):
-        if (other.__class__ == self.__class__ and
-            other.query_name == self.query_name and
-            other.query == self.query):
-            return True
-        return False
-
-    def run(self, sync):
-        app = sync.app
-        now = datetime.datetime.utcnow()
-        with app.db.getSession() as session:
-            sync_query = session.getSyncQueryByName(self.query_name)
-            query = 'q=%s' % self.query
-            if sync_query.updated:
-                # Allow 4 seconds for request time, etc.
-                query += ' -age:%ss' % (int(math.ceil((now-sync_query.updated).total_seconds())) + 4,)
-            else:
-                query += ' status:open'
-            for project in session.getProjects(subscribed=True):
-                query += ' -project:%s' % project.name
-        changes = []
-        sortkey = ''
-        done = False
-        offset = 0
-        while not done:
-            # We don't actually want to limit to 500, but that's the server-side default, and
-            # if we don't specify this, we won't get a _more_changes flag.
-            q = 'changes/?n=500%s&%s' % (sortkey, query)
-            self.log.debug('Query: %s ' % (q,))
-            batch = sync.get(q)
-            done = True
-            if batch:
-                changes += batch
-                if '_more_changes' in batch[-1]:
-                    done = False
-                    if '_sortkey' in batch[-1]:
-                        sortkey = '&N=%s' % (batch[-1]['_sortkey'],)
-                    else:
-                        offset += len(batch)
-                        sortkey = '&start=%s' % (offset,)
-        change_ids = [c['id'] for c in changes]
-        with app.db.getSession() as session:
-            # Winnow the list of IDs to only the ones in the local DB.
-            change_ids = session.getChangeIDs(change_ids)
-
-        for c in changes:
-            # For now, just sync open changes or changes already
-            # in the db optionally we could sync all changes ever
-            if c['id'] in change_ids or (c['state'] != 'closed'):
-                sync.submitTask(SyncChangeTask(c['id'], priority=self.priority))
-        sync.submitTask(SetSyncQueryUpdatedTask(self.query_name, now, priority=self.priority))
-
-class SetSyncQueryUpdatedTask(Task):
-    def __init__(self, query_name, updated, priority=NORMAL_PRIORITY):
-        super(SetSyncQueryUpdatedTask, self).__init__(priority)
-        self.query_name = query_name
-        self.updated = updated
-
-    def __repr__(self):
-        return '<SetSyncQueryUpdatedTask %s %s>' % (self.query_name, self.updated)
-
-    def __eq__(self, other):
-        if (other.__class__ == self.__class__ and
-            other.query_name == self.query_name and
-            other.updated == self.updated):
-            return True
-        return False
-
-    def run(self, sync):
-        app = sync.app
-        with app.db.getSession() as session:
-            sync_query = session.getSyncQueryByName(self.query_name)
-            sync_query.updated = self.updated
-
-class SyncChangesByCommitsTask(Task):
-    def __init__(self, commits, priority=NORMAL_PRIORITY):
-        super(SyncChangesByCommitsTask, self).__init__(priority)
-        self.commits = commits
-
-    def __repr__(self):
-        return '<SyncChangesByCommitsTask %s>' % (self.commits,)
-
-    def __eq__(self, other):
-        if (other.__class__ == self.__class__ and
-            other.commits == self.commits):
-            return True
-        return False
-
-    def run(self, sync):
-        query = ' OR '.join(['commit:%s' % x for x in self.commits])
-        changes = sync.get('changes/?q=%s' % query)
-        self.log.debug('Query: %s ' % (query,))
-        for c in changes:
-            sync.submitTask(SyncChangeTask(c['id'], priority=self.priority))
-            self.log.debug("Sync change %s for its commit" % (c['id'],))
-
-    def addCommit(self, commit):
-        if commit in self.commits:
-            return True
-        # 100 should be under the URL length limit
-        if len(self.commits) >= 100:
-            return False
-        self.commits.append(commit)
-        return True
-
-class SyncChangeByNumberTask(Task):
-    def __init__(self, number, priority=NORMAL_PRIORITY):
-        super(SyncChangeByNumberTask, self).__init__(priority)
-        self.number = number
-
-    def __repr__(self):
-        return '<SyncChangeByNumberTask %s>' % (self.number,)
-
-    def __eq__(self, other):
-        if (other.__class__ == self.__class__ and
-            other.number == self.number):
-            return True
-        return False
-
-    def run(self, sync):
-        query = '%s' % self.number
-        changes = sync.get('changes/?q=%s' % query)
-        self.log.debug('Query: %s ' % (query,))
-        for c in changes:
-            task = SyncChangeTask(c['id'], priority=self.priority)
-            self.tasks.append(task)
-            sync.submitTask(task)
-            self.log.debug("Sync change %s because it is number %s" % (c['id'], self.number))
 
 class SyncOutdatedChangesTask(Task):
     def __init__(self, priority=NORMAL_PRIORITY):
@@ -861,20 +716,6 @@ class SyncChangeTask(Task):
                                                  remote_commit['parents'][0]['sha'])
                     self.log.info("Created new commit %s for change %s in local DB.",
                                   commit.key, self.change_id)
-            #     # TODO: handle multiple parents
-            #     if commit.parent not in parent_commits:
-            #         parent_commit = change.getCommitBySha(commit.parent)
-            #         if not parent_commit and change.state != 'closed':
-            #             sync._syncChangeByCommit(commit.parent, self.priority)
-            #             self.log.debug("Change %s needs parent commit %s synced" %
-            #                            (change.change_id, commit.parent))
-            #         parent_commits.add(commit.parent)
-            #     result.updateRelatedChanges(session, change)
-
-            #     f = commit.getFile('/COMMIT_MSG')
-            #     if f is None:
-            #         f = commit.createFile('/COMMIT_MSG', None,
-            #                                 None, None, None)
 
                 remote_commit_details = remote_commit.get('_hubtty_remote_commit_details', {})
                 for file in remote_commit_details['files']:
@@ -1164,7 +1005,6 @@ class RebaseChangeTask(Task):
                     }, headers=headers, response_callback=checkResponse)
                 sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
 
-# TODO(mandre) Rename this to EditPullRequestTask or something like that
 class EditPullRequestTask(Task):
     def __init__(self, change_key, priority=NORMAL_PRIORITY):
         super(EditPullRequestTask, self).__init__(priority)
@@ -1615,18 +1455,6 @@ class Sync(object):
         if task.wait():
             for subtask in task.tasks:
                 subtask.wait()
-
-    def _syncChangeByCommit(self, commit, priority):
-        # Accumulate sync change by commit tasks because they often
-        # come in batches.  This method assumes it is being called
-        # from within the run queue already and therefore does not
-        # need to worry about locking the queue.
-        task = None
-        for task in self.queue.find(SyncChangesByCommitsTask, priority):
-            if task.addCommit(commit):
-                return
-        task = SyncChangesByCommitsTask([commit], priority)
-        self.submitTask(task)
 
     def query(self, query):
         q = 'search/issues?per_page=100&q=%s' % query

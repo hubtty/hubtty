@@ -157,12 +157,6 @@ pending_merge_table = Table(
     Column('sha', String(255), nullable=False),
     Column('merge_method', String(255), nullable=False),
     )
-sync_query_table = Table(
-    'sync_query', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('name', String(255), index=True, unique=True, nullable=False),
-    Column('updated', DateTime),
-    )
 file_table = Table(
     'file', metadata,
     Column('key', Integer, primary_key=True),
@@ -549,10 +543,6 @@ class PendingMerge(object):
         self.sha = sha
         self.merge_method = merge_method
 
-class SyncQuery(object):
-    def __init__(self, name):
-        self.name = name
-
 class File(object):
     def __init__(self, commit, path, status, old_path=None,
                  inserted=None, deleted=None):
@@ -699,7 +689,6 @@ mapper(Comment, comment_table, properties=dict(
 mapper(Approval, approval_table, properties=dict(
         reviewer=relationship(Account)))
 mapper(PendingMerge, pending_merge_table)
-mapper(SyncQuery, sync_query_table)
 mapper(Server, server_table, properties=dict(
     own_account=relationship(Account)
     ))
@@ -837,12 +826,6 @@ class DatabaseSession(object):
             return self.session().query(Topic).filter_by(name=name).one()
         except sqlalchemy.orm.exc.NoResultFound:
             return None
-
-    def getSyncQueryByName(self, name):
-        try:
-            return self.session().query(SyncQuery).filter_by(name=name).one()
-        except sqlalchemy.orm.exc.NoResultFound:
-            return self.createSyncQuery(name)
 
     def getChange(self, key, lazy=True):
         query = self.session().query(Change).filter_by(key=key)
@@ -1055,12 +1038,6 @@ class DatabaseSession(object):
         self.session().add(a)
         self.session().flush()
         return a
-
-    def createSyncQuery(self, *args, **kw):
-        o = SyncQuery(*args, **kw)
-        self.session().add(o)
-        self.session().flush()
-        return o
 
     def createTopic(self, *args, **kw):
         o = Topic(*args, **kw)

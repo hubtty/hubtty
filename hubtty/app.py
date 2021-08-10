@@ -552,30 +552,7 @@ class App(object):
                 changes = session.getChangesByChangeID(changeid)
             change_keys = [c.key for c in changes if c]
             restids = [c.change_id for c in changes if c]
-        if not change_keys:
-            if self.sync.offline:
-                raise Exception('Can not sync change while offline.')
-            dialog = mywid.SystemMessage("Syncing change...")
-            self.popup(dialog, width=40, height=6)
-            self.loop.draw_screen()
-            try:
-                task = sync.SyncChangeByNumberTask(number or changeid, sync.HIGH_PRIORITY)
-                self.sync.submitTask(task)
-                succeeded = task.wait(300)
-                if not succeeded:
-                    raise Exception('Unable to find change.')
-                for subtask in task.tasks:
-                    succeeded = subtask.wait(300)
-                    if not succeeded:
-                        raise Exception('Unable to sync change.')
-            finally:
-                # Remove "syncing..." popup
-                self.backScreen()
-            with self.db.getSession() as session:
-                if changeid:
-                    changes = session.getChangesByChangeID(changeid)
-                change_keys = [c.key for c in changes if c]
-        elif restids:
+        if restids:
             for restid in restids:
                 task = sync.SyncChangeTask(restid, sync.HIGH_PRIORITY)
                 self.sync.submitTask(task)
