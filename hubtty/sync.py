@@ -478,37 +478,6 @@ class SetProjectUpdatedTask(Task):
             project = session.getProject(self.project_key)
             project.updated = self.updated
 
-class SyncChangesByCommitsTask(Task):
-    def __init__(self, commits, priority=NORMAL_PRIORITY):
-        super(SyncChangesByCommitsTask, self).__init__(priority)
-        self.commits = commits
-
-    def __repr__(self):
-        return '<SyncChangesByCommitsTask %s>' % (self.commits,)
-
-    def __eq__(self, other):
-        if (other.__class__ == self.__class__ and
-            other.commits == self.commits):
-            return True
-        return False
-
-    def run(self, sync):
-        query = ' OR '.join(['commit:%s' % x for x in self.commits])
-        changes = sync.get('changes/?q=%s' % query)
-        self.log.debug('Query: %s ' % (query,))
-        for c in changes:
-            sync.submitTask(SyncChangeTask(c['id'], priority=self.priority))
-            self.log.debug("Sync change %s for its commit" % (c['id'],))
-
-    def addCommit(self, commit):
-        if commit in self.commits:
-            return True
-        # 100 should be under the URL length limit
-        if len(self.commits) >= 100:
-            return False
-        self.commits.append(commit)
-        return True
-
 class SyncChangeByNumberTask(Task):
     def __init__(self, number, priority=NORMAL_PRIORITY):
         super(SyncChangeByNumberTask, self).__init__(priority)
@@ -771,20 +740,6 @@ class SyncChangeTask(Task):
                                                  remote_commit['parents'][0]['sha'])
                     self.log.info("Created new commit %s for change %s in local DB.",
                                   commit.key, self.change_id)
-            #     # TODO: handle multiple parents
-            #     if commit.parent not in parent_commits:
-            #         parent_commit = change.getCommitBySha(commit.parent)
-            #         if not parent_commit and change.state != 'closed':
-            #             sync._syncChangeByCommit(commit.parent, self.priority)
-            #             self.log.debug("Change %s needs parent commit %s synced" %
-            #                            (change.change_id, commit.parent))
-            #         parent_commits.add(commit.parent)
-            #     result.updateRelatedChanges(session, change)
-
-            #     f = commit.getFile('/COMMIT_MSG')
-            #     if f is None:
-            #         f = commit.createFile('/COMMIT_MSG', None,
-            #                                 None, None, None)
 
                 remote_commit_details = remote_commit.get('_hubtty_remote_commit_details', {})
                 for file in remote_commit_details['files']:
@@ -1524,18 +1479,6 @@ class Sync(object):
         if task.wait():
             for subtask in task.tasks:
                 subtask.wait()
-
-    def _syncChangeByCommit(self, commit, priority):
-        # Accumulate sync change by commit tasks because they often
-        # come in batches.  This method assumes it is being called
-        # from within the run queue already and therefore does not
-        # need to worry about locking the queue.
-        task = None
-        for task in self.queue.find(SyncChangesByCommitsTask, priority):
-            if task.addCommit(commit):
-                return
-        task = SyncChangesByCommitsTask([commit], priority)
-        self.submitTask(task)
 
     def query(self, query):
         q = 'search/issues?per_page=100&q=%s' % query
