@@ -56,7 +56,6 @@ TOGGLE_HIDDEN_COMMENTS = 'toggle hidden comments'
 CLOSE_CHANGE = 'close change'
 REOPEN_CHANGE = 'reopen change'
 REBASE_CHANGE = 'rebase change'
-CHERRY_PICK_CHANGE = 'cherry pick change'
 REFRESH = 'refresh'
 EDIT_LABELS = 'edit labels'
 EDIT_PULL_REQUEST = 'edit pull request'
@@ -124,7 +123,6 @@ DEFAULT_KEYMAP = {
     CLOSE_CHANGE: 'meta c',
     REOPEN_CHANGE: 'ctrl e',
     REBASE_CHANGE: 'ctrl b',
-    CHERRY_PICK_CHANGE: 'ctrl x',
     REFRESH: 'ctrl r',
     EDIT_LABELS: 'meta l',
     EDIT_PULL_REQUEST: 'ctrl d',
