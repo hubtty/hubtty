@@ -478,30 +478,6 @@ class SetProjectUpdatedTask(Task):
             project = session.getProject(self.project_key)
             project.updated = self.updated
 
-class SyncChangeByNumberTask(Task):
-    def __init__(self, number, priority=NORMAL_PRIORITY):
-        super(SyncChangeByNumberTask, self).__init__(priority)
-        self.number = number
-
-    def __repr__(self):
-        return '<SyncChangeByNumberTask %s>' % (self.number,)
-
-    def __eq__(self, other):
-        if (other.__class__ == self.__class__ and
-            other.number == self.number):
-            return True
-        return False
-
-    def run(self, sync):
-        query = '%s' % self.number
-        changes = sync.get('changes/?q=%s' % query)
-        self.log.debug('Query: %s ' % (query,))
-        for c in changes:
-            task = SyncChangeTask(c['id'], priority=self.priority)
-            self.tasks.append(task)
-            sync.submitTask(task)
-            self.log.debug("Sync change %s because it is number %s" % (c['id'], self.number))
-
 class SyncOutdatedChangesTask(Task):
     def __init__(self, priority=NORMAL_PRIORITY):
         super(SyncOutdatedChangesTask, self).__init__(priority)
