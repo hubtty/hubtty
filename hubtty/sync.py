@@ -1074,7 +1074,6 @@ class RebaseChangeTask(Task):
                     }, headers=headers, response_callback=checkResponse)
                 sync.submitTask(SyncChangeTask(change.change_id, priority=self.priority))
 
-# TODO(mandre) Rename this to EditPullRequestTask or something like that
 class EditPullRequestTask(Task):
     def __init__(self, change_key, priority=NORMAL_PRIORITY):
         super(EditPullRequestTask, self).__init__(priority)
