@@ -429,9 +429,8 @@ class SyncProjectTask(Task):
                 project = session.getProject(project_key)
                 if project.updated:
                     partial_sync.append(project.name)
-                    # We can use the oldest sync time of the bunch, because
-                    # when we sync projects individually when subscribing to
-                    # them.
+                    # We can use the oldest sync time of the bunch, because we
+                    # sync projects individually when subscribing to them.
                     if project.updated < sync_from:
                         sync_from = project.updated
                 else:
@@ -441,8 +440,16 @@ class SyncProjectTask(Task):
             for project_name in projects:
                 query += ' repo:%s' % project_name
             changes = sync.query(query)
+            change_ids = [c['pull_request']['url'].split('repos/')[1] for c in changes]
+            with app.db.getSession() as session:
+                # Winnow the list of IDs to only the ones in the local DB.
+                change_ids = session.getChangeIDs(change_ids)
             for c in changes:
-                sync.submitTask(SyncChangeTask(c['pull_request']['url'].split('repos/')[1], priority=self.priority))
+                change_id = c['pull_request']['url'].split('repos/')[1]
+                # For now, just sync open changes or changes already
+                # in the db optionally we could sync all changes ever
+                if change_id in change_ids or c['state'] == 'open':
+                    sync.submitTask(SyncChangeTask(change_id, priority=self.priority))
 
         if full_sync:
             query = 'type:pr state:open'
