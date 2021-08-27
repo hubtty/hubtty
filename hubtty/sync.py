@@ -1345,6 +1345,9 @@ class Sync(object):
             # https://docs.github.com/en/rest/reference/search#timeouts-and-incomplete-results
             if r.status_code == 200:
                 result = json.loads(r.text)
+                # Search queries will store results under the 'items' key
+                if isinstance(result, dict) and 'items' in result:
+                    result = result.get('items', [])
                 if isinstance(ret, list):
                     ret.extend(result)
                 else:
@@ -1461,5 +1464,4 @@ class Sync(object):
     def query(self, query):
         q = 'search/issues?per_page=100&q=%s' % query
         self.log.debug('Query: %s' % (q,))
-        response = self.get(q)
-        return response.get('items', [])
+        return self.get(q)
