@@ -848,7 +848,7 @@ class DatabaseSession(object):
         # locally with the remote changes.
         if not ids:
             return set()
-        query = self.session().query(Change.id)
+        query = self.session().query(Change.change_id)
         return set(ids).intersection(r[0] for r in query.all())
 
     def getChangesByChangeID(self, change_id):
