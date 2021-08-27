@@ -604,7 +604,9 @@ class SyncChangeTask(Task):
         app = sync.app
         remote_change = sync.get('repos/%s' % self.change_id)
         remote_commits = sync.get('repos/%s/commits?per_page=100' % self.change_id)
-        remote_pr_comments = sync.get('repos/%s/comments?per_page=100' % self.change_id)
+        # Limit to 50, as github seems to struggle sending more comments
+        # https://github.com/hubtty/hubtty/issues/59
+        remote_pr_comments = sync.get('repos/%s/comments?per_page=50' % self.change_id)
         remote_pr_reviews = sync.get('repos/%s/reviews?per_page=100' % self.change_id)
         remote_issue_comments = sync.get(('repos/%s/comments?per_page=100'
                                           % self.change_id).replace('/pulls/', '/issues/'))
