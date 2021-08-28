@@ -102,8 +102,8 @@ class ConfigSchema(object):
 
     hide_comments = [hide_comment]
 
-    change_list_options = {'sort-by': sort_by,
-                           'reverse': bool}
+    pr_list_options = {'sort-by': sort_by,
+                       'reverse': bool}
 
     keymap = {v.Required('name'): str,
               v.Match('(?!name)'): v.Any([[str], str], [str], str)}
@@ -124,15 +124,15 @@ class ConfigSchema(object):
                            'commentlinks': self.commentlinks,
                            'dashboards': self.dashboards,
                            'reviewkeys': self.reviewkeys,
-                           'change-list-query': str,
+                           'pr-list-query': str,
                            'diff-view': str,
                            'hide-comments': self.hide_comments,
-                           'thread-changes': bool,
+                           # 'thread-prs': bool,
                            'display-times-in-utc': bool,
                            'handle-mouse': bool,
                            'breadcrumbs': bool,
-                           'close-change-on-review': bool,
-                           'change-list-options': self.change_list_options,
+                           'close-pr-on-review': bool,
+                           'pr-list-options': self.pr_list_options,
                            'expire-age': str,
                            'size-column': self.size_column,
                            })
@@ -208,7 +208,7 @@ class Config(object):
                                 text="{url}",
                                 url="{url}"))])))
 
-        self.project_change_list_query = self.config.get('change-list-query', 'state:open')
+        self.project_pr_list_query = self.config.get('pr-list-query', 'state:open')
 
         self.diff_view = self.config.get('diff-view', 'side-by-side')
 
@@ -225,16 +225,16 @@ class Config(object):
         for h in self.config.get('hide-comments', []):
             self.hide_comments.append(re.compile(h['author']))
 
-        self.thread_changes = self.config.get('thread-changes', True)
+        # self.thread_prs = self.config.get('thread-prs', True)
         self.utc = self.config.get('display-times-in-utc', False)
         self.breadcrumbs = self.config.get('breadcrumbs', True)
-        self.close_change_on_review = self.config.get('close-change-on-review', False)
+        self.close_pr_on_review = self.config.get('close-pr-on-review', False)
         self.handle_mouse = self.config.get('handle-mouse', True)
 
-        change_list_options = self.config.get('change-list-options', {})
-        self.change_list_options = {
-            'sort-by': change_list_options.get('sort-by', 'number'),
-            'reverse': change_list_options.get('reverse', False)}
+        pr_list_options = self.config.get('pr-list-options', {})
+        self.pr_list_options = {
+            'sort-by': pr_list_options.get('sort-by', 'number'),
+            'reverse': pr_list_options.get('reverse', False)}
 
         self.expire_age = self.config.get('expire-age', '2 months')
 

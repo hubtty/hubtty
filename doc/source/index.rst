@@ -10,7 +10,7 @@ As compared to the web interface, the main advantages are:
    deal with a large number of review requests across a large number
    of projects.
 
- * Offline Use -- Hubtty syncs information about changes in subscribed
+ * Offline Use -- Hubtty syncs information about pull requests in subscribed
    projects to a local database and local git repos.  All review
    operations are performed against that database and then synced back
    to Github.
@@ -18,9 +18,9 @@ As compared to the web interface, the main advantages are:
  * Speed -- user actions modify locally cached content and need not
    wait for server interaction.
 
- * Convenience -- because Hubtty downloads all changes to local git
-   repos, a single command instructs it to checkout a change into that
-   repo for detailed examination or testing of larger changes.
+ * Convenience -- because Hubtty downloads all pull requests to local git
+   repos, a single command instructs it to checkout a pull request into that
+   repo for detailed examination or testing of larger pull requests.
 
 
 Contents:

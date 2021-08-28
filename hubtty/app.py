@@ -44,9 +44,9 @@ from hubtty import palette
 from hubtty import sync
 from hubtty import search
 from hubtty import requestsexceptions
-from hubtty.view import change_list as view_change_list
+from hubtty.view import pull_request_list as view_pr_list
 from hubtty.view import project_list as view_project_list
-from hubtty.view import change as view_change
+from hubtty.view import pull_request as view_pr
 import hubtty.view
 import hubtty.version
 
@@ -55,7 +55,7 @@ Welcome to Hubtty!
 
 To get started, you should subscribe to some projects.  Press the "L" key (shift-L) to list all the projects the user has explicit permission on, navigate to the ones you are interested in, and then press "s" to subscribe to them.  Use the `additional-repositories` setting to add more projects to this list.
 
-Hubtty will automatically clone the repositories and sync changes in your subscribed projects. Repositories are cloned in ~/hubtty by default.
+Hubtty will automatically clone the repositories and sync pull requests in your subscribed projects. Repositories are cloned in ~/hubtty by default.
 
 Change your configuration in %s.
 
@@ -185,7 +185,7 @@ class SearchDialog(mywid.ButtonDialog):
         urwid.connect_signal(cancel_button, 'click',
                              lambda button:self._emit('cancel'))
         super(SearchDialog, self).__init__("Search",
-                                           "Enter a change number or search string.",
+                                           "Enter a pull request or search string.",
                                            entry_prompt="Search: ",
                                            entry_text=default,
                                            buttons=[search_button,
@@ -233,8 +233,8 @@ class ProjectCache(object):
     def get(self, project):
         if project.key not in self.projects:
             self.projects[project.key] = dict(
-                unreviewed_changes = len(project.unreviewed_changes),
-                open_changes = len(project.open_changes),
+                unreviewed_prs = len(project.unreviewed_prs),
+                open_prs = len(project.open_prs),
             )
         return self.projects[project.key]
 
@@ -243,7 +243,7 @@ class ProjectCache(object):
             del self.projects[project.key]
 
 class App(object):
-    simple_change_search = re.compile('^(\d+|I[a-fA-F0-9]{40})$')
+    simple_pr_search = re.compile(r'([a-zA-Z_]+/)+\d+')
 
     def __init__(self, server=None, palette='default',
                  keymap='default', debug=False, verbose=False,
@@ -433,9 +433,9 @@ class App(object):
         self.frame.body = widget
         self.refresh(force=True)
 
-    def findChangeList(self):
+    def findPullRequestList(self):
         for widget in reversed(self.screens):
-            if isinstance(widget, view_change_list.ChangeListView):
+            if isinstance(widget, view_pr_list.PullRequestListView):
                 return widget
         return None
 
@@ -536,52 +536,52 @@ class App(object):
             lambda button: self.backScreen())
         self.popup(dialog, min_width=76, min_height=total_lines+4)
 
-    def _syncOneChangeFromQuery(self, query):
-        number = changeid = restid = None
-        if query.startswith("change:"):
+    def _syncOnePullRequestFromQuery(self, query):
+        number = prid = restid = None
+        if query.startswith("pr:"):
             number = query.split(':')[1].strip()
             try:
                 number = int(number)
             except ValueError:
                 number = None
-                changeid = query.split(':')[1].strip()
-        if not (number or changeid):
+                prid = query.split(':')[1].strip()
+        if not (number or prid):
             return
         with self.db.getSession() as session:
-            if changeid:
-                changes = session.getChangesByChangeID(changeid)
-            change_keys = [c.key for c in changes if c]
-            restids = [c.change_id for c in changes if c]
+            if prid:
+                pull_requests = session.getPullRequestsByPullRequestID(prid)
+            pr_keys = [pr.key for pr in pull_requests if pr]
+            restids = [pr.pr_id for pr in pull_requests if pr]
         if restids:
             for restid in restids:
-                task = sync.SyncChangeTask(restid, sync.HIGH_PRIORITY)
+                task = sync.SyncPullRequestTask(restid, sync.HIGH_PRIORITY)
                 self.sync.submitTask(task)
-        if not change_keys:
-            raise Exception('Change is not in local database.')
+        if not pr_keys:
+            raise Exception('Pull request is not in local database.')
 
     def doSearch(self, query):
         self.log.debug("Search query: %s" % query)
         try:
-            self._syncOneChangeFromQuery(query)
+            self._syncOnePullRequestFromQuery(query)
         except Exception as e:
             return self.error(str(e))
         with self.db.getSession() as session:
             try:
-                changes = session.getChanges(query)
+                pull_requests = session.getPullRequests(query)
             except hubtty.search.SearchSyntaxError as e:
                 return self.error(e.message)
             except sqlalchemy.exc.OperationalError as e:
                 return self.error(e.message)
             except Exception as e:
                 return self.error(str(e))
-            change_key = None
-            if len(changes) == 1:
-                change_key = changes[0].key
+            pr_key = None
+            if len(pull_requests) == 1:
+                pr_key = pull_requests[0].key
         try:
-            if change_key:
-                view = view_change.ChangeView(self, change_key)
+            if pr_key:
+                view = view_pr.PullRequestView(self, pr_key)
             else:
-                view = view_change_list.ChangeListView(self, query)
+                view = view_pr_list.PullRequestListView(self, query)
             self.changeScreen(view)
         except hubtty.view.DisplayError as e:
             return self.error(e.message)
@@ -597,8 +597,8 @@ class App(object):
     def _searchDialog(self, dialog):
         self.backScreen()
         query = dialog.entry.edit_text.strip()
-        if self.simple_change_search.match(query):
-            query = 'change:%s' % query
+        if self.simple_pr_search.match(query):
+            query = 'pr:%s' % query
         else:
             result = self.parseInternalURL(query)
             if result is not None:
@@ -610,17 +610,17 @@ class App(object):
         if not url.startswith(self.config.url):
             return None
         result = urlparse.urlparse(url)
-        change = patchset = filename = None
+        pr = patchset = filename = None
         path = [x for x in result.path.split('/') if x]
         if path:
-            change = path[0]
+            pr = path[0]
         else:
             path = [x for x in result.fragment.split('/') if x]
             if path[0] == 'c':
                 path.pop(0)
             while path:
-                if not change:
-                    change = path.pop(0)
+                if not pr:
+                    pr = path.pop(0)
                     continue
                 if not patchset:
                     patchset = path.pop(0)
@@ -631,12 +631,12 @@ class App(object):
                     if m:
                         filename = filename[:0-len(m.group(1))]
                     path = None
-        return (change, patchset, filename)
+        return (pr, patchset, filename)
 
     def openInternalURL(self, result):
-        (change, patchset, filename) = result
+        (pr, patchset, filename) = result
         # TODO: support deep-linking to a filename
-        self.doSearch('change:%s' % change)
+        self.doSearch('pr:%s' % pr)
 
     def error(self, message, title='Error'):
         dialog = mywid.MessageDialog(title, message)
@@ -671,15 +671,15 @@ class App(object):
             self.help()
         elif keymap.QUIT in commands:
             self.quit()
-        elif keymap.CHANGE_SEARCH in commands:
+        elif keymap.PR_SEARCH in commands:
             self.searchDialog('')
         elif keymap.LIST_HELD in commands:
             self.doSearch("is:held")
         elif key in self.config.dashboards:
             d = self.config.dashboards[key]
-            view = view_change_list.ChangeListView(self, d['query'], d['name'],
-                                                   sort_by=d.get('sort-by'),
-                                                   reverse=d.get('reverse'))
+            view = view_pr_list.PullRequestListView(self, d['query'], d['name'],
+                                                    sort_by=d.get('sort-by'),
+                                                    reverse=d.get('reverse'))
             self.changeScreen(view)
         elif keymap.FURTHER_INPUT in commands:
             self.input_buffer.append(key)
@@ -745,14 +745,14 @@ class App(object):
         else:
             self.log.error("Unable to parse command %s with data %s" % (command, data))
 
-    def toggleHeldChange(self, change_key):
+    def toggleHeldPullRequest(self, pr_key):
         with self.db.getSession() as session:
-            change = session.getChange(change_key)
-            change.held = not change.held
-            ret = change.held
-            if not change.held:
-                for c in change.commits:
-                    for m in change.messages:
+            pr = session.getPullRequest(pr_key)
+            pr.held = not pr.held
+            ret = pr.held
+            if not pr.held:
+                for c in pr.commits:
+                    for m in pr.messages:
                         if m.pending:
                             self.sync.submitTask(
                                 sync.UploadReviewTask(m.key, sync.HIGH_PRIORITY))
@@ -763,7 +763,7 @@ class App(object):
         repo = gitrepo.get_repo(project_name, self.config)
         try:
             repo.checkout(commit_sha)
-            dialog = mywid.MessageDialog('Checkout', 'Change checked out in %s' % repo.path)
+            dialog = mywid.MessageDialog('Checkout', 'Pull request checked out in %s' % repo.path)
             min_height=8
         except gitrepo.GitCheckoutError as e:
             dialog = mywid.MessageDialog('Error', e.msg)
@@ -776,7 +776,7 @@ class App(object):
         repo = gitrepo.get_repo(project_name, self.config)
         try:
             repo.cherryPick(commit_sha)
-            dialog = mywid.MessageDialog('Cherry-Pick', 'Change cherry-picked in %s' % repo.path)
+            dialog = mywid.MessageDialog('Cherry-Pick', 'Pull request cherry-picked in %s' % repo.path)
             min_height=8
         except gitrepo.GitCheckoutError as e:
             dialog = mywid.MessageDialog('Error', e.msg)
@@ -800,33 +800,33 @@ class App(object):
                     approval, message, upload, merge):
         message_key = None
         commit = session.getCommit(commit_key)
-        change = commit.change
+        pr = commit.pull_request
 
-        existing_approval = session.getApproval(change, account, commit.sha)
+        existing_approval = session.getApproval(pr, account, commit.sha)
         if existing_approval:
             existing_approval.draft = True
         else:
-            change.createApproval(account, approval, commit.sha, draft=True)
+            pr.createApproval(account, approval, commit.sha, draft=True)
 
         draft_message = commit.getPendingMessage()
         if not draft_message:
             draft_message = commit.getDraftMessage()
         if not draft_message:
             if message or upload:
-                draft_message = change.createMessage(commit.key, None, account,
-                                                     datetime.datetime.utcnow(),
-                                                     '', draft=True)
+                draft_message = pr.createMessage(commit.key, None, account,
+                                                 datetime.datetime.utcnow(),
+                                                 '', draft=True)
         if draft_message:
             draft_message.created = datetime.datetime.utcnow()
             draft_message.message = message
             draft_message.pending = upload
             message_key = draft_message.key
         if upload:
-            change.reviewed = True
-            self.project_cache.clear(change.project)
+            pr.reviewed = True
+            self.project_cache.clear(pr.project)
         if merge:
-            sha = change.commits[-1].sha
-            pending_merge = change.createPendingMerge(sha,'merge')
+            sha = pr.commits[-1].sha
+            pending_merge = pr.createPendingMerge(sha,'merge')
             self.sync.submitTask(
                     sync.SendMergeTask(pending_merge.key, sync.HIGH_PRIORITY))
         return message_key
@@ -848,7 +848,7 @@ class PrintPaletteAction(argparse.Action):
             print(attr)
         sys.exit(0)
 
-class OpenChangeAction(argparse.Action):
+class OpenPullRequestAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         cf = config.Config(namespace.server, namespace.palette,
                            namespace.keymap, namespace.path)
@@ -882,7 +882,7 @@ def main():
                         help='print the keymap command names to stdout')
     parser.add_argument('--print-palette', nargs=0, action=PrintPaletteAction,
                         help='print the palette attribute names to stdout')
-    parser.add_argument('--open', nargs=1, action=OpenChangeAction,
+    parser.add_argument('--open', nargs=1, action=OpenPullRequestAction,
                         metavar='URL',
                         help='open the given URL in a running Hubtty')
     parser.add_argument('--version', dest='version', action='version',

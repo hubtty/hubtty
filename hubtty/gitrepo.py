@@ -13,11 +13,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-# Test changes:
-# https://review.opendev.org/275862
-# https://review.opendev.org/119302
-# https://review.opendev.org/133550
-
 import datetime
 import logging
 import difflib

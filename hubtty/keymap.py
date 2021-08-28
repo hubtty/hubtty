@@ -36,10 +36,10 @@ PREV_SCREEN = 'previous screen'
 TOP_SCREEN = 'top screen'
 HELP = 'help'
 QUIT = 'quit'
-CHANGE_SEARCH = 'change search'
-REFINE_CHANGE_SEARCH = 'refine change search'
-LIST_HELD = 'list held changes'
-# Change screen:
+PR_SEARCH = 'pull request search'
+REFINE_PR_SEARCH = 'refine pull request search'
+LIST_HELD = 'list held pull requests'
+# Pull requests screen:
 TOGGLE_REVIEWED = 'toggle reviewed'
 TOGGLE_HIDDEN = 'toggle hidden'
 TOGGLE_STARRED = 'toggle starred'
@@ -50,16 +50,16 @@ DIFF = 'diff'
 LOCAL_CHECKOUT = 'local checkout'
 LOCAL_CHERRY_PICK = 'local cherry pick'
 SEARCH_RESULTS = 'search results'
-NEXT_CHANGE = 'next change'
-PREV_CHANGE = 'previous change'
+NEXT_PR = 'next pull request'
+PREV_PR = 'previous pull request'
 TOGGLE_HIDDEN_COMMENTS = 'toggle hidden comments'
-CLOSE_CHANGE = 'close change'
-REOPEN_CHANGE = 'reopen change'
-REBASE_CHANGE = 'rebase change'
+CLOSE_PR = 'close pull request'
+REOPEN_PR = 'reopen pull request'
+REBASE_PR = 'rebase pull request'
 REFRESH = 'refresh'
 EDIT_LABELS = 'edit labels'
 EDIT_PULL_REQUEST = 'edit pull request'
-MERGE_CHANGE = 'merge change'
+MERGE_PR = 'merge pull request'
 SORT_BY_NUMBER = 'sort by number'
 SORT_BY_UPDATED = 'sort by updated'
 SORT_BY_LAST_SEEN = 'sort by last seen'
@@ -103,8 +103,8 @@ DEFAULT_KEYMAP = {
     TOP_SCREEN: 'meta home',
     HELP: ['f1', '?'],
     QUIT: ['ctrl q'],
-    CHANGE_SEARCH: 'ctrl o',
-    REFINE_CHANGE_SEARCH: 'meta o',
+    PR_SEARCH: 'ctrl o',
+    REFINE_PR_SEARCH: 'meta o',
     LIST_HELD: 'f12',
 
     TOGGLE_REVIEWED: 'v',
@@ -117,16 +117,16 @@ DEFAULT_KEYMAP = {
     LOCAL_CHECKOUT: 'c',
     LOCAL_CHERRY_PICK: 'x',
     SEARCH_RESULTS: 'u',
-    NEXT_CHANGE: 'n',
-    PREV_CHANGE: 'p',
+    NEXT_PR: 'n',
+    PREV_PR: 'p',
     TOGGLE_HIDDEN_COMMENTS: 't',
-    CLOSE_CHANGE: 'meta c',
-    REOPEN_CHANGE: 'ctrl e',
-    REBASE_CHANGE: 'ctrl b',
+    CLOSE_PR: 'meta c',
+    REOPEN_PR: 'ctrl e',
+    REBASE_PR: 'ctrl b',
     REFRESH: 'ctrl r',
     EDIT_LABELS: 'meta l',
     EDIT_PULL_REQUEST: 'ctrl d',
-    MERGE_CHANGE: 'meta m',
+    MERGE_PR: 'meta m',
     SORT_BY_NUMBER: [['S', 'n']],
     SORT_BY_UPDATED: [['S', 'u']],
     SORT_BY_LAST_SEEN: [['S', 's']],

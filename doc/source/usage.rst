@@ -26,21 +26,21 @@ The status bar at the top of the screen displays the current number of
 outstanding tasks that Hubtty must perform in order to be fully up to
 date.  Some of these tasks are more complicated than others, and some
 of them will end up creating new tasks (for instance, one task may be
-to search for new changes in a project which will then produce 5 new
-tasks if there are 5 new changes).
+to search for new pull requests in a project which will then produce
+5 new tasks if there are 5 new pull requests).
 
 If Hubtty is offline, it will so indicate in the status bar.  It will
 retry requests if needed, and will switch between offline and online
 mode automatically.
 
-If you review a change while offline with a positive vote, and someone
-else leaves a negative vote on that change in the same category before
+If you review a pull request while offline with a positive vote, and someone
+else leaves a negative vote on that pull request in the same category before
 Hubtty is able to upload your review, Hubtty will detect the situation
-and mark the change as "held" so that you may re-inspect the change
+and mark the pull request as "held" so that you may re-inspect the pull request
 and any new comments before uploading the review.  The status bar will
-alert you to any held changes and direct you to a list of them (the
-`F12` key by default).  When viewing a change, the "held" flag may be
-toggled with the exclamation key (`!`).  Once held, a change must be
+alert you to any held pull requests and direct you to a list of them (the
+`F12` key by default).  When viewing a pull request, the "held" flag may be
+toggled with the exclamation key (`!`).  Once held, a pull request must be
 explicitly un-held in this manner for your review to be uploaded.
 
 If Hubtty encounters an error, this will also be indicated in the

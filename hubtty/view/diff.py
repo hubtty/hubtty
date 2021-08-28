@@ -159,15 +159,13 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                         self.old_file_keys[f.old_path] = f.key
                     else:
                         self.old_file_keys[f.path] = f.key
-            self.title = u'Diff of %s #%s from %s to %s' % (
-                new_commit.change.project.name,
-                new_commit.change.number,
+            self.title = u'Diff of %s from %s to %s' % (
+                new_commit.pull_request.project.name,
                 new_commit.parent[0:7],
                 new_commit.sha[0:7])
-            self.short_title = u'Diff of %s/%s' % (new_commit.change.number,
-                                                   new_commit.sha[0:7])
-            self.change_key = new_commit.change.key
-            self.project_name = new_commit.change.project.name
+            self.short_title = u'Diff of %s' % (new_commit.sha[0:7],)
+            self.pr_key = new_commit.pull_request.key
+            self.project_name = new_commit.pull_request.project.name
             self.sha = new_commit.sha
             for f in new_commit.files:
                 new_comments += f.current_comments
@@ -359,11 +357,11 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         raise NotImplementedError
 
     def interested(self, event):
-        if not ((isinstance(event, sync.ChangeAddedEvent) and
-                 self.change_key in event.related_change_keys)
+        if not ((isinstance(event, sync.PullRequestAddedEvent) and
+                 self.pr_key in event.related_pr_keys)
                 or
-                (isinstance(event, sync.ChangeUpdatedEvent) and
-                 self.change_key in event.related_change_keys)):
+                (isinstance(event, sync.PullRequestUpdatedEvent) and
+                 self.pr_key in event.related_pr_keys)):
             #self.log.debug("Ignoring refresh diff due to event %s" % (event,))
             return False
         #self.log.debug("Refreshing diff due to event %s" % (event,))
@@ -467,14 +465,14 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             raise Exception("Comment is not associated with a file")
         with self.app.db.getSession() as session:
             account = session.getOwnAccount()
-            change = session.getChange(self.change_key)
+            pr = session.getPullRequest(self.pr_key)
             commit = session.getCommit(self.new_commit_key)
 
             message = commit.getPendingMessage()
             if not message:
-                message = change.createMessage(commit.key, None, account,
-                                               datetime.datetime.utcnow(),
-                                               '', draft=True)
+                message = pr.createMessage(commit.key, None, account,
+                                           datetime.datetime.utcnow(),
+                                           '', draft=True)
             comment = message.createComment(file_key, None, account, None,
                                             datetime.datetime.utcnow(),
                                             datetime.datetime.utcnow(),
@@ -484,17 +482,17 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         return key
 
     def reviewKey(self, reviewkey):
-        change_view = self.app.getPreviousScreen()
-        if change_view:
-            change_view.reviewKey(reviewkey)
+        pr_view = self.app.getPreviousScreen()
+        if pr_view:
+            pr_view.reviewKey(reviewkey)
         self.app.backScreen()
 
     def moveCommit(self, offset):
         commits = []
         commit_idx = None
         with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            for c in change.commits:
+            pr = session.getPullRequest(self.pr_key)
+            for c in pr.commits:
                 commits.append(c.key)
 
         for i, key in enumerate(commits):

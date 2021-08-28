@@ -40,7 +40,7 @@ except AttributeError:
 
 class EditLabelsDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
     signals = ['save', 'cancel']
-    def __init__(self, app, change):
+    def __init__(self, app, pr):
         self.app = app
         save_button = mywid.FixedButton('Save')
         cancel_button = mywid.FixedButton('Cancel')
@@ -56,8 +56,8 @@ class EditLabelsDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         self.labels_checkboxes = []
 
         rows.append(urwid.Text(u"Labels:"))
-        for label in change.project.labels:
-            b = mywid.FixedCheckBox(label.name, state=(label in change.labels))
+        for label in pr.project.labels:
+            b = mywid.FixedCheckBox(label.name, state=(label in pr.labels))
             rows.append(b)
             self.labels_checkboxes.append(b)
         rows.append(urwid.Divider())
@@ -91,15 +91,15 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         self.button_group = []
         with self.app.db.getSession() as session:
             commit = session.getCommit(self.commit_key)
-            change = commit.change
+            pr = commit.pull_request
             buttons = [('pack', save_button)]
-            if commit.change.canMerge():
+            if commit.pull_request.canMerge():
                 buttons.append(('pack', merge_button))
             buttons.append(('pack', cancel_button))
             buttons = urwid.Columns(buttons, dividechars=2)
-            if commit == change.commits[-1]:
+            if commit == pr.commits[-1]:
                 current = None
-                for approval in change.approvals:
+                for approval in pr.approvals:
                     if self.app.isOwnAccount(approval.reviewer):
                         current = approval.state
                         break
@@ -150,7 +150,7 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
 
 class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
     signals = ['merge', 'cancel']
-    def __init__(self, app, change, title='', message=''):
+    def __init__(self, app, pr, title='', message=''):
         self.app = app
         merge_button = mywid.FixedButton(u'Merge')
         cancel_button = mywid.FixedButton(u'Cancel')
@@ -167,7 +167,7 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         }
         self.button_group = []
         buttons = []
-        if change.canMerge():
+        if pr.canMerge():
             buttons.append(('pack', merge_button))
         buttons.append(('pack', cancel_button))
         buttons = urwid.Columns(buttons, dividechars=2)
@@ -188,7 +188,7 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         rows.append(buttons)
         pile = urwid.Pile(rows)
         fill = urwid.Filler(pile, valign='top')
-        super(MergeDialog, self).__init__(urwid.LineBox(fill, 'Merge Change'))
+        super(MergeDialog, self).__init__(urwid.LineBox(fill, 'Merge pull request'))
 
     def getValues(self):
         strategy = ''
@@ -215,7 +215,7 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
 
 class EditPullRequestDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
     signals = ['save', 'cancel']
-    def __init__(self, app, change):
+    def __init__(self, app, pr):
         self.app = app
         save_button = mywid.FixedButton(u'Save')
         cancel_button = mywid.FixedButton(u'Cancel')
@@ -229,12 +229,12 @@ class EditPullRequestDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         button_columns = urwid.Columns(button_widgets, dividechars=2)
         rows = []
 
-        self.pr_title = mywid.MyEdit(edit_text=change.title, multiline=False,
+        self.pr_title = mywid.MyEdit(edit_text=pr.title, multiline=False,
                 ring=app.ring)
         rows.append(urwid.Text(u"Title:"))
         rows.append(self.pr_title)
         rows.append(urwid.Divider())
-        self.pr_description = mywid.MyEdit(edit_text=change.body,
+        self.pr_description = mywid.MyEdit(edit_text=pr.body,
                 multiline=True, ring=app.ring)
         rows.append(urwid.Text(u"Description:"))
         rows.append(self.pr_description)
@@ -248,12 +248,12 @@ class ReviewButton(mywid.FixedButton):
     def __init__(self, commit_row):
         super(ReviewButton, self).__init__(('commit-button', u'Review'))
         self.commit_row = commit_row
-        self.change_view = commit_row.change_view
+        self.pr_view = commit_row.pr_view
         urwid.connect_signal(self, 'click',
             lambda button: self.openReview())
 
     def openReview(self, message=''):
-        self.dialog = ReviewDialog(self.change_view.app,
+        self.dialog = ReviewDialog(self.pr_view.app,
                                    self.commit_row.commit_key,
                                    message=message)
         urwid.connect_signal(self.dialog, 'save',
@@ -262,17 +262,17 @@ class ReviewButton(mywid.FixedButton):
             lambda button: self.closeReview(True, True))
         urwid.connect_signal(self.dialog, 'cancel',
             lambda button: self.closeReview(False, False))
-        self.change_view.app.popup(self.dialog,
-                                   relative_width=50, relative_height=75,
-                                   min_width=60, min_height=20)
+        self.pr_view.app.popup(self.dialog,
+                               relative_width=50, relative_height=75,
+                               min_width=60, min_height=20)
 
     def closeReview(self, upload, merge):
         approval, message = self.dialog.getValues()
-        self.change_view.saveReview(self.commit_row.commit_key, approval,
+        self.pr_view.saveReview(self.commit_row.commit_key, approval,
                                     message, upload, False)
-        self.change_view.app.backScreen()
+        self.pr_view.app.backScreen()
         if merge:
-            self.change_view.mergeChange()
+            self.pr_view.mergePullRequest()
 
 class CommitRow(urwid.WidgetWrap):
     commit_focus_map = {
@@ -282,14 +282,14 @@ class CommitRow(urwid.WidgetWrap):
                           'commit-drafts': 'focused-commit-drafts',
                           }
 
-    def __init__(self, app, change_view, repo, commit, expanded=False):
+    def __init__(self, app, pr_view, repo, commit, expanded=False):
         super(CommitRow, self).__init__(urwid.Pile([]))
         self.app = app
-        self.change_view = change_view
+        self.pr_view = pr_view
         self.commit_key = commit.key
-        self.project_name = commit.change.project.name
+        self.project_name = commit.pull_request.project.name
         self.commit_sha = commit.sha
-        self.can_merge = commit.change.canMerge()
+        self.can_merge = commit.pull_request.canMerge()
         self.title = mywid.TextButton(u'', on_press = self.expandContract)
         table = mywid.Table(columns=3)
         total_added = 0
@@ -356,7 +356,7 @@ class CommitRow(urwid.WidgetWrap):
             self.expanded = True
 
     def diff(self, button):
-        self.change_view.diff(self.commit_key)
+        self.pr_view.diff(self.commit_key)
 
     def checkout(self, button):
         self.app.localCheckoutCommit(self.project_name, self.commit_sha)
@@ -364,33 +364,33 @@ class CommitRow(urwid.WidgetWrap):
     def cherryPick(self, button):
         self.app.localCherryPickCommit(self.project_name, self.commit_sha)
 
-class ChangeButton(urwid.Button):
+class PullRequestButton(urwid.Button):
     button_left = urwid.Text(u' ')
     button_right = urwid.Text(u' ')
 
-    def __init__(self, change_view, change_key, text):
-        super(ChangeButton, self).__init__('')
+    def __init__(self, pr_view, pr_key, text):
+        super(PullRequestButton, self).__init__('')
         self.set_label(text)
-        self.change_view = change_view
-        self.change_key = change_key
+        self.pr_view = pr_view
+        self.pr_key = pr_key
         urwid.connect_signal(self, 'click',
-            lambda button: self.openChange())
+            lambda button: self.openPullRequest())
 
     def set_label(self, text):
-        super(ChangeButton, self).set_label(text)
+        super(PullRequestButton, self).set_label(text)
 
-    def openChange(self):
+    def openPullRequest(self):
         try:
-            self.change_view.app.changeScreen(ChangeView(self.change_view.app, self.change_key))
+            self.pr_view.app.changeScreen(PullRequestView(self.pr_view.app, self.pr_key))
         except hubtty.view.DisplayError as e:
-            self.change_view.app.error(e.message)
+            self.pr_view.app.error(e.message)
 
-class ChangeMessageBox(mywid.HyperText):
-    def __init__(self, change_view, change, message):
-        super(ChangeMessageBox, self).__init__(u'')
-        self.change_view = change_view
-        self.app = change_view.app
-        self.refresh(change, message)
+class PullRequestMessageBox(mywid.HyperText):
+    def __init__(self, pr_view, pr, message):
+        super(PullRequestMessageBox, self).__init__(u'')
+        self.pr_view = pr_view
+        self.app = pr_view.app
+        self.refresh(pr, message)
 
     def formatReply(self):
         text = self.message_text
@@ -426,23 +426,23 @@ class ChangeMessageBox(mywid.HyperText):
         reply_text = self.formatReply()
         if reply_text:
             reply_text = self.message_author + ' wrote:\n\n' + reply_text + '\n'
-        row = self.change_view.commit_rows[self.commit_key]
+        row = self.pr_view.commit_rows[self.commit_key]
         row.review_button.openReview(reply_text)
 
-    def refresh(self, change, message):
-        self.commit_key = self.change_view.last_commit_key
+    def refresh(self, pr, message):
+        self.commit_key = self.pr_view.last_commit_key
         self.message_created = message.created
         self.message_author = message.author_name
         self.message_text = message.message
         created = self.app.time(message.created)
         lines = message.message.split('\n')
         if self.app.isOwnAccount(message.author):
-            name_style = 'change-message-own-name'
-            header_style = 'change-message-own-header'
+            name_style = 'pr-message-own-name'
+            header_style = 'pr-message-own-header'
             reviewer_string = message.author_name
         else:
-            name_style = 'change-message-name'
-            header_style = 'change-message-header'
+            name_style = 'pr-message-name'
+            header_style = 'pr-message-header'
             if message.author.email:
                 reviewer_string = "%s <%s>" % (
                     message.author_name,
@@ -454,7 +454,7 @@ class ChangeMessageBox(mywid.HyperText):
                 (header_style,
                  created.strftime(' (%Y-%m-%d %H:%M:%S%z)'))]
         if message.draft and not message.pending:
-            text.append(('change-message-draft', ' (draft)'))
+            text.append(('pr-message-draft', ' (draft)'))
         else:
             link = mywid.Link('< Reply >',
                               'commit-button',
@@ -508,47 +508,47 @@ class PrDescriptionBox(mywid.HyperText):
         super(PrDescriptionBox, self).set_text(text)
 
 @mouse_scroll_decorator.ScrollByWheel
-class ChangeView(urwid.WidgetWrap):
+class PullRequestView(urwid.WidgetWrap):
     def getCommands(self):
         return [
             (keymap.LOCAL_CHECKOUT,
-             "Checkout the change into the local repo"),
+             "Checkout the pull request into the local repo"),
             (keymap.DIFF,
              "Show the diff of the first commit"),
             (keymap.TOGGLE_HIDDEN,
-             "Toggle the hidden flag for the current change"),
-            (keymap.NEXT_CHANGE,
-             "Go to the next change in the list"),
-            (keymap.PREV_CHANGE,
-             "Go to the previous change in the list"),
+             "Toggle the hidden flag for the current pull request"),
+            (keymap.NEXT_PR,
+             "Go to the next pull request in the list"),
+            (keymap.PREV_PR,
+             "Go to the previous pull request in the list"),
             (keymap.REVIEW,
-             "Leave a review for the change"),
+             "Leave a review for the pull request"),
             (keymap.TOGGLE_HELD,
-             "Toggle the held flag for the current change"),
+             "Toggle the held flag for the current pull request"),
             (keymap.TOGGLE_HIDDEN_COMMENTS,
              "Toggle display of hidden comments"),
             (keymap.SEARCH_RESULTS,
-             "Back to the list of changes"),
+             "Back to the list of pull requests"),
             (keymap.TOGGLE_REVIEWED,
-             "Toggle the reviewed flag for the current change"),
+             "Toggle the reviewed flag for the current pull request"),
             (keymap.TOGGLE_STARRED,
-             "Toggle the starred flag for the current change"),
+             "Toggle the starred flag for the current pull request"),
             (keymap.LOCAL_CHERRY_PICK,
              "Cherry-pick the most recent commit onto the local repo"),
-            (keymap.CLOSE_CHANGE,
-             "Close this change"),
+            (keymap.CLOSE_PR,
+             "Close this pull request"),
             (keymap.EDIT_PULL_REQUEST,
-             "Edit the commit message of this change"),
-            (keymap.REBASE_CHANGE,
-             "Rebase this change (remotely)"),
-            (keymap.REOPEN_CHANGE,
+             "Edit the commit message of this pull request"),
+            (keymap.REBASE_PR,
+             "Rebase this pull request (remotely)"),
+            (keymap.REOPEN_PR,
              "Reopen pull request"),
             (keymap.REFRESH,
-             "Refresh this change"),
+             "Refresh this pull request"),
             (keymap.EDIT_LABELS,
-             "Edit the labels of this change"),
-            (keymap.MERGE_CHANGE,
-             "Merge this change"),
+             "Edit the labels of this pull request"),
+            (keymap.MERGE_PR,
+             "Merge this pull request"),
             ]
 
     def help(self):
@@ -565,11 +565,11 @@ class ChangeView(urwid.WidgetWrap):
             ret.append(('', keymap.formatKey(k['key']), action))
         return ret
 
-    def __init__(self, app, change_key):
-        super(ChangeView, self).__init__(urwid.Pile([]))
-        self.log = logging.getLogger('hubtty.view.change')
+    def __init__(self, app, pr_key):
+        super(PullRequestView, self).__init__(urwid.Pile([]))
+        self.log = logging.getLogger('hubtty.view.pull_request')
         self.app = app
-        self.change_key = change_key
+        self.pr_key = pr_key
         self.commit_rows = {}
         self.message_rows = {}
         self.first_commit_key = None
@@ -584,13 +584,13 @@ class ChangeView(urwid.WidgetWrap):
         self.updated_label = urwid.Text(u'', wrap='clip')
         self.status_label = urwid.Text(u'', wrap='clip')
         self.permalink_label = mywid.TextButton(u'', on_press=self.openPermalink)
-        change_info = []
-        change_info_map={'change-data': 'focused-change-data'}
+        pr_info = []
+        pr_info_map={'pr-data': 'focused-pr-data'}
         for l, v in [("Author", urwid.Padding(urwid.AttrMap(self.author_label, None,
-                                                           focus_map=change_info_map),
+                                                           focus_map=pr_info_map),
                                              width='pack')),
                      ("Project", urwid.Padding(urwid.AttrMap(self.project_label, None,
-                                                           focus_map=change_info_map),
+                                                           focus_map=pr_info_map),
                                              width='pack')),
                      ("Branch", self.branch_label),
                      ("Labels", self.labels_label),
@@ -598,21 +598,21 @@ class ChangeView(urwid.WidgetWrap):
                      ("Updated", self.updated_label),
                      ("Status", self.status_label),
                      ("Permalink", urwid.Padding(urwid.AttrMap(self.permalink_label, None,
-                                                               focus_map=change_info_map),
+                                                               focus_map=pr_info_map),
                                                  width='pack')),
                      ]:
-            row = urwid.Columns([(12, urwid.Text(('change-header', l), wrap='clip')), v])
-            change_info.append(row)
-        change_info = urwid.Pile(change_info)
+            row = urwid.Columns([(12, urwid.Text(('pr-header', l), wrap='clip')), v])
+            pr_info.append(row)
+        pr_info = urwid.Pile(pr_info)
         self.pr_description = PrDescriptionBox(app, u'')
         votes = mywid.Table([])
         self.depends_on = urwid.Pile([])
         self.depends_on_rows = {}
         self.needed_by = urwid.Pile([])
         self.needed_by_rows = {}
-        self.related_changes = urwid.Pile([self.depends_on, self.needed_by])
+        self.related_prs = urwid.Pile([self.depends_on, self.needed_by])
         self.results = mywid.HyperText(u'') # because it scrolls better than a table
-        self.grid = mywid.MyGridFlow([change_info, self.pr_description, votes, self.results],
+        self.grid = mywid.MyGridFlow([pr_info, self.pr_description, votes, self.results],
                                      cell_width=80, h_sep=2, v_sep=1, align='left')
         self.listbox = urwid.ListBox(urwid.SimpleFocusListWalker([]))
         self._w.contents.append((self.app.header, ('pack', 1)))
@@ -622,7 +622,7 @@ class ChangeView(urwid.WidgetWrap):
 
         self.listbox.body.append(self.grid)
         self.listbox.body.append(urwid.Divider())
-        self.listbox.body.append(self.related_changes)
+        self.listbox.body.append(self.related_prs)
         self.listbox.body.append(urwid.Divider())
         self.listbox_patchset_start = len(self.listbox.body)
 
@@ -633,25 +633,25 @@ class ChangeView(urwid.WidgetWrap):
 
     def checkGitRepo(self):
         missing_commits = set()
-        change_number = None
-        change_id = None
+        pr_number = None
+        pr_id = None
         shas = set()
         with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            change_project_name = change.project.name
-            change_number = change.number
-            change_id = change.change_id
-            for commit in change.commits:
+            pr = session.getPullRequest(self.pr_key)
+            pr_project_name = pr.project.name
+            pr_number = pr.number
+            pr_id = pr.pr_id
+            for commit in pr.commits:
                 shas.add(commit.parent)
                 shas.add(commit.sha)
-        repo = gitrepo.get_repo(change_project_name, self.app.config)
+        repo = gitrepo.get_repo(pr_project_name, self.app.config)
         missing_commits = repo.checkCommits(shas)
         if missing_commits:
             if self.app.sync.offline:
                 raise hubtty.view.DisplayError("Git commits not present in local repository")
-            self.app.log.warning("Missing some commits for change %s %s",
-                change_number, missing_commits)
-            task = sync.SyncChangeTask(change_id, force_fetch=True,
+            self.app.log.warning("Missing some commits for pull request %s %s",
+                pr_number, missing_commits)
+            task = sync.SyncPullRequestTask(pr_id, force_fetch=True,
                                        priority=sync.HIGH_PRIORITY)
             self.app.sync.submitTask(task)
             succeeded = task.wait(300)
@@ -659,69 +659,68 @@ class ChangeView(urwid.WidgetWrap):
                 raise hubtty.view.DisplayError("Git commits not present in local repository")
 
     def interested(self, event):
-        if not ((isinstance(event, sync.ChangeAddedEvent) and
-                 self.change_key in event.related_change_keys)
+        if not ((isinstance(event, sync.PullRequestAddedEvent) and
+                 self.pr_key in event.related_pr_keys)
                 or
-                (isinstance(event, sync.ChangeUpdatedEvent) and
-                 self.change_key in event.related_change_keys)):
-            self.log.debug("Ignoring refresh change due to event %s" % (event,))
+                (isinstance(event, sync.PullRequestUpdatedEvent) and
+                 self.pr_key in event.related_pr_keys)):
+            self.log.debug("Ignoring refresh pull request due to event %s" % (event,))
             return False
-        self.log.debug("Refreshing change due to event %s" % (event,))
+        self.log.debug("Refreshing pull request due to event %s" % (event,))
         return True
 
     def refresh(self):
         with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key, lazy=False)
-            # When we first open the change, update its last_seen
-            # time.
+            pr = session.getPullRequest(self.pr_key, lazy=False)
+            # When we first open the pr, update its last_seen time.
             if not self.marked_seen:
-                change.last_seen = datetime.datetime.utcnow()
+                pr.last_seen = datetime.datetime.utcnow()
                 self.marked_seen = True
-            self.pending_edit_message = change.pending_edit_message or ''
+            self.pending_edit_message = pr.pending_edit_message or ''
             reviewed = hidden = starred = held = ''
-            if change.reviewed:
+            if pr.reviewed:
                 reviewed = ' (reviewed)'
-            if change.hidden:
+            if pr.hidden:
                 hidden = ' (hidden)'
-            if change.starred:
+            if pr.starred:
                 starred = '* '
-            if change.held:
+            if pr.held:
                 held = ' (held)'
-            self.title = '%sChange %s%s%s%s' % (starred, change.number, reviewed,
+            self.title = '%sPull request %s%s%s%s' % (starred, pr.number, reviewed,
                                                 hidden, held)
             self.app.status.update(title=self.title)
-            self.project_key = change.project.key
-            self.project_name = change.project.name
-            self.change_rest_id = change.change_id
-            if change.author:
-                self.author_login = change.author.username
+            self.project_key = pr.project.key
+            self.project_name = pr.project.name
+            self.pr_rest_id = pr.pr_id
+            if pr.author:
+                self.author_login = pr.author.username
             else:
                 self.author_login = None
 
-            if change.author.email:
-                author_string = '%s <%s>' % (change.author_name,
-                                            change.author.email)
+            if pr.author.email:
+                author_string = '%s <%s>' % (pr.author_name,
+                                             pr.author.email)
             else:
-                author_string = change.author_name
-            self.author_label.text.set_text(('change-data', author_string))
-            self.project_label.text.set_text(('change-data', change.project.name))
-            self.branch_label.set_text(('change-data', change.branch))
+                author_string = pr.author_name
+            self.author_label.text.set_text(('pr-data', author_string))
+            self.project_label.text.set_text(('pr-data', pr.project.name))
+            self.branch_label.set_text(('pr-data', pr.branch))
             label_buttons = []
-            for x in change.labels:
+            for x in pr.labels:
                 if label_buttons:
                     label_buttons.append(', ')
-                link = mywid.Link(x.name, 'change-data', 'focused-change-data')
+                link = mywid.Link(x.name, 'pr-data', 'focused-pr-data')
                 urwid.connect_signal(
                     link, 'selected',
                     lambda link, x=x: self.searchLabel(x.name))
                 label_buttons.append(link)
-            self.labels_label.set_text(('change-data', label_buttons or u''))
-            self.created_label.set_text(('change-data', str(self.app.time(change.created))))
-            self.updated_label.set_text(('change-data', str(self.app.time(change.updated))))
-            self.status_label.set_text(('change-data', change.state))
-            self.permalink_url = str(change.html_url)
-            self.permalink_label.text.set_text(('change-data', self.permalink_url))
-            self.pr_description.set_text('\n'.join([change.title, '', change.body]))
+            self.labels_label.set_text(('pr-data', label_buttons or u''))
+            self.created_label.set_text(('pr-data', str(self.app.time(pr.created))))
+            self.updated_label.set_text(('pr-data', str(self.app.time(pr.updated))))
+            self.status_label.set_text(('pr-data', pr.state))
+            self.permalink_url = str(pr.html_url)
+            self.permalink_label.text.set_text(('pr-data', self.permalink_url))
+            self.pr_description.set_text('\n'.join([pr.title, '', pr.body]))
 
             review_states = ['Changes Requested', 'Comment', 'Approved']
             approval_headers = [urwid.Text(('table-header', 'Name'))]
@@ -729,8 +728,8 @@ class ChangeView(urwid.WidgetWrap):
                 approval_headers.append(urwid.Text(('table-header', state)))
             votes = mywid.Table(approval_headers)
             approvals_for_account = {}
-            pending_message = change.commits[-1].getPendingMessage()
-            for approval in change.approvals:
+            pending_message = pr.commits[-1].getPendingMessage()
+            for approval in pr.approvals:
                 # Don't display draft approvals unless they are pending-upload
                 if approval.draft and not pending_message:
                     continue
@@ -750,7 +749,7 @@ class ChangeView(urwid.WidgetWrap):
                     approvals_for_account[approval.reviewer.id] = approvals
                     votes.addRow(row)
                 # Only set approval status if the review is for the current commit
-                if approval.sha == change.commits[-1].sha:
+                if approval.sha == pr.commits[-1].sha:
                     if approval.state in ['APPROVED', 'APPROVE']:
                         approvals['Approved'].set_text(('positive-label', '✓'))
                     elif approval.state in ['CHANGES_REQUESTED', 'REQUEST_CHANGES']:
@@ -764,15 +763,15 @@ class ChangeView(urwid.WidgetWrap):
             # gets selectable items (like clickable names).
             self.grid.contents[2] = (votes, ('given', 80))
 
-            # self.refreshDependencies(session, change)
+            # self.refreshDependencies(session, pr)
 
-            repo = gitrepo.get_repo(change.project.name, self.app.config)
+            repo = gitrepo.get_repo(pr.project.name, self.app.config)
             # The listbox has both commits and messages in it (and
-            # may later contain the vote table and change header), so
+            # may later contain the vote table and pull request header), so
             # keep track of the index separate from the loop.
             listbox_index = self.listbox_patchset_start
-            self.first_commit_key = change.commits[0].key
-            for commit in change.commits:
+            self.first_commit_key = pr.commits[0].key
+            for commit in pr.commits:
                 self.last_commit_key = commit.key
                 row = self.commit_rows.get(commit.key)
                 if not row:
@@ -789,8 +788,8 @@ class ChangeView(urwid.WidgetWrap):
             # Get the set of messages that should be displayed
             display_messages = []
             result_systems = {}
-            for message in change.messages:
-                if (message.commit == change.commits[-1] and
+            for message in pr.messages:
+                if (message.commit == pr.commits[-1] and
                     message.author and message.author.name):
                     for commentlink in self.app.config.commentlinks:
                         results = commentlink.getTestResults(self.app, message.message)
@@ -813,14 +812,14 @@ class ChangeView(urwid.WidgetWrap):
             for message in display_messages:
                 row = self.message_rows.get(message.key)
                 if not row:
-                    box = ChangeMessageBox(self, change, message)
+                    box = PullRequestMessageBox(self, pr, message)
                     row = urwid.Padding(box, width=80)
                     self.listbox.body.insert(listbox_index, row)
                     self.message_rows[message.key] = row
                 else:
                     unseen_keys.remove(message.key)
                     if message.created != row.original_widget.message_created:
-                        row.original_widget.refresh(change, message)
+                        row.original_widget.refresh(pr, message)
                 listbox_index += 1
             # Remove any messages that should not be displayed
             for key in unseen_keys:
@@ -828,7 +827,7 @@ class ChangeView(urwid.WidgetWrap):
                 self.listbox.body.remove(row)
                 del self.message_rows[key]
                 listbox_index -= 1
-            self._updateTestResults(change, result_systems)
+            self._updateTestResults(pr, result_systems)
 
     def _add_link(self, name, url):
         link = mywid.Link('{:<42}'.format(name), 'link', 'focused-link')
@@ -836,14 +835,14 @@ class ChangeView(urwid.WidgetWrap):
             urwid.connect_signal(link, 'selected', lambda link:self.app.openURL(url))
         return link
 
-    def _updateTestResults(self, change, result_systems):
+    def _updateTestResults(self, pr, result_systems):
         text = []
         for system, results in result_systems.items():
             for job, result in results.items():
                 text.append(result)
 
         # Add check results
-        commit = change.commits[-1]
+        commit = pr.commits[-1]
         for check in commit.checks:
             if not (check.url or check.message):
                 continue
@@ -861,8 +860,8 @@ class ChangeView(urwid.WidgetWrap):
         else:
             self.results.set_text('')
 
-    def _updateDependenciesWidget(self, changes, widget, widget_rows, header):
-        if not changes:
+    def _updateDependenciesWidget(self, prs, widget, widget_rows, header):
+        if not prs:
             if len(widget.contents) > 0:
                 widget.contents[:] = []
             return
@@ -873,17 +872,17 @@ class ChangeView(urwid.WidgetWrap):
 
         unseen_keys = set(widget_rows.keys())
         i = 1
-        for key, title in changes.items():
+        for key, title in prs.items():
             row = widget_rows.get(key)
             if not row:
-                row = urwid.AttrMap(urwid.Padding(ChangeButton(self, key, title), width='pack'),
+                row = urwid.AttrMap(urwid.Padding(PullRequestButton(self, key, title), width='pack'),
                                     'link', focus_map={None: 'focused-link'})
                 row = (row, widget.options('pack'))
                 widget.contents.insert(i, row)
                 if not widget.selectable():
                     widget.set_focus(i)
-                if not self.related_changes.selectable():
-                    self.related_changes.set_focus(widget)
+                if not self.related_prs.selectable():
+                    self.related_prs.set_focus(widget)
                 widget_rows[key] = row
             else:
                 row[0].original_widget.original_widget.set_label(title)
@@ -894,31 +893,31 @@ class ChangeView(urwid.WidgetWrap):
             widget.contents.remove(row)
             del widget_rows[key]
 
-    def refreshDependencies(self, session, change):
-        commit = change.commits[-1]
+    def refreshDependencies(self, session, pr):
+        commit = pr.commits[-1]
 
         # Handle depends-on
         parents = {}
-        parent = change.getCommitBySha(commit.parent)
+        parent = pr.getCommitBySha(commit.parent)
         if parent:
-            title = parent.change.title
+            title = parent.pull_request.title
             show_merged = False
-            if parent != parent.change.commits[-1]:
+            if parent != parent.pull_request.commits[-1]:
                 title += ' [OUTDATED]'
                 show_merged = True
-            if parent.change.state == 'closed' and not parent.change.merged:
+            if parent.pull_request.state == 'closed' and not parent.pull_request.merged:
                 title += ' [CLOSED]'
-            if show_merged or parent.change.merged:
-                parents[parent.change.key] = title
+            if show_merged or parent.pull_request.merged:
+                parents[parent.pull_request.key] = title
         self._updateDependenciesWidget(parents,
                                        self.depends_on, self.depends_on_rows,
                                        header='Depends on:')
 
         # Handle needed-by
         children = {}
-        children.update((r.change.key, r.change.title)
-                        for r in session.getCommitsByParent([commit.sha for commit in change.commits])
-                        if (r.change.state == 'open' and r == r.change.commits[-1]))
+        children.update((r.pull_request.key, r.pull_request.title)
+                        for r in session.getCommitsByParent([commit.sha for commit in pr.commits])
+                        if (r.pull_request.state == 'open' and r == r.pull_request.commits[-1]))
         self._updateDependenciesWidget(children,
                                        self.needed_by, self.needed_by_rows,
                                        header='Needed by:')
@@ -926,28 +925,28 @@ class ChangeView(urwid.WidgetWrap):
 
     def toggleReviewed(self):
         with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            change.reviewed = not change.reviewed
-            self.app.project_cache.clear(change.project)
+            pr = session.getPullRequest(self.pr_key)
+            pr.reviewed = not pr.reviewed
+            self.app.project_cache.clear(pr.project)
 
     def toggleHidden(self):
         with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            change.hidden = not change.hidden
-            self.app.project_cache.clear(change.project)
+            pr = session.getPullRequest(self.pr_key)
+            pr.hidden = not pr.hidden
+            self.app.project_cache.clear(pr.project)
 
     def toggleStarred(self):
         with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            change.starred = not change.starred
-            self.app.project_cache.clear(change.project)
+            pr = session.getPullRequest(self.pr_key)
+            pr.starred = not pr.starred
+            self.app.project_cache.clear(pr.project)
 
     def toggleHeld(self):
-        return self.app.toggleHeldChange(self.change_key)
+        return self.app.toggleHeldPullRequest(self.pr_key)
 
     def keypress(self, size, key):
         if not self.app.input_buffer:
-            key = super(ChangeView, self).keypress(size, key)
+            key = super(PullRequestView, self).keypress(size, key)
         keys = self.app.input_buffer + [key]
         commands = self.app.config.keymap.getCommands(keys)
         if keymap.TOGGLE_REVIEWED in commands:
@@ -983,21 +982,21 @@ class ChangeView(urwid.WidgetWrap):
             row.cherryPick(None)
             return None
         if keymap.SEARCH_RESULTS in commands:
-            widget = self.app.findChangeList()
+            widget = self.app.findPullRequestList()
             if widget:
                 self.app.backScreen(widget)
             return None
-        if ((keymap.NEXT_CHANGE in commands) or
-            (keymap.PREV_CHANGE in commands)):
-            widget = self.app.findChangeList()
+        if ((keymap.NEXT_PR in commands) or
+            (keymap.PREV_PR in commands)):
+            widget = self.app.findPullRequestList()
             if widget:
-                if keymap.NEXT_CHANGE in commands:
-                    new_change_key = widget.getNextChangeKey(self.change_key)
+                if keymap.NEXT_PR in commands:
+                    new_pr_key = widget.getNextPullRequestKey(self.pr_key)
                 else:
-                    new_change_key = widget.getPrevChangeKey(self.change_key)
-                if new_change_key:
+                    new_pr_key = widget.getPrevPullRequestKey(self.pr_key)
+                if new_pr_key:
                     try:
-                        view = ChangeView(self.app, new_change_key)
+                        view = PullRequestView(self.app, new_pr_key)
                         self.app.changeScreen(view, push=False)
                     except hubtty.view.DisplayError as e:
                         self.app.error(e.message)
@@ -1006,25 +1005,25 @@ class ChangeView(urwid.WidgetWrap):
             self.hide_comments = not self.hide_comments
             self.refresh()
             return None
-        if keymap.CLOSE_CHANGE in commands:
-            self.closeChange()
+        if keymap.CLOSE_PR in commands:
+            self.closePullRequest()
             return None
         if keymap.EDIT_PULL_REQUEST in commands:
             self.editPullRequest()
             return None
-        if keymap.REBASE_CHANGE in commands:
-            self.rebaseChange()
+        if keymap.REBASE_PR in commands:
+            self.rebasePullRequest()
             return None
-        if keymap.REOPEN_CHANGE in commands:
-            self.reopenChange()
+        if keymap.REOPEN_PR in commands:
+            self.reopenPullRequest()
             return None
         if keymap.REFRESH in commands:
             self.app.sync.submitTask(
-                sync.SyncChangeTask(self.change_rest_id, priority=sync.HIGH_PRIORITY))
+                sync.SyncPullRequestTask(self.pr_rest_id, priority=sync.HIGH_PRIORITY))
             self.app.status.update()
             return None
-        if keymap.MERGE_CHANGE in commands:
-            self.mergeChange()
+        if keymap.MERGE_PR in commands:
+            self.mergePullRequest()
             return None
         if keymap.EDIT_LABELS in commands:
             self.editLabels()
@@ -1041,41 +1040,41 @@ class ChangeView(urwid.WidgetWrap):
             screen = view_side_diff.SideDiffView(self.app, commit_key)
         self.app.changeScreen(screen)
 
-    def closeChange(self):
+    def closePullRequest(self):
         dialog = mywid.TextEditDialog(u'Close pull request', u'Message:',
                                       u'Close pull request',
                                       self.pending_edit_message)
         urwid.connect_signal(dialog, 'cancel', lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'save', lambda button:
-                                 self.doCloseReopenChange(dialog, 'closed'))
+                                 self.doCloseReopenPullRequest(dialog, 'closed'))
         self.app.popup(dialog)
 
-    def reopenChange(self):
+    def reopenPullRequest(self):
         dialog = mywid.TextEditDialog(u'Reopen pull request', u'Message:',
                                       u'Reopen pull request',
                                       self.pending_edit_message)
         urwid.connect_signal(dialog, 'cancel', lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'save', lambda button:
-                                 self.doCloseReopenChange(dialog, 'open'))
+                                 self.doCloseReopenPullRequest(dialog, 'open'))
         self.app.popup(dialog)
 
-    def doCloseReopenChange(self, dialog, state):
-        change_key = None
+    def doCloseReopenPullRequest(self, dialog, state):
+        pr_key = None
         with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            change.state = state
-            change.pending_edit = True
-            change.pending_edit_message = dialog.entry.edit_text
-            change_key = change.key
+            pr = session.getPullRequest(self.pr_key)
+            pr.state = state
+            pr.pending_edit = True
+            pr.pending_edit_message = dialog.entry.edit_text
+            pr_key = pr.key
         self.app.sync.submitTask(
-            sync.EditPullRequestTask(change_key, sync.HIGH_PRIORITY))
+            sync.EditPullRequestTask(pr_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
     def editPullRequest(self):
         with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            dialog = EditPullRequestDialog(self.app, change)
+            pr = session.getPullRequest(self.pr_key)
+            dialog = EditPullRequestDialog(self.app, pr)
         urwid.connect_signal(dialog, 'cancel',
                     lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'save', lambda button:
@@ -1085,65 +1084,65 @@ class ChangeView(urwid.WidgetWrap):
                        min_width=60, min_height=20)
 
     def doEditPullRequest(self, dialog):
-        change_key = None
+        pr_key = None
         with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            change.title = dialog.pr_title.edit_text
-            change.body = dialog.pr_description.edit_text
-            change.pending_edit = True
-            change_key = change.key
+            pr = session.getPullRequest(self.pr_key)
+            pr.title = dialog.pr_title.edit_text
+            pr.body = dialog.pr_description.edit_text
+            pr.pending_edit = True
+            pr_key = pr.key
         self.app.sync.submitTask(
-            sync.EditPullRequestTask(change_key, sync.HIGH_PRIORITY))
+            sync.EditPullRequestTask(pr_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
-    def rebaseChange(self):
-        dialog = mywid.YesNoDialog(u'Rebase Change',
-                                   u'Perform a remote rebase of this change?')
+    def rebasePullRequest(self):
+        dialog = mywid.YesNoDialog(u'Rebase pull request',
+                                   u'Perform a remote rebase of this pull request?')
         urwid.connect_signal(dialog, 'no', self.app.backScreen)
-        urwid.connect_signal(dialog, 'yes', self.doRebaseChange)
+        urwid.connect_signal(dialog, 'yes', self.doRebasePullRequest)
         self.app.popup(dialog)
 
-    def doRebaseChange(self, button=None):
-        change_key = None
+    def doRebasePullRequest(self, button=None):
+        pr_key = None
         with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            change.pending_rebase = True
-            change_key = change.key
+            pr = session.getPullRequest(self.pr_key)
+            pr.pending_rebase = True
+            pr_key = pr.key
         self.app.sync.submitTask(
-            sync.RebaseChangeTask(change_key, sync.HIGH_PRIORITY))
+            sync.RebasePullRequestTask(pr_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
-    def mergeChange(self):
+    def mergePullRequest(self):
         with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            dialog = MergeDialog(self.app, change)
+            pr = session.getPullRequest(self.pr_key)
+            dialog = MergeDialog(self.app, pr)
         urwid.connect_signal(dialog, 'cancel',
                     lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'merge', lambda button:
-                                 self.doMergeChange(dialog))
+                                 self.doMergePullRequest(dialog))
         self.app.popup(dialog,
                        relative_width=50, relative_height=75,
                        min_width=60, min_height=20)
 
-    def doMergeChange(self, dialog):
+    def doMergePullRequest(self, dialog):
         pending_merge = None
 
         strategy, title, message = dialog.getValues()
 
         with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
+            pr = session.getPullRequest(self.pr_key)
 
-            if not change.canMerge():
-                error_dialog = mywid.MessageDialog('Error', 'You cannot merge this change.')
+            if not pr.canMerge():
+                error_dialog = mywid.MessageDialog('Error', 'You cannot merge this pull request.')
                 urwid.connect_signal(error_dialog, 'close',
                     lambda button: self.app.backScreen())
                 self.app.popup(error_dialog)
                 return
 
-            sha = change.commits[-1].sha
-            pending_merge = change.createPendingMerge(sha, strategy,
+            sha = pr.commits[-1].sha
+            pending_merge = pr.createPendingMerge(sha, strategy,
                     commit_title=title, commit_message=message)
 
         if pending_merge:
@@ -1155,8 +1154,8 @@ class ChangeView(urwid.WidgetWrap):
 
     def editLabels(self):
         with self.app.db.getSession() as session:
-            change = session.getChange(self.change_key)
-            dialog = EditLabelsDialog(self.app, change)
+            pr = session.getPullRequest(self.pr_key)
+            dialog = EditLabelsDialog(self.app, pr)
         urwid.connect_signal(dialog, 'save',
             lambda button: self.closeEditLabels(dialog, True))
         urwid.connect_signal(dialog, 'cancel',
@@ -1165,19 +1164,19 @@ class ChangeView(urwid.WidgetWrap):
 
     def closeEditLabels(self, dialog, save):
         if save:
-            change_key = None
+            pr_key = None
             labels_to_set = [ cb.label for cb in dialog.labels_checkboxes if cb.state ]
             with self.app.db.getSession() as session:
-                change = session.getChange(self.change_key)
-                for label in change.project.labels:
-                    if label.name in labels_to_set and label not in change.labels:
-                        change.addLabel(label)
-                    if label.name not in labels_to_set and label in change.labels:
-                        change.removeLabel(label)
-                change.pending_labels = True
-                change_key = change.key
+                pr = session.getPullRequest(self.pr_key)
+                for label in pr.project.labels:
+                    if label.name in labels_to_set and label not in pr.labels:
+                        pr.addLabel(label)
+                    if label.name not in labels_to_set and label in pr.labels:
+                        pr.removeLabel(label)
+                pr.pending_labels = True
+                pr_key = pr.key
             self.app.sync.submitTask(
-                sync.SetLabelsTask(change_key, sync.HIGH_PRIORITY))
+                sync.SetLabelsTask(pr_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
@@ -1212,5 +1211,5 @@ class ChangeView(urwid.WidgetWrap):
                 self.app.sync.submitTask(
                     sync.UploadReviewTask(message_key, sync.HIGH_PRIORITY))
         self.refresh()
-        if self.app.config.close_change_on_review:
+        if self.app.config.close_pr_on_review:
             self.app.backScreen()

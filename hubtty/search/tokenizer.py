@@ -18,7 +18,7 @@ import six
 operators = {
     'age': 'OP_AGE', # Hubtty extension
     'recentlyseen': 'OP_RECENTLYSEEN', # Hubtty extension
-    'change': 'OP_CHANGE',
+    'pr': 'OP_PR', # Hubtty extension
     'author': 'OP_AUTHOR',
     'reviewed-by': 'OP_REVIEWEDBY',
     'commenter': 'OP_COMMENTER',
@@ -60,7 +60,7 @@ tokens = [
     'LPAREN',
     'RPAREN',
     'NUMBER',
-    'CHANGE_ID',
+    'PR_ID',
     'SSTRING',
     'DSTRING',
     'USTRING',
@@ -81,7 +81,7 @@ def SearchTokenizer():
         t.type = operators.get(t.value[:-1], 'OP')
         return t
 
-    def t_CHANGE_ID(t):
+    def t_PR_ID(t):
         r'([a-zA-Z_]+/)+\d+'
         return t
 

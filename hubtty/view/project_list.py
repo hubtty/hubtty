@@ -19,7 +19,7 @@ import urwid
 from hubtty import keymap
 from hubtty import mywid
 from hubtty import sync
-from hubtty.view import change_list as view_change_list
+from hubtty.view import pull_request_list as view_pr_list
 from hubtty.view import mouse_scroll_decorator
 
 class TopicSelectDialog(urwid.WidgetWrap):
@@ -94,12 +94,12 @@ class ProjectRow(urwid.Button):
         self.name = mywid.SearchableText('')
         self._setName(project.name, self.indent)
         self.name.set_wrap_mode('clip')
-        self.unreviewed_changes = urwid.Text(u'', align=urwid.RIGHT)
-        self.open_changes = urwid.Text(u'', align=urwid.RIGHT)
+        self.unreviewed_prs = urwid.Text(u'', align=urwid.RIGHT)
+        self.open_prs = urwid.Text(u'', align=urwid.RIGHT)
         col = urwid.Columns([
                 self.name,
-                ('fixed', 11, self.unreviewed_changes),
-                ('fixed', 5, self.open_changes),
+                ('fixed', 11, self.unreviewed_prs),
+                ('fixed', 5, self.open_prs),
                 ])
         self.row_style = urwid.AttrMap(col, '')
         self._w = urwid.AttrMap(self.row_style, None, focus_map=self.project_focus_map)
@@ -111,7 +111,7 @@ class ProjectRow(urwid.Button):
     def update(self, project):
         cache = self.app.project_cache.get(project)
         if project.subscribed:
-            if cache['unreviewed_changes'] > 0:
+            if cache['unreviewed_prs'] > 0:
                 style = 'unreviewed-project'
             else:
                 style = 'subscribed-project'
@@ -121,8 +121,8 @@ class ProjectRow(urwid.Button):
         if self.mark:
             style = 'marked-project'
         self.row_style.set_attr_map({None: style})
-        self.unreviewed_changes.set_text('%i ' % cache['unreviewed_changes'])
-        self.open_changes.set_text('%i ' % cache['open_changes'])
+        self.unreviewed_prs.set_text('%i ' % cache['unreviewed_prs'])
+        self.open_prs.set_text('%i ' % cache['open_prs'])
 
     def toggleMark(self):
         self.mark = not self.mark
@@ -160,12 +160,12 @@ class TopicRow(urwid.Button):
         self.name = urwid.Text('')
         self._setName(topic.name)
         self.name.set_wrap_mode('clip')
-        self.unreviewed_changes = urwid.Text(u'', align=urwid.RIGHT)
-        self.open_changes = urwid.Text(u'', align=urwid.RIGHT)
+        self.unreviewed_prs = urwid.Text(u'', align=urwid.RIGHT)
+        self.open_prs = urwid.Text(u'', align=urwid.RIGHT)
         col = urwid.Columns([
                 self.name,
-                ('fixed', 11, self.unreviewed_changes),
-                ('fixed', 5, self.open_changes),
+                ('fixed', 11, self.unreviewed_prs),
+                ('fixed', 5, self.open_prs),
                 ])
         self.row_style = urwid.AttrMap(col, '')
         self._w = urwid.AttrMap(self.row_style, None, focus_map=self.project_focus_map)
@@ -173,16 +173,16 @@ class TopicRow(urwid.Button):
         self.row_style.set_attr_map({None: self._style})
         self.update(topic)
 
-    def update(self, topic, unreviewed_changes=None, open_changes=None):
+    def update(self, topic, unreviewed_prs=None, open_prs=None):
         self._setName(topic.name)
-        if unreviewed_changes is None:
-            self.unreviewed_changes.set_text('')
+        if unreviewed_prs is None:
+            self.unreviewed_prs.set_text('')
         else:
-            self.unreviewed_changes.set_text('%i ' % unreviewed_changes)
-        if open_changes is None:
-            self.open_changes.set_text('')
+            self.unreviewed_prs.set_text('%i ' % unreviewed_prs)
+        if open_prs is None:
+            self.open_prs.set_text('')
         else:
-            self.open_changes.set_text('%i ' % open_changes)
+            self.open_prs.set_text('%i ' % open_prs)
 
     def toggleMark(self):
         self.mark = not self.mark
@@ -207,7 +207,7 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
             (keymap.TOGGLE_LIST_SUBSCRIBED,
              "Toggle whether only subscribed projects or all projects are listed"),
             (keymap.TOGGLE_LIST_REVIEWED,
-             "Toggle listing of projects with unreviewed changes"),
+             "Toggle listing of projects with unreviewed pull requests"),
             (keymap.TOGGLE_SUBSCRIBED,
              "Toggle the subscription flag for the selected project"),
             (keymap.REFRESH,
@@ -257,9 +257,9 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
     def interested(self, event):
         if not (isinstance(event, sync.ProjectAddedEvent)
                 or
-                isinstance(event, sync.ChangeAddedEvent)
+                isinstance(event, sync.PullRequestAddedEvent)
                 or
-                (isinstance(event, sync.ChangeUpdatedEvent) and
+                (isinstance(event, sync.PullRequestUpdatedEvent) and
                  (event.state_changed or event.review_flag_changed))):
             self.log.debug("Ignoring refresh project list due to event %s" % (event,))
             return False
@@ -327,7 +327,7 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
             self.title = u'Subscribed projects'
             self.short_title = self.title[:]
             if self.unreviewed:
-                self.title += u' with unreviewed changes'
+                self.title += u' with unreviewed pull requests'
         else:
             self.title = u'All projects'
             self.short_title = self.title[:]
@@ -346,12 +346,12 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
                 for project in topic.projects:
                     #self.log.debug("  project: %s" % project.name)
                     cache = self.app.project_cache.get(project)
-                    topic_unreviewed += cache['unreviewed_changes']
-                    topic_open += cache['open_changes']
+                    topic_unreviewed += cache['unreviewed_prs']
+                    topic_open += cache['open_prs']
                     if self.subscribed:
                         if not project.subscribed:
                             continue
-                        if self.unreviewed and not cache['unreviewed_changes']:
+                        if self.unreviewed and not cache['unreviewed_prs']:
                             continue
                     if topic.key in self.open_topics:
                         i = self._projectRow(i, project, topic)
@@ -363,9 +363,9 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
 
     def onSelect(self, button, data):
         project_key, project_name = data
-        self.app.changeScreen(view_change_list.ChangeListView(
+        self.app.changeScreen(view_pr_list.PullRequestListView(
                 self.app,
-                "_project_key:%s %s" % (project_key, self.app.config.project_change_list_query),
+                "_project_key:%s %s" % (project_key, self.app.config.project_pr_list_query),
                 project_name, project_key=project_key, unreviewed=True))
 
     def onSelectTopic(self, button, data):
