@@ -332,8 +332,6 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
              "Sort pull requests by how recently they were updated"),
             (keymap.SORT_BY_REVERSE,
              "Reverse the sort"),
-            (keymap.LOCAL_CHERRY_PICK,
-             "Cherry-pick the most recent commit of the selected PR onto the local repo"),
             (keymap.INTERACTIVE_SEARCH,
              "Interactive search"),
             ]
@@ -690,13 +688,6 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
             pos = self.listbox.focus_position
             row = self.listbox.body[pos]
             self.app.localCheckoutCommit(row.repository_name, row.commit_sha)
-            return True
-        if keymap.LOCAL_CHERRY_PICK in commands:
-            if not len(self.listbox.body):
-                return True
-            pos = self.listbox.focus_position
-            row = self.listbox.body[pos]
-            self.app.localCherryPickCommit(row.repository_name, row.commit_sha)
             return True
         if keymap.REFINE_PR_SEARCH in commands:
             default = self.getQueryString()
