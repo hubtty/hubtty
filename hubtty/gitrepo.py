@@ -13,11 +13,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-# Test changes:
-# https://review.opendev.org/275862
-# https://review.opendev.org/119302
-# https://review.opendev.org/133550
-
 import datetime
 import logging
 import difflib
@@ -575,8 +570,8 @@ class Repo(object):
         f.finalize()
         return f
 
-def get_repo(project_name, config):
-    local_path = os.path.join(config.git_root, project_name)
+def get_repo(repo_name, config):
+    local_path = os.path.join(config.git_root, repo_name)
     local_root = os.path.abspath(config.git_root)
     assert os.path.commonprefix((local_root, local_path)) == local_root
-    return Repo(config.git_url + project_name, local_path)
+    return Repo(config.git_url + repo_name, local_path)

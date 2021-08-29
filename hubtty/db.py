@@ -32,8 +32,8 @@ from sqlalchemy.sql.expression import and_
 from hubtty import sync
 
 metadata = MetaData()
-project_table = Table(
-    'project', metadata,
+repository_table = Table(
+    'repository', metadata,
     Column('key', Integer, primary_key=True),
     Column('name', String(255), index=True, unique=True, nullable=False),
     Column('subscribed', Boolean, index=True, default=False),
@@ -44,7 +44,7 @@ project_table = Table(
 branch_table = Table(
     'branch', metadata,
     Column('key', Integer, primary_key=True),
-    Column('project_key', Integer, ForeignKey("project.key"), index=True),
+    Column('repository_key', Integer, ForeignKey("repository.key"), index=True),
     Column('name', String(255), index=True, nullable=False),
     )
 topic_table = Table(
@@ -53,22 +53,22 @@ topic_table = Table(
     Column('name', String(255), index=True, nullable=False),
     Column('sequence', Integer, index=True, unique=True, nullable=False),
     )
-project_topic_table = Table(
-    'project_topic', metadata,
+repository_topic_table = Table(
+    'repository_topic', metadata,
     Column('key', Integer, primary_key=True),
-    Column('project_key', Integer, ForeignKey("project.key"), index=True),
+    Column('repository_key', Integer, ForeignKey("repository.key"), index=True),
     Column('topic_key', Integer, ForeignKey("topic.key"), index=True),
     Column('sequence', Integer, nullable=False),
     UniqueConstraint('topic_key', 'sequence', name='topic_key_sequence_const'),
     )
-change_table = Table(
-    'change', metadata,
+pull_request_table = Table(
+    'pull_request', metadata,
     Column('key', Integer, primary_key=True),
-    Column('project_key', Integer, ForeignKey("project.key"), index=True),
+    Column('repository_key', Integer, ForeignKey("repository.key"), index=True),
     Column('id', Integer, index=True, unique=True, nullable=False),
     Column('number', Integer, index=True, nullable=False),
     Column('branch', String(255), index=True, nullable=False),
-    Column('change_id', String(255), index=True, unique=True, nullable=False),
+    Column('pr_id', String(255), index=True, unique=True, nullable=False),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
     Column('title', String(255), nullable=False),
     Column('body', Text, nullable=False),
@@ -94,7 +94,7 @@ change_table = Table(
 commit_table = Table(
     'commit', metadata,
     Column('key', Integer, primary_key=True),
-    Column('change_key', Integer, ForeignKey("change.key"), index=True),
+    Column('pr_key', Integer, ForeignKey("pull_request.key"), index=True),
     Column('message', Text, nullable=False),
     Column('sha', String(64), index=True, nullable=False),
     Column('parent', String(64), index=True, nullable=False),
@@ -102,7 +102,7 @@ commit_table = Table(
 message_table = Table(
     'message', metadata,
     Column('key', Integer, primary_key=True),
-    Column('change_key', Integer, ForeignKey("change.key"), index=True),
+    Column('pr_key', Integer, ForeignKey("pull_request.key"), index=True),
     Column('commit_key', Integer, ForeignKey("commit.key"), index=True),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
     Column('id', Integer, index=True), #, unique=True, nullable=False),
@@ -133,12 +133,12 @@ comment_table = Table(
 approval_table = Table(
     'approval', metadata,
     Column('key', Integer, primary_key=True),
-    Column('change_key', Integer, ForeignKey("change.key"), index=True),
+    Column('pr_key', Integer, ForeignKey("pull_request.key"), index=True),
     Column('account_key', Integer, ForeignKey("account.key"), index=True),
     Column('state', String(32), index=True, nullable=False),
     Column('sha', String(64), nullable=False),
     Column('draft', Boolean, index=True, nullable=False),
-    UniqueConstraint('change_key', 'account_key', 'sha', name='approval_change_key_account_key_sha_const'),
+    UniqueConstraint('pr_key', 'account_key', 'sha', name='approval_pr_key_account_key_sha_const'),
     )
 account_table = Table(
     'account', metadata,
@@ -151,7 +151,7 @@ account_table = Table(
 pending_merge_table = Table(
     'pending_merge', metadata,
     Column('key', Integer, primary_key=True),
-    Column('change_key', Integer, ForeignKey("change.key"), index=True),
+    Column('pr_key', Integer, ForeignKey("pull_request.key"), index=True),
     Column('commit_title', String(255)),
     Column('commit_message', Text),
     Column('sha', String(255), nullable=False),
@@ -188,18 +188,18 @@ check_table = Table(
 label_table = Table(
     'label', metadata,
     Column('key', Integer, primary_key=True),
-    Column('project_key', Integer, ForeignKey("project.key"), index=True),
+    Column('repository_key', Integer, ForeignKey("repository.key"), index=True),
     Column('id', Integer, nullable=False, index=True),
     Column('name', String(length=255), nullable=False),
     Column('color', String(length=8), nullable=False),
     Column('description', Text),
     )
-change_label_table = Table(
-    'change_label', metadata,
+pull_request_label_table = Table(
+    'pull_request_label', metadata,
     Column('key', Integer, primary_key=True),
-    Column('change_key', Integer, ForeignKey("change.key"), index=True),
+    Column('pr_key', Integer, ForeignKey("pull_request.key"), index=True),
     Column('label_key', Integer, ForeignKey("label.key"), index=True),
-    UniqueConstraint('change_key', 'label_key', name='change_key_label_key_const'),
+    UniqueConstraint('pr_key', 'label_key', name='pr_key_label_key_const'),
     )
 
 
@@ -210,18 +210,18 @@ class Account(object):
         self.username = username
         self.email = email
 
-class Project(object):
+class Repository(object):
     def __init__(self, name, subscribed=False, description='', can_push=False):
         self.name = name
         self.subscribed = subscribed
         self.description = description
         self.can_push = can_push
 
-    def createChange(self, *args, **kw):
+    def createPullRequest(self, *args, **kw):
         session = Session.object_session(self)
         args = [self] + list(args)
-        c = Change(*args, **kw)
-        self.changes.append(c)
+        c = PullRequest(*args, **kw)
+        self.pull_requests.append(c)
         session.add(c)
         session.flush()
         return c
@@ -245,13 +245,13 @@ class Project(object):
         return l
 
 class Branch(object):
-    def __init__(self, project, name):
-        self.project_key = project.key
+    def __init__(self, repository, name):
+        self.repository_key = repository.key
         self.name = name
 
-class ProjectTopic(object):
-    def __init__(self, project, topic, sequence):
-        self.project_key = project.key
+class RepositoryTopic(object):
+    def __init__(self, repository, topic, sequence):
+        self.repository_key = repository.key
         self.topic_key = topic.key
         self.sequence = sequence
 
@@ -260,50 +260,50 @@ class Topic(object):
         self.name = name
         self.sequence = sequence
 
-    def addProject(self, project):
+    def addRepository(self, repository):
         session = Session.object_session(self)
-        seq = max([x.sequence for x in self.project_topics] + [0])
-        pt = ProjectTopic(project, self, seq+1)
-        self.project_topics.append(pt)
-        self.projects.append(project)
-        session.add(pt)
+        seq = max([x.sequence for x in self.repository_topics] + [0])
+        rt = RepositoryTopic(repository, self, seq+1)
+        self.repository_topics.append(rt)
+        self.repositories.append(repository)
+        session.add(rt)
         session.flush()
 
-    def removeProject(self, project):
+    def removeRepository(self, repository):
         session = Session.object_session(self)
-        for pt in self.project_topics:
-            if pt.project_key == project.key:
-                self.project_topics.remove(pt)
-                session.delete(pt)
-        self.projects.remove(project)
+        for rt in self.repository_topics:
+            if rt.repository_key == repository.key:
+                self.repository_topics.remove(rt)
+                session.delete(rt)
+        self.repositories.remove(repository)
         session.flush()
 
 class Label(object):
-    def __init__(self, project, id, name, color, description=None):
-        self.project_key = project.key
+    def __init__(self, repository, id, name, color, description=None):
+        self.repository_key = repository.key
         self.id = id
         self.name = name
         self.color = color
         self.description = description
 
-class ChangeLabel(object):
-    def __init__(self, change, label):
-        self.change_key = change.key
+class PullRequestLabel(object):
+    def __init__(self, pull_request, label):
+        self.pr_key = pull_request.key
         self.label_key = label.key
 
-class Change(object):
-    def __init__(self, project, id, author, number, branch, change_id,
+class PullRequest(object):
+    def __init__(self, repository, id, author, number, branch, pr_id,
                  title, body, created, updated, state, additions, deletions,
                  html_url, merged, mergeable, hidden=False, reviewed=False,
                  starred=False, held=False, pending_rebase=False,
                  pending_edit=False, pending_edit_message=None,
                  pending_labels=False, outdated=False):
-        self.project_key = project.key
+        self.repository_key = repository.key
         self.account_key = author.key
         self.id = id
         self.number = number
         self.branch = branch
-        self.change_id = change_id
+        self.pr_id = pr_id
         self.title = title
         self.body = body
         self.created = created
@@ -379,8 +379,8 @@ class Change(object):
 
     def addLabel(self, label):
         session = Session.object_session(self)
-        cl = ChangeLabel(self, label)
-        self.change_labels.append(cl)
+        cl = PullRequestLabel(self, label)
+        self.pull_request_labels.append(cl)
         self.labels.append(label)
         session.add(cl)
         session.flush()
@@ -388,9 +388,9 @@ class Change(object):
     def removeLabel(self, label):
         session = Session.object_session(self)
 
-        for cl in self.change_labels:
+        for cl in self.pull_request_labels:
             if cl.label_key == label.key:
-                self.change_labels.remove(cl)
+                self.pull_request_labels.remove(cl)
                 session.delete(cl)
         self.labels.remove(label)
         session.flush()
@@ -401,7 +401,7 @@ class Change(object):
         return len(self.commits) > 0
 
     def canMerge(self):
-        return self.mergeable and self.project.can_push
+        return self.mergeable and self.repository.can_push
 
     @property
     def author_name(self):
@@ -416,8 +416,8 @@ class Change(object):
         return author_name
 
 class Commit(object):
-    def __init__(self, change, message, sha, parent):
-        self.change_key = change.key
+    def __init__(self, pull_request, message, sha, parent):
+        self.pr_key = pull_request.key
         self.message = message
         self.sha = sha
         self.parent = parent
@@ -463,8 +463,8 @@ class Commit(object):
 
 
 class Message(object):
-    def __init__(self, change, commit_id, id, author, created, message, draft=False, pending=False):
-        self.change_key = change.key
+    def __init__(self, pull_request, commit_id, id, author, created, message, draft=False, pending=False):
+        self.pr_key = pull_request.key
         self.commit_key = commit_id
         self.account_key = author.key
         self.id = id
@@ -515,8 +515,8 @@ class Comment(object):
         self.url = url
 
 class Approval(object):
-    def __init__(self, change, reviewer, state, sha, draft=False):
-        self.change_key = change.key
+    def __init__(self, pull_request, reviewer, state, sha, draft=False):
+        self.pr_key = pull_request.key
         self.account_key = reviewer.key
         self.state = state
         self.sha = sha
@@ -535,9 +535,9 @@ class Approval(object):
         return reviewer_name
 
 class PendingMerge(object):
-    def __init__(self, change, sha, merge_method, commit_title=None,
+    def __init__(self, pull_request, sha, merge_method, commit_title=None,
             commit_message=None):
-        self.change_key = change.key
+        self.pr_key = pull_request.key
         self.commit_title = commit_title
         self.commit_message = commit_message
         self.sha = sha
@@ -592,61 +592,59 @@ class Check(object):
         self.updated = updated
 
 mapper(Account, account_table)
-mapper(Project, project_table, properties=dict(
-    branches=relationship(Branch, backref='project',
+mapper(Repository, repository_table, properties=dict(
+    branches=relationship(Branch, backref='repository',
                           order_by=branch_table.c.name,
                           cascade='all, delete-orphan'),
-    changes=relationship(Change, backref='project',
-                         order_by=change_table.c.number,
+    pull_requests=relationship(PullRequest, backref='repository',
+                         order_by=pull_request_table.c.number,
                          cascade='all, delete-orphan'),
-    labels=relationship(Label, backref='project',
+    labels=relationship(Label, backref='repository',
                           order_by=label_table.c.name,
                           cascade='all, delete-orphan'),
     topics=relationship(Topic,
-                        secondary=project_topic_table,
+                        secondary=repository_topic_table,
                         order_by=topic_table.c.name,
                         viewonly=True),
-    unreviewed_changes=relationship(Change,
-                                    primaryjoin=and_(project_table.c.key==change_table.c.project_key,
-                                                     change_table.c.hidden==False,
-                                                     change_table.c.state=='open',
-                                                     change_table.c.reviewed==False),
-                                    order_by=change_table.c.number,
-                                ),
-    open_changes=relationship(Change,
-                              primaryjoin=and_(project_table.c.key==change_table.c.project_key,
-                                               change_table.c.state=='open'),
-                              order_by=change_table.c.number,
-                          ),
+    unreviewed_prs=relationship(PullRequest,
+                                primaryjoin=and_(repository_table.c.key==pull_request_table.c.repository_key,
+                                                 pull_request_table.c.hidden==False,
+                                                 pull_request_table.c.state=='open',
+                                                 pull_request_table.c.reviewed==False),
+                                order_by=pull_request_table.c.number),
+    open_prs=relationship(PullRequest,
+                          primaryjoin=and_(repository_table.c.key==pull_request_table.c.repository_key,
+                                           pull_request_table.c.state=='open'),
+                          order_by=pull_request_table.c.number),
 ))
 mapper(Branch, branch_table)
 mapper(Topic, topic_table, properties=dict(
-    projects=relationship(Project,
-                          secondary=project_topic_table,
-                          order_by=project_table.c.name,
+    repositories=relationship(Repository,
+                          secondary=repository_topic_table,
+                          order_by=repository_table.c.name,
                           viewonly=True),
-    project_topics=relationship(ProjectTopic),
+    repository_topics=relationship(RepositoryTopic),
 ))
-mapper(ProjectTopic, project_topic_table)
-mapper(Change, change_table, properties=dict(
+mapper(RepositoryTopic, repository_topic_table)
+mapper(PullRequest, pull_request_table, properties=dict(
         author=relationship(Account),
-        commits=relationship(Commit, backref='change',
+        commits=relationship(Commit, backref='pull_request',
                              cascade='all, delete-orphan'),
-        messages=relationship(Message, backref='change',
-                             order_by=message_table.c.created,
+        messages=relationship(Message, backref='pull_request',
+                              order_by=message_table.c.created,
                               cascade='all, delete-orphan'),
-        approvals=relationship(Approval, backref='change',
+        approvals=relationship(Approval, backref='pull_request',
                                order_by=approval_table.c.state,
                                cascade='all, delete-orphan'),
-        pending_merge=relationship(PendingMerge, backref='change',
+        pending_merge=relationship(PendingMerge, backref='pull_request',
                                    cascade='all, delete-orphan'),
         labels=relationship(Label,
-                            secondary=change_label_table,
+                            secondary=pull_request_label_table,
                             order_by=label_table.c.name,
                             viewonly=True),
-        change_labels=relationship(ChangeLabel),
+        pull_request_labels=relationship(PullRequestLabel),
         draft_approvals=relationship(Approval,
-                                     primaryjoin=and_(change_table.c.key==approval_table.c.change_key,
+                                     primaryjoin=and_(pull_request_table.c.key==approval_table.c.pr_key,
                                                       approval_table.c.draft==True),
                                      order_by=approval_table.c.state)
         ))
@@ -663,7 +661,7 @@ mapper(Commit, commit_table, properties=dict(
         ))
 mapper(Message, message_table, properties=dict(
         author=relationship(Account),
-        comments=relationship(Comment, backref='change',
+        comments=relationship(Comment, backref='pull_request',
                               order_by=comment_table.c.created,
                               cascade='all, delete-orphan'),
         ))
@@ -694,7 +692,7 @@ mapper(Server, server_table, properties=dict(
     ))
 mapper(Check, check_table)
 mapper(Label, label_table)
-mapper(ChangeLabel, change_label_table)
+mapper(PullRequestLabel, pull_request_label_table)
 
 
 def match(expr, item):
@@ -737,7 +735,7 @@ class Database(object):
         current_rev = context.get_current_revision()
         self.log.debug('Current migration revision: %s' % current_rev)
 
-        has_table = self.engine.dialect.has_table(conn, "project")
+        has_table = self.engine.dialect.has_table(conn, "repository")
 
         config = alembic.config.Config()
         config.set_main_option("script_location", "hubtty:alembic")
@@ -783,35 +781,35 @@ class DatabaseSession(object):
     def vacuum(self):
         self.session().execute("VACUUM")
 
-    def getProjects(self, subscribed=False, unreviewed=False, topicless=False):
-        """Retrieve projects.
+    def getRepositories(self, subscribed=False, unreviewed=False, topicless=False):
+        """Retrieve repositories.
 
-        :param subscribed: If True limit to only subscribed projects.
-        :param unreviewed: If True limit to only projects with unreviewed
-            changes.
-        :param topicless: If True limit to only projects without topics.
+        :param subscribed: If True limit to only subscribed repositories.
+        :param unreviewed: If True limit to only repositories with unreviewed
+            pull requests.
+        :param topicless: If True limit to only repositories without topics.
         """
-        query = self.session().query(Project)
+        query = self.session().query(Repository)
         if subscribed:
             query = query.filter_by(subscribed=subscribed)
             if unreviewed:
-                query = query.filter(exists().where(Project.unreviewed_changes))
+                query = query.filter(exists().where(Repository.unreviewed_prs))
         if topicless:
             query = query.filter_by(topics=None)
-        return query.order_by(Project.name).all()
+        return query.order_by(Repository.name).all()
 
     def getTopics(self):
         return self.session().query(Topic).order_by(Topic.sequence).all()
 
-    def getProject(self, key):
+    def getRepository(self, key):
         try:
-            return self.session().query(Project).filter_by(key=key).one()
+            return self.session().query(Repository).filter_by(key=key).one()
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
-    def getProjectByName(self, name):
+    def getRepositoryByName(self, name):
         try:
-            return self.session().query(Project).filter_by(name=name).one()
+            return self.session().query(Repository).filter_by(name=name).one()
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
@@ -827,33 +825,33 @@ class DatabaseSession(object):
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
-    def getChange(self, key, lazy=True):
-        query = self.session().query(Change).filter_by(key=key)
+    def getPullRequest(self, key, lazy=True):
+        query = self.session().query(PullRequest).filter_by(key=key)
         if not lazy:
-            query = query.options(joinedload(Change.commits).joinedload(Commit.files).joinedload(File.comments))
+            query = query.options(joinedload(PullRequest.commits).joinedload(Commit.files).joinedload(File.comments))
         try:
             return query.one()
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
-    def getChangeByChangeID(self, change_id):
+    def getPullRequestByPullRequestID(self, pr_id):
         try:
-            return self.session().query(Change).filter_by(change_id=change_id).one()
+            return self.session().query(PullRequest).filter_by(pr_id=pr_id).one()
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
-    def getChangeIDs(self, ids):
+    def getPullRequestIDs(self, ids):
         # Returns a set of IDs that exist in the local database matching
-        # the set of supplied IDs. This is used when sync'ing the changesets
-        # locally with the remote changes.
+        # the set of supplied IDs. This is used when sync'ing the PRs
+        # locally with the remote PRs.
         if not ids:
             return set()
-        query = self.session().query(Change.change_id)
+        query = self.session().query(PullRequest.pr_id)
         return set(ids).intersection(r[0] for r in query.all())
 
-    def getChangesByChangeID(self, change_id):
+    def getPullRequestsByPullRequestID(self, pr_id):
         try:
-            return self.session().query(Change).filter_by(change_id=change_id)
+            return self.session().query(PullRequest).filter_by(pr_id=pr_id)
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
@@ -863,33 +861,33 @@ class DatabaseSession(object):
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
-    def getChanges(self, query, unreviewed=False, sort_by='number'):
+    def getPullRequests(self, query, unreviewed=False, sort_by='number'):
         self.database.log.debug("Search query: %s sort: %s" % (query, sort_by))
-        q = self.session().query(Change).filter(self.search.parse(query))
+        q = self.session().query(PullRequest).filter(self.search.parse(query))
         if not isinstance(sort_by, (list, tuple)):
             sort_by = [sort_by]
         if unreviewed:
-            q = q.filter(change_table.c.hidden==False, change_table.c.reviewed==False)
+            q = q.filter(pull_request_table.c.hidden==False, pull_request_table.c.reviewed==False)
         for s in sort_by:
             if s == 'updated':
-                q = q.order_by(change_table.c.updated)
+                q = q.order_by(pull_request_table.c.updated)
             elif s == 'last-seen':
-                q = q.order_by(change_table.c.last_seen)
+                q = q.order_by(pull_request_table.c.last_seen)
             elif s == 'number':
-                q = q.order_by(change_table.c.number)
-            elif s == 'project':
-                q = q.filter(project_table.c.key == change_table.c.project_key)
-                q = q.order_by(project_table.c.name)
+                q = q.order_by(pull_request_table.c.number)
+            elif s == 'repository':
+                q = q.filter(repository_table.c.key == pull_request_table.c.repository_key)
+                q = q.order_by(repository_table.c.name)
         self.database.log.debug("Search SQL: %s" % q)
         try:
-            validChanges = []
+            validPullRequests = []
             for c in q.all():
                 if c.isValid():
-                    validChanges.append(c)
+                    validPullRequests.append(c)
                 else:
                     self.database.app.sync.submitTask(
-                        sync.SyncChangeTask(c.change_id, priority=sync.HIGH_PRIORITY))
-            return validChanges
+                        sync.SyncPullRequestTask(c.pr_id, priority=sync.HIGH_PRIORITY))
+            return validPullRequests
         except sqlalchemy.orm.exc.NoResultFound:
             return []
 
@@ -943,30 +941,30 @@ class DatabaseSession(object):
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
-    def getApproval(self, change, account, sha):
+    def getApproval(self, pull_request, account, sha):
         try:
             return self.session().query(Approval).filter_by(
-                change_key=change.key, account_key=account.key, sha=sha).one()
+                pr_key=pull_request.key, account_key=account.key, sha=sha).one()
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
     def getHeld(self):
-        return self.session().query(Change).filter_by(held=True).all()
+        return self.session().query(PullRequest).filter_by(held=True).all()
 
     def getOutdated(self):
-        return self.session().query(Change).filter_by(outdated=True).all()
+        return self.session().query(PullRequest).filter_by(outdated=True).all()
 
     def getPendingMessages(self):
         return self.session().query(Message).filter_by(pending=True).all()
 
     def getPendingLabels(self):
-        return self.session().query(Change).filter_by(pending_labels=True).all()
+        return self.session().query(PullRequest).filter_by(pending_labels=True).all()
 
     def getPendingRebases(self):
-        return self.session().query(Change).filter_by(pending_rebase=True).all()
+        return self.session().query(PullRequest).filter_by(pending_rebase=True).all()
 
     def getPendingPullRequestEdits(self):
-        return self.session().query(Change).filter_by(pending_edit=True).all()
+        return self.session().query(PullRequest).filter_by(pending_edit=True).all()
 
     def getPendingMerges(self):
         return self.session().query(PendingMerge).all()
@@ -1027,8 +1025,8 @@ class DatabaseSession(object):
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
-    def createProject(self, *args, **kw):
-        o = Project(*args, **kw)
+    def createRepository(self, *args, **kw):
+        o = Repository(*args, **kw)
         self.session().add(o)
         self.session().flush()
         return o

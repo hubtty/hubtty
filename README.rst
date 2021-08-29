@@ -8,19 +8,19 @@ As compared to the web interface, the main advantages are:
  * Workflow -- the interface is designed to support a workflow similar
    to reading network news or mail.  In particular, it is designed to
    deal with a large number of review requests across a large number
-   of projects.
+   of repositories.
 
- * Offline Use -- Hubtty syncs information about changes in subscribed
-   projects to a local database and local git repos.  All review
+ * Offline Use -- Hubtty syncs information about pull requests in subscribed
+   repositories to a local database and local git repos.  All review
    operations are performed against that database and then synced back
    to Github.
 
  * Speed -- user actions modify locally cached content and need not
    wait for server interaction.
 
- * Convenience -- because Hubtty downloads all changes to local git
-   repos, a single command instructs it to checkout a change into that
-   repo for detailed examination or testing of larger changes.
+ * Convenience -- because Hubtty downloads all pull requests to local git
+   repos, a single command instructs it to checkout a pull request into that
+   repo for detailed examination or testing of larger pull requests.
 
 Installation
 ------------
@@ -85,9 +85,9 @@ which you may wish to add to your shell aliases.  Use ``hubtty
 --help`` to see a list of command line options available.
 
 Once Hubtty is running, you will need to start by subscribing to some
-projects.  Use 'L' to list all of the projects and then 's' to
+repositories.  Use 'L' to list all of the repositories and then 's' to
 subscribe to the ones you are interested in.  Hit 'L' again to shrink
-the list to your subscribed projects.
+the list to your subscribed repositories.
 
 In general, pressing the F1 key will show help text on any screen, and
 ESC will take you to the previous screen.
@@ -103,21 +103,21 @@ The status bar at the top of the screen displays the current number of
 outstanding tasks that Hubtty must perform in order to be fully up to
 date.  Some of these tasks are more complicated than others, and some
 of them will end up creating new tasks (for instance, one task may be
-to search for new changes in a project which will then produce 5 new
-tasks if there are 5 new changes).
+to search for new pull requests in a repository which will then produce
+5 new tasks if there are 5 new pull requests).
 
 If Hubtty is offline, it will so indicate in the status bar.  It will
 retry requests if needed, and will switch between offline and online
 mode automatically.
 
-If you review a change while offline with a positive vote, and someone
-else leaves a negative vote on that change in the same category before
+If you review a pull request while offline with a positive vote, and someone
+else leaves a negative vote on that pull request in the same category before
 Hubtty is able to upload your review, Hubtty will detect the situation
-and mark the change as "held" so that you may re-inspect the change
+and mark the pull request as "held" so that you may re-inspect the pull request
 and any new comments before uploading the review.  The status bar will
-alert you to any held changes and direct you to a list of them (the
-`F12` key by default).  When viewing a change, the "held" flag may be
-toggled with the exclamation key (`!`).  Once held, a change must be
+alert you to any held pull requests and direct you to a list of them (the
+`F12` key by default).  When viewing a pull request, the "held" flag may be
+toggled with the exclamation key (`!`).  Once held, a pull request must be
 explicitly un-held in this manner for your review to be uploaded.
 
 If Hubtty encounters an error, this will also be indicated in the
@@ -138,7 +138,7 @@ search key combo. For example::
 
   keymaps:
     - name: default # MacOS blocks ctrl+o
-      change-search: 'ctrl s'
+      pr-search: 'ctrl s'
       interactive-search: 'ctrl i'
 
 Terminal Integration

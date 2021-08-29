@@ -171,7 +171,7 @@ The following example modifies the `default` keymap:
      - name: custom
        review: ['r', 'R']
      - name: osx #OS X blocks ctrl+o
-       change-search: 'ctrl s'
+       pr-search: 'ctrl s'
 
 
 To specify a sequence of keys, they must be a list of keystrokes
@@ -254,20 +254,20 @@ to an internal Hubtty search for that change id.
              text: "{id}"
              query: "change:{id}"
 
-Change List Options
-+++++++++++++++++++
+Pull Request List Options
++++++++++++++++++++++++++
 
-**change-list-query**
-  This is the query used for the list of changes when a project is
+**pr-list-query**
+  This is the query used for the list of pull requests when a repository is
   selected.  The default is `state:open`.
 
-**change-list-options**
-  This section defines default sorting options for the change list.
+**pr-list-options**
+  This section defines default sorting options for the pull request list.
 
   **sort-by**
     This key specifies the sort order, which can be `number` (the
-    Change number), `updated` (when the change was last updated), or
-    `last-seen` (when the change was last opened in Hubtty).
+    pull request number), `updated` (when the pull request was last updated), or
+    `last-seen` (when the pull request was last opened in Hubtty).
 
   **reverse**
     This is a boolean value which indicates whether the list should be
@@ -276,7 +276,7 @@ Change List Options
 Example:
 
 .. code-block: yaml
-   change-list-options:
+   pr-list-options:
      sort-by: 'number'
      reverse: false
 
@@ -284,8 +284,8 @@ Example:
   Dependent changes are displayed as "threads" in the change list by
   default.  To disable this behavior, set this value to false.
 
-Change View Options
-+++++++++++++++++++
+Pull Request View Options
++++++++++++++++++++++++++
 
 **hide-comments**
   This is a list of descriptors which cause matching comments to be
@@ -308,9 +308,9 @@ For example, to hide comments from a CI system:
   Specifies how patch diffs should be displayed.  The values `unified`
   or `side-by-side` (the default) are supported.
 
-**close-change-on-review**
-  When a review is saved, close the change view and pop up to the
-  previous screen, which will be the change list for the repo.
+**close-pr-on-review**
+  When a review is saved, close the pull request view and pop up to the
+  previous screen, which will be the pull request list for the repo.
 
 Dashboards
 ++++++++++
@@ -328,7 +328,7 @@ run the query and display the results.
     bar at the top of the screen.
 
   **query**
-    The search query to perform to gather changes to be listed in the
+    The search query to perform to gather pull requests to be listed in the
     dashboard.
 
   **key**
@@ -339,7 +339,7 @@ Example:
 .. code-block: yaml
 
    dashboards:
-     - name: "My changes"
+     - name: "My pull requests"
        query: "author:self state:open"
        key: "f2"
 
@@ -347,10 +347,10 @@ Reviewkeys
 ++++++++++
 
 Reviewkeys are hotkeys that perform immediate reviews within the
-change screen.  Any pending comments or review messages will be
+pull request screen.  Any pending comments or review messages will be
 attached to the review; otherwise an empty review message will be
 left.
-Reviewkeys appear in the help text for the change screen.
+Reviewkeys appear in the help text for the pull request screen.
 
 **reviewkeys**
   A list of reviewkey definitions, the format of which is described
@@ -373,7 +373,7 @@ Reviewkeys appear in the help text for the change screen.
     Optional, keep the review as a draft and don't submit it right away.
 
   **merge**
-    Optional, merge the change directly.
+    Optional, merge the pull request directly.
 
 
 The following example includes a reviewkey that leaves a "/retest" message on
@@ -389,12 +389,12 @@ requesting for changes.
       - key: 'meta 1'
         approval: 'APPROVE'
         message: ":shipit:"
-        description: 'Approve change'
+        description: 'Approve pull request'
       - key: 'meta 2'
         approval: 'APPROVE'
         message: ":shipit:"
         merge: true
-        description: 'Approve change and merge'
+        description: 'Approve pull request and merge'
       - key: 'meta 3'
         approval: 'REQUEST_CHANGES'
         message: "Please add unit tests"
@@ -421,7 +421,7 @@ General Options
   `false`.
 
 **expire-age**
-  By default, closed changes that are older than two months are
+  By default, closed pull requests that are older than two months are
   removed from the local database (and their refs are removed from the
   local git repos so that git may garbage collect them).  If you would
   like to change the expiration delay or disable it, uncomment the

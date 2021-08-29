@@ -37,7 +37,7 @@ class SearchCompiler(object):
         while stack:
             x = stack.pop()
             if hasattr(x, 'table'):
-                if (x.table != hubtty.db.change_table
+                if (x.table != hubtty.db.pull_request_table
                     and hasattr(x.table, 'name')):
                     tables.add(x.table)
             for child in x.get_children():
@@ -52,17 +52,17 @@ class SearchCompiler(object):
             raise Exception("Own account is unknown")
         result = self.parser.parse(data, lexer=self.lexer)
         tables = self.findTables(result)
-        if hubtty.db.project_table in tables:
-            result = and_(hubtty.db.change_table.c.project_key == hubtty.db.project_table.c.key,
+        if hubtty.db.repository_table in tables:
+            result = and_(hubtty.db.pull_request_table.c.repository_key == hubtty.db.repository_table.c.key,
                           result)
-            tables.remove(hubtty.db.project_table)
+            tables.remove(hubtty.db.repository_table)
         if hubtty.db.account_table in tables:
-            result = and_(hubtty.db.change_table.c.account_key == hubtty.db.account_table.c.key,
+            result = and_(hubtty.db.pull_request_table.c.account_key == hubtty.db.account_table.c.key,
                           result)
             tables.remove(hubtty.db.account_table)
         if hubtty.db.file_table in tables:
             result = and_(hubtty.db.file_table.c.commit_key == hubtty.db.commit_table.c.key,
-                          hubtty.db.commit_table.c.change_key == hubtty.db.change_table.c.key,
+                          hubtty.db.commit_table.c.pr_key == hubtty.db.pull_request_table.c.key,
                           result)
             tables.remove(hubtty.db.file_table)
         if tables:

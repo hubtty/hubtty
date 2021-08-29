@@ -18,7 +18,7 @@ import six
 operators = {
     'age': 'OP_AGE', # Hubtty extension
     'recentlyseen': 'OP_RECENTLYSEEN', # Hubtty extension
-    'change': 'OP_CHANGE',
+    'pr': 'OP_PR', # Hubtty extension
     'author': 'OP_AUTHOR',
     'reviewed-by': 'OP_REVIEWEDBY',
     'commenter': 'OP_COMMENTER',
@@ -31,7 +31,7 @@ operators = {
     'org': 'OP_ORG',
     'repo': 'OP_REPO',
     'commit': 'OP_COMMIT',
-    '_project_key': 'OP_PROJECT_KEY',  # internal hubtty use only
+    '_repository_key': 'OP_REPOSITORY_KEY',  # internal hubtty use only
     'branch': 'OP_BRANCH',
     'base': 'OP_BASE',
     #'tr': 'OP_TR', # needs trackingids
@@ -60,7 +60,7 @@ tokens = [
     'LPAREN',
     'RPAREN',
     'NUMBER',
-    'CHANGE_ID',
+    'PR_ID',
     'SSTRING',
     'DSTRING',
     'USTRING',
@@ -81,7 +81,7 @@ def SearchTokenizer():
         t.type = operators.get(t.value[:-1], 'OP')
         return t
 
-    def t_CHANGE_ID(t):
+    def t_PR_ID(t):
         r'([a-zA-Z_]+/)+\d+'
         return t
 

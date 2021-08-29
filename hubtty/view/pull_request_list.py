@@ -22,7 +22,7 @@ import urwid
 from hubtty import keymap
 from hubtty import mywid
 from hubtty import sync
-from hubtty.view import change as view_change
+from hubtty.view import pull_request as view_pr
 from hubtty.view import mouse_scroll_decorator
 import hubtty.view
 
@@ -40,17 +40,17 @@ class ColumnInfo(object):
 
 
 COLUMNS = [
-    ColumnInfo('Number',  'given',   6),
-    ColumnInfo('Title',   'weight',  4),
-    ColumnInfo('Project', 'weight',  1),
-    ColumnInfo('Branch',  'weight',  1),
-    ColumnInfo('Author',  'weight',  1),
-    ColumnInfo('Updated', 'given',  10),
-    ColumnInfo('Size',    'given',   4),
+    ColumnInfo('Number',     'given',   6),
+    ColumnInfo('Title',      'weight',  4),
+    ColumnInfo('Repository', 'weight',  1),
+    ColumnInfo('Branch',     'weight',  1),
+    ColumnInfo('Author',     'weight',  1),
+    ColumnInfo('Updated',    'given',  10),
+    ColumnInfo('Size',       'given',   4),
 ]
 
 
-class ChangeListColumns(object):
+class PullRequestListColumns(object):
     def updateColumns(self):
         del self.columns.contents[:]
         cols = self.columns.contents
@@ -66,62 +66,62 @@ class ChangeListColumns(object):
             cols.append(c)
 
 
-class ChangeRow(urwid.Button, ChangeListColumns):
-    change_focus_map = {None: 'focused',
-                        'unreviewed-change': 'focused-unreviewed-change',
-                        'reviewed-change': 'focused-reviewed-change',
-                        'starred-change': 'focused-starred-change',
-                        'held-change': 'focused-held-change',
-                        'marked-change': 'focused-marked-change',
-                        'positive-label': 'focused-positive-label',
-                        'negative-label': 'focused-negative-label',
-                        'min-label': 'focused-min-label',
-                        'max-label': 'focused-max-label',
+class PullRequestRow(urwid.Button, PullRequestListColumns):
+    pr_focus_map = {None: 'focused',
+                    'unreviewed-pr': 'focused-unreviewed-pr',
+                    'reviewed-pr': 'focused-reviewed-pr',
+                    'starred-pr': 'focused-starred-pr',
+                    'held-pr': 'focused-held-pr',
+                    'marked-pr': 'focused-marked-pr',
+                    'positive-label': 'focused-positive-label',
+                    'negative-label': 'focused-negative-label',
+                    'min-label': 'focused-min-label',
+                    'max-label': 'focused-max-label',
 
 
-                        'added-graph': 'focused-added-graph',
-                        'removed-graph': 'focused-removed-graph',
+                    'added-graph': 'focused-added-graph',
+                    'removed-graph': 'focused-removed-graph',
 
-                        'line-count-threshold-1': 'focused-line-count-threshold-1',
-                        'line-count-threshold-2': 'focused-line-count-threshold-2',
-                        'line-count-threshold-3': 'focused-line-count-threshold-3',
-                        'line-count-threshold-4': 'focused-line-count-threshold-4',
-                        'line-count-threshold-5': 'focused-line-count-threshold-5',
-                        'line-count-threshold-6': 'focused-line-count-threshold-6',
-                        'line-count-threshold-7': 'focused-line-count-threshold-7',
-                        'line-count-threshold-8': 'focused-line-count-threshold-8',
-                        }
+                    'line-count-threshold-1': 'focused-line-count-threshold-1',
+                    'line-count-threshold-2': 'focused-line-count-threshold-2',
+                    'line-count-threshold-3': 'focused-line-count-threshold-3',
+                    'line-count-threshold-4': 'focused-line-count-threshold-4',
+                    'line-count-threshold-5': 'focused-line-count-threshold-5',
+                    'line-count-threshold-6': 'focused-line-count-threshold-6',
+                    'line-count-threshold-7': 'focused-line-count-threshold-7',
+                    'line-count-threshold-8': 'focused-line-count-threshold-8',
+                    }
 
     def selectable(self):
         return True
 
-    def __init__(self, app, change, prefix, categories,
+    def __init__(self, app, pr, prefix, categories,
                  enabled_columns, callback=None):
-        super(ChangeRow, self).__init__('', on_press=callback, user_data=change.key)
+        super(PullRequestRow, self).__init__('', on_press=callback, user_data=pr.key)
         self.app = app
-        self.change_key = change.key
+        self.pr_key = pr.key
         self.prefix = prefix
         self.enabled_columns = enabled_columns
         self.title = mywid.SearchableText(u'', wrap='clip')
         self.number = mywid.SearchableText(u'')
         self.updated = mywid.SearchableText(u'')
         self.size = mywid.SearchableText(u'', align='right')
-        self.project = mywid.SearchableText(u'', wrap='clip')
+        self.repository = mywid.SearchableText(u'', wrap='clip')
         self.author = mywid.SearchableText(u'', wrap='clip')
         self.branch = mywid.SearchableText(u'', wrap='clip')
         self.mark = False
         self.columns = urwid.Columns([], dividechars=1)
         self.row_style = urwid.AttrMap(self.columns, '')
-        self._w = urwid.AttrMap(self.row_style, None, focus_map=self.change_focus_map)
+        self._w = urwid.AttrMap(self.row_style, None, focus_map=self.pr_focus_map)
         self.category_columns = []
-        self.update(change, categories)
+        self.update(pr, categories)
 
     def search(self, search, attribute):
         if self.title.search(search, attribute):
             return True
         if self.number.search(search, attribute):
             return True
-        if self.project.search(search, attribute):
+        if self.repository.search(search, attribute):
             return True
         if self.branch.search(search, attribute):
             return True
@@ -191,40 +191,40 @@ class ChangeRow(urwid.Button, ChangeListColumns):
             ret.append(' ')
         return ret
 
-    def update(self, change, categories):
-        if change.reviewed or change.hidden:
-            style = 'reviewed-change'
+    def update(self, pr, categories):
+        if pr.reviewed or pr.hidden:
+            style = 'reviewed-pr'
         else:
-            style = 'unreviewed-change'
-        title = '%s%s' % (self.prefix, change.title)
+            style = 'unreviewed-pr'
+        title = '%s%s' % (self.prefix, pr.title)
         flag = ' '
-        if change.starred:
+        if pr.starred:
             flag = '*'
-            style = 'starred-change'
-        if change.held:
+            style = 'starred-pr'
+        if pr.held:
             flag = '!'
-            style = 'held-change'
+            style = 'held-pr'
         if self.mark:
             flag = '%'
-            style = 'marked-change'
+            style = 'marked-pr'
         title = flag + title
         self.row_style.set_attr_map({None: style})
         self.title.set_text(title)
-        self.number.set_text(str(change.number))
-        self.project.set_text(change.project.name.split('/')[-1])
-        self.author.set_text(change.author_name)
-        self.branch.set_text(change.branch or '')
-        self.project_name = change.project.name
-        self.commit_sha = change.commits[-1].sha
-        self.current_commit_key = change.commits[-1].key
+        self.number.set_text(str(pr.number))
+        self.repository.set_text(pr.repository.name.split('/')[-1])
+        self.author.set_text(pr.author_name)
+        self.branch.set_text(pr.branch or '')
+        self.repository_name = pr.repository.name
+        self.commit_sha = pr.commits[-1].sha
+        self.current_commit_key = pr.commits[-1].key
         today = self.app.time(datetime.datetime.utcnow()).date()
-        updated_time = self.app.time(change.updated)
+        updated_time = self.app.time(pr.updated)
         if today == updated_time.date():
             self.updated.set_text(updated_time.strftime("%I:%M %p").upper())
         else:
             self.updated.set_text(updated_time.strftime("%Y-%m-%d"))
-        total_added = change.additions
-        total_removed = change.deletions
+        total_added = pr.additions
+        total_removed = pr.deletions
         if self.app.config.size_column['type'] == 'number':
             total_added_removed = total_added + total_removed
             thresholds = self.app.config.size_column['thresholds']
@@ -257,7 +257,7 @@ class ChangeRow(urwid.Button, ChangeListColumns):
             v = ''
             val = ''
             if category == 'Code-Review':
-                v = change.getReviewState()
+                v = pr.getReviewState()
             if v in ['APPROVED']:
                 val = ('positive-label', ' ✓')
             elif v in ['CHANGES_REQUESTED']:
@@ -268,19 +268,19 @@ class ChangeRow(urwid.Button, ChangeListColumns):
                                           self.columns.options('given', 2)))
         self.updateColumns()
 
-class ChangeListHeader(urwid.WidgetWrap, ChangeListColumns):
+class PullRequestListHeader(urwid.WidgetWrap, PullRequestListColumns):
     def __init__(self, enabled_columns):
         self.enabled_columns = enabled_columns
         self.title = urwid.Text(u'Title', wrap='clip')
         self.number = urwid.Text(u'Number')
         self.updated = urwid.Text(u'Updated')
         self.size = urwid.Text(u'Size')
-        self.project = urwid.Text(u'Project', wrap='clip')
+        self.repository = urwid.Text(u'Repository', wrap='clip')
         self.author = urwid.Text(u'Author', wrap='clip')
         self.branch = urwid.Text(u'Branch', wrap='clip')
         self.columns = urwid.Columns([], dividechars=1)
         self.category_columns = []
-        super(ChangeListHeader, self).__init__(self.columns)
+        super(PullRequestListHeader, self).__init__(self.columns)
 
     def update(self, categories):
         self.category_columns = []
@@ -291,49 +291,49 @@ class ChangeListHeader(urwid.WidgetWrap, ChangeListColumns):
 
 
 @mouse_scroll_decorator.ScrollByWheel
-class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
+class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
     required_columns = set(['Number', 'Title', 'Updated'])
     # FIXME(masayukig): Disable 'Size' column when configured
     optional_columns = set(['Branch', 'Size'])
 
     def getCommands(self):
-        if self.project_key:
-            refresh_help = "Sync current project"
+        if self.repository_key:
+            refresh_help = "Sync current repository"
         else:
-            refresh_help = "Sync subscribed projects"
+            refresh_help = "Sync subscribed repositories"
         return [
             (keymap.TOGGLE_HELD,
-             "Toggle the held flag for the currently selected change"),
+             "Toggle the held flag for the currently selected pull request"),
             (keymap.LOCAL_CHECKOUT,
-             "Checkout the selected change into the local repo"),
+             "Checkout the selected pull request into the local repo"),
             (keymap.TOGGLE_HIDDEN,
-             "Toggle the hidden flag for the currently selected change"),
+             "Toggle the hidden flag for the currently selected PR"),
             (keymap.TOGGLE_LIST_REVIEWED,
-             "Toggle whether only unreviewed or all changes are displayed"),
+             "Toggle whether only unreviewed or all PRs are displayed"),
             (keymap.TOGGLE_REVIEWED,
-             "Toggle the reviewed flag for the currently selected change"),
+             "Toggle the reviewed flag for the currently selected PR"),
             (keymap.TOGGLE_STARRED,
-             "Toggle the starred flag for the currently selected change"),
+             "Toggle the starred flag for the currently selected PR"),
             (keymap.TOGGLE_MARK,
-             "Toggle the process mark for the currently selected change"),
-            (keymap.REFINE_CHANGE_SEARCH,
+             "Toggle the process mark for the currently selected PR"),
+            (keymap.REFINE_PR_SEARCH,
              "Refine the current search query"),
-            (keymap.CLOSE_CHANGE,
+            (keymap.CLOSE_PR,
              "Close the marked pull requests"),
-            (keymap.REOPEN_CHANGE,
+            (keymap.REOPEN_PR,
              "Reopen the marked pull requests"),
             (keymap.REFRESH,
              refresh_help),
             (keymap.REVIEW,
-             "Leave reviews for the marked changes"),
+             "Leave reviews for the marked pull requests"),
             (keymap.SORT_BY_NUMBER,
-             "Sort changes by number"),
+             "Sort pull requests by number"),
             (keymap.SORT_BY_UPDATED,
-             "Sort changes by how recently the change was updated"),
+             "Sort pull requests by how recently they were updated"),
             (keymap.SORT_BY_REVERSE,
              "Reverse the sort"),
             (keymap.LOCAL_CHERRY_PICK,
-             "Cherry-pick the most recent commit of the selected change onto the local repo"),
+             "Cherry-pick the most recent commit of the selected PR onto the local repo"),
             (keymap.INTERACTIVE_SEARCH,
              "Interactive search"),
             ]
@@ -343,16 +343,16 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
         commands = self.getCommands()
         return [(c[0], key(c[0]), c[1]) for c in commands]
 
-    def __init__(self, app, query, query_desc=None, project_key=None,
+    def __init__(self, app, query, query_desc=None, repository_key=None,
                  unreviewed=False, sort_by=None, reverse=None):
-        super(ChangeListView, self).__init__(urwid.Pile([]))
-        self.log = logging.getLogger('hubtty.view.change_list')
+        super(PullRequestListView, self).__init__(urwid.Pile([]))
+        self.log = logging.getLogger('hubtty.view.pull_request_list')
         self.searchInit()
         self.app = app
         self.query = query
         self.query_desc = query_desc or query
         self.unreviewed = unreviewed
-        self.change_rows = {}
+        self.pr_rows = {}
         self.enabled_columns = set()
         for colinfo in COLUMNS:
             if (colinfo.name in self.required_columns or
@@ -360,10 +360,10 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
                 self.enabled_columns.add(colinfo.name)
         self.disabled_columns = set()
         self.listbox = urwid.ListBox(urwid.SimpleFocusListWalker([]))
-        self.project_key = project_key
-        if 'Project' not in self.required_columns and project_key is not None:
-            self.enabled_columns.discard('Project')
-            self.disabled_columns.add('Project')
+        self.repository_key = repository_key
+        if 'Repository' not in self.required_columns and repository_key is not None:
+            self.enabled_columns.discard('Repository')
+            self.disabled_columns.add('Repository')
         if 'Author' not in self.required_columns and 'author:' in query:
             # This could be or'd with something else, but probably
             # not.
@@ -372,12 +372,12 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
         if app.config.size_column['type'] == 'disabled':
             self.enabled_columns.discard('Size')
             self.disabled_columns.add('Size')
-        self.sort_by = sort_by or app.config.change_list_options['sort-by']
+        self.sort_by = sort_by or app.config.pr_list_options['sort-by']
         if reverse is not None:
             self.reverse = reverse
         else:
-            self.reverse = app.config.change_list_options['reverse']
-        self.header = ChangeListHeader(self.enabled_columns)
+            self.reverse = app.config.pr_list_options['reverse']
+        self.header = PullRequestListHeader(self.enabled_columns)
         self.categories = []
         self.refresh()
         self._w.contents.append((app.header, ('pack', 1)))
@@ -387,31 +387,31 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
         self._w.set_focus(3)
 
     def interested(self, event):
-        if not ((self.project_key is not None and
-                 isinstance(event, sync.ChangeAddedEvent) and
-                 self.project_key == event.project_key)
+        if not ((self.repository_key is not None and
+                 isinstance(event, sync.PullRequestAddedEvent) and
+                 self.repository_key == event.repository_key)
                 or
-                (self.project_key is None and
-                 isinstance(event, sync.ChangeAddedEvent))
+                (self.repository_key is None and
+                 isinstance(event, sync.PullRequestAddedEvent))
                 or
-                (isinstance(event, sync.ChangeUpdatedEvent) and
-                 event.change_key in self.change_rows.keys())):
-            self.log.debug("Ignoring refresh change list due to event %s" % (event,))
+                (isinstance(event, sync.PullRequestUpdatedEvent) and
+                 event.pr_key in self.pr_rows.keys())):
+            self.log.debug("Ignoring refresh pull request list due to event %s" % (event,))
             return False
-        self.log.debug("Refreshing change list due to event %s" % (event,))
+        self.log.debug("Refreshing pull request list due to event %s" % (event,))
         return True
 
     def refresh(self):
-        unseen_keys = set(self.change_rows.keys())
+        unseen_keys = set(self.pr_rows.keys())
         with self.app.db.getSession() as session:
-            change_list = session.getChanges(self.query, self.unreviewed,
-                                             sort_by=self.sort_by)
+            pr_list = session.getPullRequests(self.query, self.unreviewed,
+                                              sort_by=self.sort_by)
             if self.unreviewed:
-                self.title = (u'Unreviewed %d changes in %s' %
-                    (len(change_list), self.query_desc))
+                self.title = (u'Unreviewed %d pull requests in %s' %
+                    (len(pr_list), self.query_desc))
             else:
-                self.title = (u'All %d changes in %s' %
-                    (len(change_list), self.query_desc))
+                self.title = (u'All %d pull requests in %s' %
+                    (len(pr_list), self.query_desc))
             self.short_title = self.query_desc
             if '/' in self.short_title and ' ' not in self.short_title:
                 i = self.short_title.rfind('/')
@@ -423,7 +423,7 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             self.header.update(self.categories)
             i = 0
             if self.reverse:
-                change_list.reverse()
+                pr_list.reverse()
             prefixes = {}
             new_rows = []
             if len(self.listbox.body):
@@ -432,19 +432,19 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             else:
                 focus_pos = 0
                 focus_row = None
-            for change in change_list:
-                row = self.change_rows.get(change.key)
+            for pr in pr_list:
+                row = self.pr_rows.get(pr.key)
                 if not row:
-                    row = ChangeRow(self.app, change,
-                                    prefixes.get(change.key, ''),
-                                    self.categories,
-                                    self.enabled_columns,
-                                    callback=self.onSelect)
+                    row = PullRequestRow(self.app, pr,
+                                         prefixes.get(pr.key, ''),
+                                         self.categories,
+                                         self.enabled_columns,
+                                         callback=self.onSelect)
                     self.listbox.body.insert(i, row)
-                    self.change_rows[change.key] = row
+                    self.pr_rows[pr.key] = row
                 else:
-                    row.update(change, self.categories)
-                    unseen_keys.remove(change.key)
+                    row.update(pr, self.categories)
+                    unseen_keys.remove(pr.key)
                 new_rows.append(row)
                 i += 1
             self.listbox.body[:] = new_rows
@@ -454,8 +454,8 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
                 pos = min(focus_pos, len(self.listbox.body)-1)
             self.listbox.body.set_focus(pos)
         for key in unseen_keys:
-            row = self.change_rows[key]
-            del self.change_rows[key]
+            row = self.pr_rows[key]
+            del self.pr_rows[key]
 
     def chooseColumns(self):
         currently_enabled_columns = self.enabled_columns.copy()
@@ -475,21 +475,21 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
                     self.enabled_columns.discard(colinfo.name)
         if currently_enabled_columns != self.enabled_columns:
             self.header.updateColumns()
-            for key, value in six.iteritems(self.change_rows):
+            for key, value in six.iteritems(self.pr_rows):
                 value.updateColumns()
 
     def getQueryString(self):
-        if self.project_key is not None:
-            return "repo:%s %s" % (self.query_desc, self.app.config.project_change_list_query)
+        if self.repository_key is not None:
+            return "repo:%s %s" % (self.query_desc, self.app.config.repository_pr_list_query)
         return self.query
 
-    def clearChangeList(self):
-        for key, value in six.iteritems(self.change_rows):
+    def clearPullRequestList(self):
+        for key, value in six.iteritems(self.pr_rows):
             self.listbox.body.remove(value)
-        self.change_rows = {}
+        self.pr_rows = {}
 
-    def getNextChangeKey(self, change_key):
-        row = self.change_rows.get(change_key)
+    def getNextPullRequestKey(self, pr_key):
+        row = self.pr_rows.get(pr_key)
         try:
             i = self.listbox.body.index(row)
         except ValueError:
@@ -497,10 +497,10 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
         if i+1 >= len(self.listbox.body):
             return None
         row = self.listbox.body[i+1]
-        return row.change_key
+        return row.pr_key
 
-    def getPrevChangeKey(self, change_key):
-        row = self.change_rows.get(change_key)
+    def getPrevPullRequestKey(self, pr_key):
+        row = self.pr_rows.get(pr_key)
         try:
             i = self.listbox.body.index(row)
         except ValueError:
@@ -508,37 +508,37 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
         if i <= 0:
             return None
         row = self.listbox.body[i-1]
-        return row.change_key
+        return row.pr_key
 
-    def toggleReviewed(self, change_key):
+    def toggleReviewed(self, pr_key):
         with self.app.db.getSession() as session:
-            change = session.getChange(change_key)
-            change.reviewed = not change.reviewed
-            self.app.project_cache.clear(change.project)
-            ret = change.reviewed
-            reviewed_str = 'reviewed' if change.reviewed else 'unreviewed'
-            self.log.debug("Set change %s to %s", change_key, reviewed_str)
+            pr = session.getPullRequest(pr_key)
+            pr.reviewed = not pr.reviewed
+            self.app.repository_cache.clear(pr.repository)
+            ret = pr.reviewed
+            reviewed_str = 'reviewed' if pr.reviewed else 'unreviewed'
+            self.log.debug("Set pull request %s to %s", pr_key, reviewed_str)
         return ret
 
-    def toggleStarred(self, change_key):
+    def toggleStarred(self, pr_key):
         with self.app.db.getSession() as session:
-            change = session.getChange(change_key)
-            change.starred = not change.starred
-            ret = change.starred
-            starred_str = 'starred' if change.starred else 'un-starred'
-            self.log.debug("Set change %s to %s", change_key, starred_str)
+            pr = session.getPullRequest(pr_key)
+            pr.starred = not pr.starred
+            ret = pr.starred
+            starred_str = 'starred' if pr.starred else 'un-starred'
+            self.log.debug("Set pull request %s to %s", pr_key, starred_str)
         return ret
 
-    def toggleHeld(self, change_key):
-        return self.app.toggleHeldChange(change_key)
+    def toggleHeld(self, pr_key):
+        return self.app.toggleHeldPullRequest(pr_key)
 
-    def toggleHidden(self, change_key):
+    def toggleHidden(self, pr_key):
         with self.app.db.getSession() as session:
-            change = session.getChange(change_key)
-            change.hidden = not change.hidden
-            ret = change.hidden
-            hidden_str = 'hidden' if change.hidden else 'visible'
-            self.log.debug("Set change %s to %s", change_key, hidden_str)
+            pr = session.getPullRequest(pr_key)
+            pr.hidden = not pr.hidden
+            ret = pr.hidden
+            hidden_str = 'hidden' if pr.hidden else 'visible'
+            self.log.debug("Set pull request %s to %s", pr_key, hidden_str)
         return ret
 
     def advance(self):
@@ -552,7 +552,7 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             return None
 
         if not self.app.input_buffer:
-            key = super(ChangeListView, self).keypress(size, key)
+            key = super(PullRequestListView, self).keypress(size, key)
         keys = self.app.input_buffer + [key]
         commands = self.app.config.keymap.getCommands(keys)
         ret = self.handleCommands(commands)
@@ -574,19 +574,19 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             if not len(self.listbox.body):
                 return True
             pos = self.listbox.focus_position
-            change_key = self.listbox.body[pos].change_key
-            reviewed = self.toggleReviewed(change_key)
+            pr_key = self.listbox.body[pos].pr_key
+            reviewed = self.toggleReviewed(pr_key)
             if self.unreviewed and reviewed:
-                # Here we can avoid a full refresh by just removing the particular
-                # row from the change list if the view is for the unreviewed changes
-                # only.
-                row = self.change_rows[change_key]
+                # Here we can avoid a full refresh by just removing the
+                # particular row from the pull request list if the view is for
+                # the unreviewed pull requests only.
+                row = self.pr_rows[pr_key]
                 self.listbox.body.remove(row)
-                del self.change_rows[change_key]
+                del self.pr_rows[pr_key]
             else:
                 # Just fall back on doing a full refresh if we're in a situation
                 # where we're not just popping a row from the list of unreviewed
-                # changes.
+                # pull requests.
                 self.refresh()
                 self.advance()
             return True
@@ -594,17 +594,17 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             if not len(self.listbox.body):
                 return True
             pos = self.listbox.focus_position
-            change_key = self.listbox.body[pos].change_key
-            hidden = self.toggleHidden(change_key)
+            pr_key = self.listbox.body[pos].pr_key
+            hidden = self.toggleHidden(pr_key)
             if hidden:
                 # Here we can avoid a full refresh by just removing the particular
-                # row from the change list
-                row = self.change_rows[change_key]
+                # row from the pull request list
+                row = self.pr_rows[pr_key]
                 self.listbox.body.remove(row)
-                del self.change_rows[change_key]
+                del self.pr_rows[pr_key]
             else:
                 # Just fall back on doing a full refresh if we're in a situation
-                # where we're not just popping a row from the list of changes.
+                # where we're not just popping a row from the list of pull requests.
                 self.refresh()
                 self.advance()
             return True
@@ -612,49 +612,49 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             if not len(self.listbox.body):
                 return True
             pos = self.listbox.focus_position
-            change_key = self.listbox.body[pos].change_key
-            self.toggleHeld(change_key)
-            row = self.change_rows[change_key]
+            pr_key = self.listbox.body[pos].pr_key
+            self.toggleHeld(pr_key)
+            row = self.pr_rows[pr_key]
             with self.app.db.getSession() as session:
-                change = session.getChange(change_key)
-                row.update(change, self.categories)
+                pr = session.getPullRequest(pr_key)
+                row.update(pr, self.categories)
             self.advance()
             return True
         if keymap.TOGGLE_STARRED in commands:
             if not len(self.listbox.body):
                 return True
             pos = self.listbox.focus_position
-            change_key = self.listbox.body[pos].change_key
-            self.toggleStarred(change_key)
-            row = self.change_rows[change_key]
+            pr_key = self.listbox.body[pos].pr_key
+            self.toggleStarred(pr_key)
+            row = self.pr_rows[pr_key]
             with self.app.db.getSession() as session:
-                change = session.getChange(change_key)
-                row.update(change, self.categories)
+                pr = session.getPullRequest(pr_key)
+                row.update(pr, self.categories)
             self.advance()
             return True
         if keymap.TOGGLE_MARK in commands:
             if not len(self.listbox.body):
                 return True
             pos = self.listbox.focus_position
-            change_key = self.listbox.body[pos].change_key
-            row = self.change_rows[change_key]
+            pr_key = self.listbox.body[pos].pr_key
+            row = self.pr_rows[pr_key]
             row.mark = not row.mark
             with self.app.db.getSession() as session:
-                change = session.getChange(change_key)
-                row.update(change, self.categories)
+                pr = session.getPullRequest(pr_key)
+                row.update(pr, self.categories)
             self.advance()
             return True
         if keymap.REFRESH in commands:
-            if self.project_key:
+            if self.repository_key:
                 self.app.sync.submitTask(
-                    sync.SyncProjectTask(self.project_key, sync.HIGH_PRIORITY))
+                    sync.SyncRepositoryTask(self.repository_key, sync.HIGH_PRIORITY))
             else:
                 self.app.sync.submitTask(
-                    sync.SyncSubscribedProjectsTask(sync.HIGH_PRIORITY))
+                    sync.SyncSubscribedRepositoriesTask(sync.HIGH_PRIORITY))
             self.app.status.update()
             return True
         if keymap.REVIEW in commands:
-            rows = [row for row in self.change_rows.values() if row.mark]
+            rows = [row for row in self.pr_rows.values() if row.mark]
             if not rows:
                 pos = self.listbox.focus_position
                 rows = [self.listbox.body[pos]]
@@ -664,14 +664,14 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
             if not len(self.listbox.body):
                 return True
             self.sort_by = 'number'
-            self.clearChangeList()
+            self.clearPullRequestList()
             self.refresh()
             return True
         if keymap.SORT_BY_UPDATED in commands:
             if not len(self.listbox.body):
                 return True
             self.sort_by = 'updated'
-            self.clearChangeList()
+            self.clearPullRequestList()
             self.refresh()
             return True
         if keymap.SORT_BY_REVERSE in commands:
@@ -681,7 +681,7 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
                 self.reverse = False
             else:
                 self.reverse = True
-            self.clearChangeList()
+            self.clearPullRequestList()
             self.refresh()
             return True
         if keymap.LOCAL_CHECKOUT in commands:
@@ -689,39 +689,39 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
                 return True
             pos = self.listbox.focus_position
             row = self.listbox.body[pos]
-            self.app.localCheckoutCommit(row.project_name, row.commit_sha)
+            self.app.localCheckoutCommit(row.repository_name, row.commit_sha)
             return True
         if keymap.LOCAL_CHERRY_PICK in commands:
             if not len(self.listbox.body):
                 return True
             pos = self.listbox.focus_position
             row = self.listbox.body[pos]
-            self.app.localCherryPickCommit(row.project_name, row.commit_sha)
+            self.app.localCherryPickCommit(row.repository_name, row.commit_sha)
             return True
-        if keymap.REFINE_CHANGE_SEARCH in commands:
+        if keymap.REFINE_PR_SEARCH in commands:
             default = self.getQueryString()
             self.app.searchDialog(default)
             return True
-        if keymap.CLOSE_CHANGE in commands:
-            self.closeChange()
+        if keymap.CLOSE_PR in commands:
+            self.closePullRequest()
             return True
-        if keymap.REOPEN_CHANGE in commands:
-            self.reopenChange()
+        if keymap.REOPEN_PR in commands:
+            self.reopenPullRequest()
             return True
         if keymap.INTERACTIVE_SEARCH in commands:
             self.searchStart()
             return True
         return False
 
-    def onSelect(self, button, change_key):
+    def onSelect(self, button, pr_key):
         try:
-            view = view_change.ChangeView(self.app, change_key)
+            view = view_pr.PullRequestView(self.app, pr_key)
             self.app.changeScreen(view)
         except hubtty.view.DisplayError as e:
             self.app.error(str(e))
 
     def openReview(self, rows):
-        dialog = view_change.ReviewDialog(self.app, rows[0].current_commit_key)
+        dialog = view_pr.ReviewDialog(self.app, rows[0].current_commit_key)
         urwid.connect_signal(dialog, 'save',
             lambda button: self.closeReview(dialog, rows, True, False))
         urwid.connect_signal(dialog, 'merge',
@@ -751,35 +751,35 @@ class ChangeListView(urwid.WidgetWrap, mywid.Searchable):
         self.refresh()
         self.app.backScreen()
 
-    def closeChange(self):
+    def closePullRequest(self):
         dialog = mywid.TextEditDialog(u'Close pull request', u'Message:',
                                       u'Close pull request', u'')
         urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
         urwid.connect_signal(dialog, 'save', lambda button:
-                                 self.doCloseReopenChange(dialog, 'closed'))
+                                 self.doCloseReopenPullRequest(dialog, 'closed'))
         self.app.popup(dialog)
 
-    def reopenChange(self):
+    def reopenPullRequest(self):
         dialog = mywid.TextEditDialog(u'Reopen pull request', u'Message:',
                                       u'Reopen pull request', u'')
         urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
         urwid.connect_signal(dialog, 'save', lambda button:
-                             self.doCloseReopenChange(dialog, 'open'))
+                             self.doCloseReopenPullRequest(dialog, 'open'))
         self.app.popup(dialog)
 
-    def doCloseReopenChange(self, dialog, state):
-        rows = [row for row in self.change_rows.values() if row.mark]
+    def doCloseReopenPullRequest(self, dialog, state):
+        rows = [row for row in self.pr_rows.values() if row.mark]
         if not rows:
             pos = self.listbox.focus_position
             rows = [self.listbox.body[pos]]
-        change_keys = [row.change_key for row in rows]
+        pr_keys = [row.pr_key for row in rows]
         with self.app.db.getSession() as session:
-            for change_key in change_keys:
-                change = session.getChange(change_key)
-                change.state = state
-                change.pending_edit = True
-                change.pending_edit_message = dialog.entry.edit_text
+            for pr_key in pr_keys:
+                pr = session.getPullRequest(pr_key)
+                pr.state = state
+                pr.pending_edit = True
+                pr.pending_edit_message = dialog.entry.edit_text
                 self.app.sync.submitTask(
-                    sync.EditPullRequestTask(change_key, sync.HIGH_PRIORITY))
+                    sync.EditPullRequestTask(pr_key, sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()

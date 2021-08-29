@@ -19,7 +19,7 @@ import urwid
 from hubtty import keymap
 from hubtty import mywid
 from hubtty import sync
-from hubtty.view import change_list as view_change_list
+from hubtty.view import pull_request_list as view_pr_list
 from hubtty.view import mouse_scroll_decorator
 
 class TopicSelectDialog(urwid.WidgetWrap):
@@ -57,19 +57,19 @@ class TopicSelectDialog(urwid.WidgetWrap):
                 return self.topic_keys[b]
         return None
 
-class ProjectRow(urwid.Button):
-    project_focus_map = {None: 'focused',
-                         'unreviewed-project': 'focused-unreviewed-project',
-                         'subscribed-project': 'focused-subscribed-project',
-                         'unsubscribed-project': 'focused-unsubscribed-project',
-                         'marked-project': 'focused-marked-project',
+class RepositoryRow(urwid.Button):
+    repository_focus_map = {None: 'focused',
+                         'unreviewed-repository': 'focused-unreviewed-repository',
+                         'subscribed-repository': 'focused-subscribed-repository',
+                         'unsubscribed-repository': 'focused-unsubscribed-repository',
+                         'marked-repository': 'focused-marked-repository',
     }
 
     def selectable(self):
         return True
 
     def _setName(self, name, indent):
-        self.project_name = name
+        self.repository_name = name
         name = indent+name
         if self.mark:
             name = '%'+name
@@ -77,66 +77,66 @@ class ProjectRow(urwid.Button):
             name = ' '+name
         self.name.set_text(name)
 
-    def __init__(self, app, project, topic, callback=None):
-        super(ProjectRow, self).__init__('', on_press=callback,
-                                         user_data=(project.key, project.name))
+    def __init__(self, app, repository, topic, callback=None):
+        super(RepositoryRow, self).__init__('', on_press=callback,
+                                         user_data=(repository.key, repository.name))
         self.app = app
         self.mark = False
         self._style = None
-        self.project_key = project.key
+        self.repository_key = repository.key
         if topic:
             self.topic_key = topic.key
             self.indent = '  '
         else:
             self.topic_key = None
             self.indent = ''
-        self.project_name = project.name
+        self.repository_name = repository.name
         self.name = mywid.SearchableText('')
-        self._setName(project.name, self.indent)
+        self._setName(repository.name, self.indent)
         self.name.set_wrap_mode('clip')
-        self.unreviewed_changes = urwid.Text(u'', align=urwid.RIGHT)
-        self.open_changes = urwid.Text(u'', align=urwid.RIGHT)
+        self.unreviewed_prs = urwid.Text(u'', align=urwid.RIGHT)
+        self.open_prs = urwid.Text(u'', align=urwid.RIGHT)
         col = urwid.Columns([
                 self.name,
-                ('fixed', 11, self.unreviewed_changes),
-                ('fixed', 5, self.open_changes),
+                ('fixed', 11, self.unreviewed_prs),
+                ('fixed', 5, self.open_prs),
                 ])
         self.row_style = urwid.AttrMap(col, '')
-        self._w = urwid.AttrMap(self.row_style, None, focus_map=self.project_focus_map)
-        self.update(project)
+        self._w = urwid.AttrMap(self.row_style, None, focus_map=self.repository_focus_map)
+        self.update(repository)
 
     def search(self, search, attribute):
         return self.name.search(search, attribute)
 
-    def update(self, project):
-        cache = self.app.project_cache.get(project)
-        if project.subscribed:
-            if cache['unreviewed_changes'] > 0:
-                style = 'unreviewed-project'
+    def update(self, repository):
+        cache = self.app.repository_cache.get(repository)
+        if repository.subscribed:
+            if cache['unreviewed_prs'] > 0:
+                style = 'unreviewed-repository'
             else:
-                style = 'subscribed-project'
+                style = 'subscribed-repository'
         else:
-            style = 'unsubscribed-project'
+            style = 'unsubscribed-repository'
         self._style = style
         if self.mark:
-            style = 'marked-project'
+            style = 'marked-repository'
         self.row_style.set_attr_map({None: style})
-        self.unreviewed_changes.set_text('%i ' % cache['unreviewed_changes'])
-        self.open_changes.set_text('%i ' % cache['open_changes'])
+        self.unreviewed_prs.set_text('%i ' % cache['unreviewed_prs'])
+        self.open_prs.set_text('%i ' % cache['open_prs'])
 
     def toggleMark(self):
         self.mark = not self.mark
         if self.mark:
-            style = 'marked-project'
+            style = 'marked-repository'
         else:
             style = self._style
         self.row_style.set_attr_map({None: style})
-        self._setName(self.project_name, self.indent)
+        self._setName(self.repository_name, self.indent)
 
 class TopicRow(urwid.Button):
-    project_focus_map = {None: 'focused',
-                         'subscribed-project': 'focused-subscribed-project',
-                         'marked-project': 'focused-marked-project',
+    repository_focus_map = {None: 'focused',
+                           'subscribed-repository': 'focused-subscribed-repository',
+                           'marked-repository': 'focused-marked-repository',
     }
 
     def selectable(self):
@@ -160,72 +160,72 @@ class TopicRow(urwid.Button):
         self.name = urwid.Text('')
         self._setName(topic.name)
         self.name.set_wrap_mode('clip')
-        self.unreviewed_changes = urwid.Text(u'', align=urwid.RIGHT)
-        self.open_changes = urwid.Text(u'', align=urwid.RIGHT)
+        self.unreviewed_prs = urwid.Text(u'', align=urwid.RIGHT)
+        self.open_prs = urwid.Text(u'', align=urwid.RIGHT)
         col = urwid.Columns([
                 self.name,
-                ('fixed', 11, self.unreviewed_changes),
-                ('fixed', 5, self.open_changes),
+                ('fixed', 11, self.unreviewed_prs),
+                ('fixed', 5, self.open_prs),
                 ])
         self.row_style = urwid.AttrMap(col, '')
-        self._w = urwid.AttrMap(self.row_style, None, focus_map=self.project_focus_map)
-        self._style = 'subscribed-project'
+        self._w = urwid.AttrMap(self.row_style, None, focus_map=self.repository_focus_map)
+        self._style = 'subscribed-repository'
         self.row_style.set_attr_map({None: self._style})
         self.update(topic)
 
-    def update(self, topic, unreviewed_changes=None, open_changes=None):
+    def update(self, topic, unreviewed_prs=None, open_prs=None):
         self._setName(topic.name)
-        if unreviewed_changes is None:
-            self.unreviewed_changes.set_text('')
+        if unreviewed_prs is None:
+            self.unreviewed_prs.set_text('')
         else:
-            self.unreviewed_changes.set_text('%i ' % unreviewed_changes)
-        if open_changes is None:
-            self.open_changes.set_text('')
+            self.unreviewed_prs.set_text('%i ' % unreviewed_prs)
+        if open_prs is None:
+            self.open_prs.set_text('')
         else:
-            self.open_changes.set_text('%i ' % open_changes)
+            self.open_prs.set_text('%i ' % open_prs)
 
     def toggleMark(self):
         self.mark = not self.mark
         if self.mark:
-            style = 'marked-project'
+            style = 'marked-repository'
         else:
             style = self._style
         self.row_style.set_attr_map({None: style})
         self._setName(self.topic_name)
 
-class ProjectListHeader(urwid.WidgetWrap):
+class RepositoryListHeader(urwid.WidgetWrap):
     def __init__(self):
-        cols = [urwid.Text(u' Project'),
+        cols = [urwid.Text(u' Repository'),
                 (11, urwid.Text(u'Unreviewed')),
                 (5, urwid.Text(u'Open'))]
-        super(ProjectListHeader, self).__init__(urwid.Columns(cols))
+        super(RepositoryListHeader, self).__init__(urwid.Columns(cols))
 
 @mouse_scroll_decorator.ScrollByWheel
-class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
+class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
     def getCommands(self):
         return [
             (keymap.TOGGLE_LIST_SUBSCRIBED,
-             "Toggle whether only subscribed projects or all projects are listed"),
+             "Toggle whether only subscribed repos or all repos are listed"),
             (keymap.TOGGLE_LIST_REVIEWED,
-             "Toggle listing of projects with unreviewed changes"),
+             "Toggle listing of repositories with unreviewed pull requests"),
             (keymap.TOGGLE_SUBSCRIBED,
-             "Toggle the subscription flag for the selected project"),
+             "Toggle the subscription flag for the selected repository"),
             (keymap.REFRESH,
-             "Sync subscribed projects"),
+             "Sync subscribed repositories"),
             (keymap.TOGGLE_MARK,
-             "Toggle the process mark for the selected project"),
-            (keymap.NEW_PROJECT_TOPIC,
-             "Create project topic"),
-            (keymap.DELETE_PROJECT_TOPIC,
-             "Delete selected project topic"),
-            (keymap.MOVE_PROJECT_TOPIC,
-             "Move selected project to topic"),
-            (keymap.COPY_PROJECT_TOPIC,
-             "Copy selected project to topic"),
-            (keymap.REMOVE_PROJECT_TOPIC,
-             "Remove selected project from topic"),
-            (keymap.RENAME_PROJECT_TOPIC,
-             "Rename selected project topic"),
+             "Toggle the process mark for the selected repository"),
+            (keymap.NEW_REPOSITORY_TOPIC,
+             "Create repository topic"),
+            (keymap.DELETE_REPOSITORY_TOPIC,
+             "Delete selected repository topic"),
+            (keymap.MOVE_REPOSITORY_TOPIC,
+             "Move selected repository to topic"),
+            (keymap.COPY_REPOSITORY_TOPIC,
+             "Copy selected repository to topic"),
+            (keymap.REMOVE_REPOSITORY_TOPIC,
+             "Remove selected repository from topic"),
+            (keymap.RENAME_REPOSITORY_TOPIC,
+             "Rename selected repository topic"),
             (keymap.INTERACTIVE_SEARCH,
              "Interactive search"),
         ]
@@ -236,17 +236,17 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
         return [(c[0], key(c[0]), c[1]) for c in commands]
 
     def __init__(self, app):
-        super(ProjectListView, self).__init__(urwid.Pile([]))
-        self.log = logging.getLogger('hubtty.view.project_list')
+        super(RepositoryListView, self).__init__(urwid.Pile([]))
+        self.log = logging.getLogger('hubtty.view.repository_list')
         self.searchInit()
         self.app = app
         self.unreviewed = True
         self.subscribed = True
-        self.project_rows = {}
+        self.repository_rows = {}
         self.topic_rows = {}
         self.open_topics = set()
         self.listbox = urwid.ListBox(urwid.SimpleFocusListWalker([]))
-        self.header = ProjectListHeader()
+        self.header = RepositoryListHeader()
         self.refresh()
         self._w.contents.append((app.header, ('pack', 1)))
         self._w.contents.append((urwid.Divider(),('pack', 1)))
@@ -255,15 +255,15 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
         self._w.set_focus(3)
 
     def interested(self, event):
-        if not (isinstance(event, sync.ProjectAddedEvent)
+        if not (isinstance(event, sync.RepositoryAddedEvent)
                 or
-                isinstance(event, sync.ChangeAddedEvent)
+                isinstance(event, sync.PullRequestAddedEvent)
                 or
-                (isinstance(event, sync.ChangeUpdatedEvent) and
+                (isinstance(event, sync.PullRequestUpdatedEvent) and
                  (event.state_changed or event.review_flag_changed))):
-            self.log.debug("Ignoring refresh project list due to event %s" % (event,))
+            self.log.debug("Ignoring refresh repository list due to event %s" % (event,))
             return False
-        self.log.debug("Refreshing project list due to event %s" % (event,))
+        self.log.debug("Refreshing repository list due to event %s" % (event,))
         return True
 
     def advance(self):
@@ -275,33 +275,33 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
     def _deleteRow(self, row):
         if row in self.listbox.body:
             self.listbox.body.remove(row)
-        if isinstance(row, ProjectRow):
-            del self.project_rows[(row.topic_key, row.project_key)]
+        if isinstance(row, RepositoryRow):
+            del self.repository_rows[(row.topic_key, row.repository_key)]
         else:
             del self.topic_rows[row.topic_key]
 
-    def _projectRow(self, i, project, topic):
-        # Ensure that the row at i is the given project.  If the row
+    def _repositoryRow(self, i, repository, topic):
+        # Ensure that the row at i is the given repository.  If the row
         # already exists somewhere in the list, delete all rows
         # between i and the row and then update the row.  If the row
         # does not exist, insert the row at position i.
         topic_key = topic and topic.key or None
-        key = (topic_key, project.key)
-        row = self.project_rows.get(key)
+        key = (topic_key, repository.key)
+        row = self.repository_rows.get(key)
         while row:  # This is "if row: while True:".
             if i >= len(self.listbox.body):
                 break
             current_row = self.listbox.body[i]
-            if (isinstance(current_row, ProjectRow) and
-                current_row.project_key == project.key):
+            if (isinstance(current_row, RepositoryRow) and
+                current_row.repository_key == repository.key):
                 break
             self._deleteRow(current_row)
         if not row:
-            row = ProjectRow(self.app, project, topic, self.onSelect)
+            row = RepositoryRow(self.app, repository, topic, self.onSelect)
             self.listbox.body.insert(i, row)
-            self.project_rows[key] = row
+            self.repository_rows[key] = row
         else:
-            row.update(project)
+            row.update(repository)
         return i+1
 
     def _topicRow(self, i, topic):
@@ -324,37 +324,34 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
 
     def refresh(self):
         if self.subscribed:
-            self.title = u'Subscribed projects'
+            self.title = u'Subscribed repositories'
             self.short_title = self.title[:]
             if self.unreviewed:
-                self.title += u' with unreviewed changes'
+                self.title += u' with unreviewed pull requests'
         else:
-            self.title = u'All projects'
+            self.title = u'All repositories'
             self.short_title = self.title[:]
         self.app.status.update(title=self.title)
         with self.app.db.getSession() as session:
             i = 0
-            for project in session.getProjects(topicless=True,
+            for repository in session.getRepositories(topicless=True,
                     subscribed=self.subscribed, unreviewed=self.unreviewed):
-                #self.log.debug("project: %s" % project.name)
-                i = self._projectRow(i, project, None)
+                i = self._repositoryRow(i, repository, None)
             for topic in session.getTopics():
-                #self.log.debug("topic: %s" % topic.name)
                 i = self._topicRow(i, topic)
                 topic_unreviewed = 0
                 topic_open = 0
-                for project in topic.projects:
-                    #self.log.debug("  project: %s" % project.name)
-                    cache = self.app.project_cache.get(project)
-                    topic_unreviewed += cache['unreviewed_changes']
-                    topic_open += cache['open_changes']
+                for repository in topic.repositories:
+                    cache = self.app.repository_cache.get(repository)
+                    topic_unreviewed += cache['unreviewed_prs']
+                    topic_open += cache['open_prs']
                     if self.subscribed:
-                        if not project.subscribed:
+                        if not repository.subscribed:
                             continue
-                        if self.unreviewed and not cache['unreviewed_changes']:
+                        if self.unreviewed and not cache['unreviewed_prs']:
                             continue
                     if topic.key in self.open_topics:
-                        i = self._projectRow(i, project, topic)
+                        i = self._repositoryRow(i, repository, topic)
                 topic_row = self.topic_rows.get(topic.key)
                 topic_row.update(topic, topic_unreviewed, topic_open)
         while i < len(self.listbox.body):
@@ -362,11 +359,11 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
             self._deleteRow(current_row)
 
     def onSelect(self, button, data):
-        project_key, project_name = data
-        self.app.changeScreen(view_change_list.ChangeListView(
+        repository_key, repository_name = data
+        self.app.changeScreen(view_pr_list.PullRequestListView(
                 self.app,
-                "_project_key:%s %s" % (project_key, self.app.config.project_change_list_query),
-                project_name, project_key=project_key, unreviewed=True))
+                "_repository_key:%s %s" % (repository_key, self.app.config.repository_pr_list_query),
+                repository_name, repository_key=repository_key, unreviewed=True))
 
     def onSelectTopic(self, button, data):
         topic_key = data[0]
@@ -459,7 +456,7 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
             verb = 'Move'
         else:
             verb = 'Copy'
-        rows = self.getSelectedRows(ProjectRow)
+        rows = self.getSelectedRows(RepositoryRow)
         if not rows:
             return
 
@@ -483,13 +480,13 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
                     error = "Unable to find topic %s" % key
                 else:
                     for row in rows:
-                        project = session.getProject(row.project_key)
+                        repository = session.getRepository(row.repository_key)
                         if move and row.topic_key:
                             old_topic = session.getTopic(row.topic_key)
-                            self.log.debug("Remove %s from %s" % (project, old_topic))
-                            old_topic.removeProject(project)
-                        self.log.debug("Add %s to %s" % (project, new_topic))
-                        new_topic.addProject(project)
+                            self.log.debug("Remove %s from %s" % (repository, old_topic))
+                            old_topic.removeRepository(repository)
+                        self.log.debug("Add %s to %s" % (repository, new_topic))
+                        new_topic.addRepository(repository)
         self.app.backScreen()
         if error:
             self.app.error(error)
@@ -501,35 +498,35 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
         self.copyMoveToTopic(False)
 
     def removeFromTopic(self):
-        rows = self.getSelectedRows(ProjectRow)
+        rows = self.getSelectedRows(RepositoryRow)
         rows = [r for r in rows if r.topic_key]
         if not rows:
             return
         with self.app.db.getSession() as session:
             for row in rows:
-                project = session.getProject(row.project_key)
+                repository = session.getRepository(row.repository_key)
                 topic = session.getTopic(row.topic_key)
-                self.log.debug("Remove %s from %s" % (project, topic))
-                topic.removeProject(project)
+                self.log.debug("Remove %s from %s" % (repository, topic))
+                topic.removeRepository(repository)
         self.refresh()
 
     def toggleSubscribed(self):
-        rows = self.getSelectedRows(ProjectRow)
+        rows = self.getSelectedRows(RepositoryRow)
         if not rows:
             return
-        keys = [row.project_key for row in rows]
+        keys = [row.repository_key for row in rows]
         subscribed_keys = []
         with self.app.db.getSession() as session:
             for key in keys:
-                project = session.getProject(key)
-                project.subscribed = not project.subscribed
-                if project.subscribed:
+                repository = session.getRepository(key)
+                repository.subscribed = not repository.subscribed
+                if repository.subscribed:
                     subscribed_keys.append(key)
         for row in rows:
             if row.mark:
                 row.toggleMark()
         for key in subscribed_keys:
-            self.app.sync.submitTask(sync.SyncProjectTask(key))
+            self.app.sync.submitTask(sync.SyncRepositoryTask(key))
         self.refresh()
 
     def keypress(self, size, key):
@@ -537,7 +534,7 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
             return None
 
         if not self.app.input_buffer:
-            key = super(ProjectListView, self).keypress(size, key)
+            key = super(RepositoryListView, self).keypress(size, key)
         keys = self.app.input_buffer + [key]
         commands = self.app.config.keymap.getCommands(keys)
         ret = self.handleCommands(commands)
@@ -562,27 +559,27 @@ class ProjectListView(urwid.WidgetWrap, mywid.Searchable):
         if keymap.TOGGLE_MARK in commands:
             self.toggleMark()
             return True
-        if keymap.NEW_PROJECT_TOPIC in commands:
+        if keymap.NEW_REPOSITORY_TOPIC in commands:
             self.createTopic()
             return True
-        if keymap.DELETE_PROJECT_TOPIC in commands:
+        if keymap.DELETE_REPOSITORY_TOPIC in commands:
             self.deleteTopic()
             return True
-        if keymap.COPY_PROJECT_TOPIC in commands:
+        if keymap.COPY_REPOSITORY_TOPIC in commands:
             self.copyToTopic()
             return True
-        if keymap.MOVE_PROJECT_TOPIC in commands:
+        if keymap.MOVE_REPOSITORY_TOPIC in commands:
             self.moveToTopic()
             return True
-        if keymap.REMOVE_PROJECT_TOPIC in commands:
+        if keymap.REMOVE_REPOSITORY_TOPIC in commands:
             self.removeFromTopic()
             return True
-        if keymap.RENAME_PROJECT_TOPIC in commands:
+        if keymap.RENAME_REPOSITORY_TOPIC in commands:
             self.renameTopic()
             return True
         if keymap.REFRESH in commands:
             self.app.sync.submitTask(
-                sync.SyncSubscribedProjectsTask(sync.HIGH_PRIORITY))
+                sync.SyncSubscribedRepositoriesTask(sync.HIGH_PRIORITY))
             self.app.status.update()
             self.refresh()
             return True
