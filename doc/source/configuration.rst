@@ -280,10 +280,6 @@ Example:
      sort-by: 'number'
      reverse: false
 
-**thread-changes**
-  Dependent changes are displayed as "threads" in the change list by
-  default.  To disable this behavior, set this value to false.
-
 Pull Request View Options
 +++++++++++++++++++++++++
 
