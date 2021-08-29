@@ -205,7 +205,7 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
     def getCommands(self):
         return [
             (keymap.TOGGLE_LIST_SUBSCRIBED,
-             "Toggle whether only subscribed repositories or all repositories are listed"),
+             "Toggle whether only subscribed repos or all repos are listed"),
             (keymap.TOGGLE_LIST_REVIEWED,
              "Toggle listing of repositories with unreviewed pull requests"),
             (keymap.TOGGLE_SUBSCRIBED,
