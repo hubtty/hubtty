@@ -243,16 +243,16 @@ Replacement are applied in order.
       **query**
         The search query to use.
 
-This example matches Github change ids, and replaces them with a link
-to an internal Hubtty search for that change id.
+This example matches Github usernames, and replaces them with a link
+to an internal Hubtty search for pull requests authored by that user.
 
 .. code-block: yaml
    commentlinks:
-     - match: "(?P<id>I[0-9a-fA-F]{40})"
+     - match: "(?P<mention_str>[^\\w]@(?P<username>[\\w-]+))"
        replacements:
          - search:
-             text: "{id}"
-             query: "change:{id}"
+             text: "{mention_str}"
+             query: "author:{username}"
 
 Pull Request List Options
 +++++++++++++++++++++++++
