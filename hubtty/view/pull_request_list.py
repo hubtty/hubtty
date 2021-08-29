@@ -40,13 +40,13 @@ class ColumnInfo(object):
 
 
 COLUMNS = [
-    ColumnInfo('Number',  'given',   6),
-    ColumnInfo('Title',   'weight',  4),
-    ColumnInfo('Project', 'weight',  1),
-    ColumnInfo('Branch',  'weight',  1),
-    ColumnInfo('Author',  'weight',  1),
-    ColumnInfo('Updated', 'given',  10),
-    ColumnInfo('Size',    'given',   4),
+    ColumnInfo('Number',     'given',   6),
+    ColumnInfo('Title',      'weight',  4),
+    ColumnInfo('Repository', 'weight',  1),
+    ColumnInfo('Branch',     'weight',  1),
+    ColumnInfo('Author',     'weight',  1),
+    ColumnInfo('Updated',    'given',  10),
+    ColumnInfo('Size',       'given',   4),
 ]
 
 
@@ -106,7 +106,7 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
         self.number = mywid.SearchableText(u'')
         self.updated = mywid.SearchableText(u'')
         self.size = mywid.SearchableText(u'', align='right')
-        self.project = mywid.SearchableText(u'', wrap='clip')
+        self.repository = mywid.SearchableText(u'', wrap='clip')
         self.author = mywid.SearchableText(u'', wrap='clip')
         self.branch = mywid.SearchableText(u'', wrap='clip')
         self.mark = False
@@ -121,7 +121,7 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
             return True
         if self.number.search(search, attribute):
             return True
-        if self.project.search(search, attribute):
+        if self.repository.search(search, attribute):
             return True
         if self.branch.search(search, attribute):
             return True
@@ -211,10 +211,10 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
         self.row_style.set_attr_map({None: style})
         self.title.set_text(title)
         self.number.set_text(str(pr.number))
-        self.project.set_text(pr.project.name.split('/')[-1])
+        self.repository.set_text(pr.repository.name.split('/')[-1])
         self.author.set_text(pr.author_name)
         self.branch.set_text(pr.branch or '')
-        self.project_name = pr.project.name
+        self.repository_name = pr.repository.name
         self.commit_sha = pr.commits[-1].sha
         self.current_commit_key = pr.commits[-1].key
         today = self.app.time(datetime.datetime.utcnow()).date()
@@ -275,7 +275,7 @@ class PullRequestListHeader(urwid.WidgetWrap, PullRequestListColumns):
         self.number = urwid.Text(u'Number')
         self.updated = urwid.Text(u'Updated')
         self.size = urwid.Text(u'Size')
-        self.project = urwid.Text(u'Project', wrap='clip')
+        self.repository = urwid.Text(u'Repository', wrap='clip')
         self.author = urwid.Text(u'Author', wrap='clip')
         self.branch = urwid.Text(u'Branch', wrap='clip')
         self.columns = urwid.Columns([], dividechars=1)
@@ -297,10 +297,10 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
     optional_columns = set(['Branch', 'Size'])
 
     def getCommands(self):
-        if self.project_key:
-            refresh_help = "Sync current project"
+        if self.repository_key:
+            refresh_help = "Sync current repository"
         else:
-            refresh_help = "Sync subscribed projects"
+            refresh_help = "Sync subscribed repositories"
         return [
             (keymap.TOGGLE_HELD,
              "Toggle the held flag for the currently selected pull request"),
@@ -343,7 +343,7 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
         commands = self.getCommands()
         return [(c[0], key(c[0]), c[1]) for c in commands]
 
-    def __init__(self, app, query, query_desc=None, project_key=None,
+    def __init__(self, app, query, query_desc=None, repository_key=None,
                  unreviewed=False, sort_by=None, reverse=None):
         super(PullRequestListView, self).__init__(urwid.Pile([]))
         self.log = logging.getLogger('hubtty.view.pull_request_list')
@@ -360,10 +360,10 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
                 self.enabled_columns.add(colinfo.name)
         self.disabled_columns = set()
         self.listbox = urwid.ListBox(urwid.SimpleFocusListWalker([]))
-        self.project_key = project_key
-        if 'Project' not in self.required_columns and project_key is not None:
-            self.enabled_columns.discard('Project')
-            self.disabled_columns.add('Project')
+        self.repository_key = repository_key
+        if 'Repository' not in self.required_columns and repository_key is not None:
+            self.enabled_columns.discard('Repository')
+            self.disabled_columns.add('Repository')
         if 'Author' not in self.required_columns and 'author:' in query:
             # This could be or'd with something else, but probably
             # not.
@@ -387,11 +387,11 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
         self._w.set_focus(3)
 
     def interested(self, event):
-        if not ((self.project_key is not None and
+        if not ((self.repository_key is not None and
                  isinstance(event, sync.PullRequestAddedEvent) and
-                 self.project_key == event.project_key)
+                 self.repository_key == event.repository_key)
                 or
-                (self.project_key is None and
+                (self.repository_key is None and
                  isinstance(event, sync.PullRequestAddedEvent))
                 or
                 (isinstance(event, sync.PullRequestUpdatedEvent) and
@@ -479,8 +479,8 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
                 value.updateColumns()
 
     def getQueryString(self):
-        if self.project_key is not None:
-            return "repo:%s %s" % (self.query_desc, self.app.config.project_pr_list_query)
+        if self.repository_key is not None:
+            return "repo:%s %s" % (self.query_desc, self.app.config.repository_pr_list_query)
         return self.query
 
     def clearPullRequestList(self):
@@ -514,7 +514,7 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
         with self.app.db.getSession() as session:
             pr = session.getPullRequest(pr_key)
             pr.reviewed = not pr.reviewed
-            self.app.project_cache.clear(pr.project)
+            self.app.repository_cache.clear(pr.repository)
             ret = pr.reviewed
             reviewed_str = 'reviewed' if pr.reviewed else 'unreviewed'
             self.log.debug("Set pull request %s to %s", pr_key, reviewed_str)
@@ -645,12 +645,12 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
             self.advance()
             return True
         if keymap.REFRESH in commands:
-            if self.project_key:
+            if self.repository_key:
                 self.app.sync.submitTask(
-                    sync.SyncProjectTask(self.project_key, sync.HIGH_PRIORITY))
+                    sync.SyncRepositoryTask(self.repository_key, sync.HIGH_PRIORITY))
             else:
                 self.app.sync.submitTask(
-                    sync.SyncSubscribedProjectsTask(sync.HIGH_PRIORITY))
+                    sync.SyncSubscribedRepositoriesTask(sync.HIGH_PRIORITY))
             self.app.status.update()
             return True
         if keymap.REVIEW in commands:
@@ -689,14 +689,14 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
                 return True
             pos = self.listbox.focus_position
             row = self.listbox.body[pos]
-            self.app.localCheckoutCommit(row.project_name, row.commit_sha)
+            self.app.localCheckoutCommit(row.repository_name, row.commit_sha)
             return True
         if keymap.LOCAL_CHERRY_PICK in commands:
             if not len(self.listbox.body):
                 return True
             pos = self.listbox.focus_position
             row = self.listbox.body[pos]
-            self.app.localCherryPickCommit(row.project_name, row.commit_sha)
+            self.app.localCherryPickCommit(row.repository_name, row.commit_sha)
             return True
         if keymap.REFINE_PR_SEARCH in commands:
             default = self.getQueryString()

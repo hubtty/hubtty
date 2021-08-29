@@ -64,16 +64,16 @@ SORT_BY_NUMBER = 'sort by number'
 SORT_BY_UPDATED = 'sort by updated'
 SORT_BY_LAST_SEEN = 'sort by last seen'
 SORT_BY_REVERSE = 'reverse the sort'
-# Project list screen:
+# Repository list screen:
 TOGGLE_LIST_REVIEWED = 'toggle list reviewed'
 TOGGLE_LIST_SUBSCRIBED = 'toggle list subscribed'
 TOGGLE_SUBSCRIBED = 'toggle subscribed'
-NEW_PROJECT_TOPIC = 'new project topic'
-DELETE_PROJECT_TOPIC = 'delete project topic'
-MOVE_PROJECT_TOPIC = 'move to project topic'
-COPY_PROJECT_TOPIC = 'copy to project topic'
-REMOVE_PROJECT_TOPIC = 'remove from project topic'
-RENAME_PROJECT_TOPIC = 'rename project topic'
+NEW_REPOSITORY_TOPIC = 'new repository topic'
+DELETE_REPOSITORY_TOPIC = 'delete repository topic'
+MOVE_REPOSITORY_TOPIC = 'move to repository topic'
+COPY_REPOSITORY_TOPIC = 'copy to repository topic'
+REMOVE_REPOSITORY_TOPIC = 'remove from repository topic'
+RENAME_REPOSITORY_TOPIC = 'rename repository topic'
 # Diff screens:
 # SELECT_PATCHSETS = 'select patchsets'
 NEXT_SELECTABLE = 'next selectable'
@@ -135,12 +135,12 @@ DEFAULT_KEYMAP = {
     TOGGLE_LIST_REVIEWED: 'l',
     TOGGLE_LIST_SUBSCRIBED: 'L',
     TOGGLE_SUBSCRIBED: 's',
-    NEW_PROJECT_TOPIC: [['T', 'n']],
-    DELETE_PROJECT_TOPIC: [['T', 'delete']],
-    MOVE_PROJECT_TOPIC: [['T', 'm']],
-    COPY_PROJECT_TOPIC: [['T', 'c']],
-    REMOVE_PROJECT_TOPIC: [['T', 'D']],
-    RENAME_PROJECT_TOPIC: [['T', 'r']],
+    NEW_REPOSITORY_TOPIC: [['T', 'n']],
+    DELETE_REPOSITORY_TOPIC: [['T', 'delete']],
+    MOVE_REPOSITORY_TOPIC: [['T', 'm']],
+    COPY_REPOSITORY_TOPIC: [['T', 'c']],
+    REMOVE_REPOSITORY_TOPIC: [['T', 'D']],
+    RENAME_REPOSITORY_TOPIC: [['T', 'r']],
 
     # SELECT_PATCHSETS: 'p',
     NEXT_SELECTABLE: 'tab',

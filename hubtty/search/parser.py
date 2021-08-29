@@ -89,7 +89,7 @@ def SearchParser():
                 | updated_term
                 | user_term
                 | commit_term
-                | project_key_term
+                | repository_key_term
                 | branch_term
                 | has_term
                 | in_term
@@ -316,9 +316,9 @@ def SearchParser():
         s = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
         p[0] = hubtty.db.pull_request_table.c.key.in_(s)
 
-    def p_project_key_term(p):
-        '''project_key_term : OP_PROJECT_KEY NUMBER'''
-        p[0] = hubtty.db.pull_request_table.c.project_key == p[2]
+    def p_repository_key_term(p):
+        '''repository_key_term : OP_REPOSITORY_KEY NUMBER'''
+        p[0] = hubtty.db.pull_request_table.c.repository_key == p[2]
 
     def p_branch_term(p):
         '''branch_term : OP_BRANCH string
@@ -393,7 +393,7 @@ def SearchParser():
             s = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
             p[0] = hubtty.db.pull_request_table.c.key.in_(s)
         elif p[2] == 'watched':
-            p[0] = hubtty.db.project_table.c.subscribed == True
+            p[0] = hubtty.db.repository_table.c.subscribed == True
         else:
             raise hubtty.search.SearchSyntaxError('Syntax error: is:%s is not supported' % p[2])
 

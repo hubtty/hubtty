@@ -45,7 +45,7 @@ from hubtty import sync
 from hubtty import search
 from hubtty import requestsexceptions
 from hubtty.view import pull_request_list as view_pr_list
-from hubtty.view import project_list as view_project_list
+from hubtty.view import repository_list as view_repository_list
 from hubtty.view import pull_request as view_pr
 import hubtty.view
 import hubtty.version
@@ -53,9 +53,9 @@ import hubtty.version
 WELCOME_TEXT = """\
 Welcome to Hubtty!
 
-To get started, you should subscribe to some projects.  Press the "L" key (shift-L) to list all the projects the user has explicit permission on, navigate to the ones you are interested in, and then press "s" to subscribe to them.  Use the `additional-repositories` setting to add more projects to this list.
+To get started, you should subscribe to some repositories.  Press the "L" key (shift-L) to list all the repositories the user has explicit permission on, navigate to the ones you are interested in, and then press "s" to subscribe to them.  Use the `additional-repositories` setting to add more repositories to this list.
 
-Hubtty will automatically clone the repositories and sync pull requests in your subscribed projects. Repositories are cloned in ~/hubtty by default.
+Hubtty will automatically clone the repositories and sync pull requests in your subscribed repositories. Repositories are cloned in ~/hubtty by default.
 
 Change your configuration in %s.
 
@@ -226,21 +226,21 @@ class BackgroundBrowser(webbrowser.GenericBrowser):
         except OSError:
             return False
 
-class ProjectCache(object):
+class RepositoryCache(object):
     def __init__(self):
-        self.projects = {}
+        self.repositories = {}
 
-    def get(self, project):
-        if project.key not in self.projects:
-            self.projects[project.key] = dict(
-                unreviewed_prs = len(project.unreviewed_prs),
-                open_prs = len(project.open_prs),
+    def get(self, repository):
+        if repository.key not in self.repositories:
+            self.repositories[repository.key] = dict(
+                unreviewed_prs = len(repository.unreviewed_prs),
+                open_prs = len(repository.open_prs),
             )
-        return self.projects[project.key]
+        return self.repositories[repository.key]
 
-    def clear(self, project):
-        if project.key in self.projects:
-            del self.projects[project.key]
+    def clear(self, repository):
+        if repository.key in self.repositories:
+            del self.repositories[repository.key]
 
 class App(object):
     simple_pr_search = re.compile(r'([a-zA-Z_]+/)+\d+')
@@ -282,7 +282,7 @@ class App(object):
             print("error: another instance of hubtty is running for: %s" % self.config.server['name'])
             sys.exit(1)
 
-        self.project_cache = ProjectCache()
+        self.repository_cache = RepositoryCache()
         self.ring = mywid.KillRing()
         self.input_buffer = []
         webbrowser.register('xdg-open', None, BackgroundBrowser("xdg-open"))
@@ -310,7 +310,7 @@ class App(object):
             self.footer = urwid.AttrMap(self.breadcrumbs, 'footer')
         else:
             self.footer = None
-        screen = view_project_list.ProjectListView(self)
+        screen = view_repository_list.RepositoryListView(self)
         self.status.update(title=screen.title)
         self.updateStatusQueries()
         self.frame = urwid.Frame(body=screen, footer=self.footer)
@@ -328,11 +328,11 @@ class App(object):
 
         warnings.showwarning = self._showWarning
 
-        has_subscribed_projects = False
+        has_subscribed_repositories = False
         with self.db.getSession() as session:
-            if session.getProjects(subscribed=True):
-                has_subscribed_projects = True
-        if not has_subscribed_projects:
+            if session.getRepositories(subscribed=True):
+                has_subscribed_repositories = True
+        if not has_subscribed_repositories:
             self.welcome()
 
         self.loop.screen.tty_signal_keys(start='undefined', stop='undefined')
@@ -759,8 +759,8 @@ class App(object):
         self.updateStatusQueries()
         return ret
 
-    def localCheckoutCommit(self, project_name, commit_sha):
-        repo = gitrepo.get_repo(project_name, self.config)
+    def localCheckoutCommit(self, repository_name, commit_sha):
+        repo = gitrepo.get_repo(repository_name, self.config)
         try:
             repo.checkout(commit_sha)
             dialog = mywid.MessageDialog('Checkout', 'Pull request checked out in %s' % repo.path)
@@ -772,8 +772,8 @@ class App(object):
             lambda button: self.backScreen())
         self.popup(dialog, min_height=min_height)
 
-    def localCherryPickCommit(self, project_name, commit_sha):
-        repo = gitrepo.get_repo(project_name, self.config)
+    def localCherryPickCommit(self, repository_name, commit_sha):
+        repo = gitrepo.get_repo(repository_name, self.config)
         try:
             repo.cherryPick(commit_sha)
             dialog = mywid.MessageDialog('Cherry-Pick', 'Pull request cherry-picked in %s' % repo.path)
@@ -823,7 +823,7 @@ class App(object):
             message_key = draft_message.key
         if upload:
             pr.reviewed = True
-            self.project_cache.clear(pr.project)
+            self.repository_cache.clear(pr.repository)
         if merge:
             sha = pr.commits[-1].sha
             pending_merge = pr.createPendingMerge(sha,'merge')

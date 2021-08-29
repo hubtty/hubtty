@@ -23,7 +23,7 @@ GLOBAL_HELP = (
     (keymap.PREV_SCREEN,
      "Back to previous screen"),
     (keymap.TOP_SCREEN,
-     "Back to project list"),
+     "Back to repository list"),
     (keymap.QUIT,
      "Quit Hubtty"),
     (keymap.PR_SEARCH,

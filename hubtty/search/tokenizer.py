@@ -31,7 +31,7 @@ operators = {
     'org': 'OP_ORG',
     'repo': 'OP_REPO',
     'commit': 'OP_COMMIT',
-    '_project_key': 'OP_PROJECT_KEY',  # internal hubtty use only
+    '_repository_key': 'OP_REPOSITORY_KEY',  # internal hubtty use only
     'branch': 'OP_BRANCH',
     'base': 'OP_BASE',
     #'tr': 'OP_TR', # needs trackingids

@@ -127,21 +127,21 @@ class UpdateEvent(object):
                 related_pr_keys.add(child.pull_request.key)
         self.related_pr_keys = related_pr_keys
 
-class ProjectAddedEvent(UpdateEvent):
+class RepositoryAddedEvent(UpdateEvent):
     def __repr__(self):
-        return '<ProjectAddedEvent project_key:%s>' % (
-            self.project_key,)
+        return '<RepositoryAddedEvent repository_key:%s>' % (
+            self.repository_key,)
 
-    def __init__(self, project):
-        self.project_key = project.key
+    def __init__(self, repository):
+        self.repository_key = repository.key
 
 class PullRequestAddedEvent(UpdateEvent):
     def __repr__(self):
-        return '<PullRequestAddedEvent project_key:%s pr_key:%s>' % (
-            self.project_key, self.pr_key)
+        return '<PullRequestAddedEvent repository_key:%s pr_key:%s>' % (
+            self.repository_key, self.pr_key)
 
     def __init__(self, pr):
-        self.project_key = pr.project.key
+        self.repository_key = pr.repository.key
         self.pr_key = pr.key
         self.related_pr_keys = set()
         self.review_flag_changed = True
@@ -150,11 +150,11 @@ class PullRequestAddedEvent(UpdateEvent):
 
 class PullRequestUpdatedEvent(UpdateEvent):
     def __repr__(self):
-        return '<PullRequestUpdatedEvent project_key:%s pr_key:%s review_flag_changed:%s state_changed:%s>' % (
-            self.project_key, self.pr_key, self.review_flag_changed, self.state_changed)
+        return '<PullRequestUpdatedEvent repository_key:%s pr_key:%s review_flag_changed:%s state_changed:%s>' % (
+            self.repository_key, self.pr_key, self.review_flag_changed, self.state_changed)
 
     def __init__(self, pr):
-        self.project_key = pr.project.key
+        self.repository_key = pr.repository.key
         self.pr_key = pr.key
         self.related_pr_keys = set()
         self.review_flag_changed = False
@@ -225,9 +225,9 @@ class SyncAccountTask(Task):
                                    remote.get('login'),
                                    remote.get('email'))
 
-class SyncProjectListTask(Task):
+class SyncRepositoryListTask(Task):
     def __repr__(self):
-        return '<SyncProjectListTask>'
+        return '<SyncRepositoryListTask>'
 
     def __eq__(self, other):
         if other.__class__ == self.__class__:
@@ -245,7 +245,7 @@ class SyncProjectListTask(Task):
             if response.status_code == 503:
                 raise OfflineError("Received 503 status code")
             elif response.status_code == 404:
-                self.log.error('Project %s does not exist or you do not have '
+                self.log.error('Repository %s does not exist or you do not have '
                         'the permissions to view it.' % additional_repo)
             elif response.status_code >= 400:
                 raise Exception("Received %s status code: %s"
@@ -264,23 +264,23 @@ class SyncProjectListTask(Task):
             for remote_repo in remote_repos:
                 repo_name = remote_repo['full_name']
                 repo_desc = (remote_repo.get('description', '') or '').replace('\r','')
-                project = session.getProjectByName(repo_name)
-                if not project:
-                    project = session.createProject(repo_name,
+                repository = session.getRepositoryByName(repo_name)
+                if not repository:
+                    repository = session.createRepository(repo_name,
                                                     description=repo_desc)
-                    self.log.info("Created project %s", repo_name)
-                    self.results.append(ProjectAddedEvent(project))
-                project.description = repo_desc
-                project.can_push = remote_repo['permissions']['push']
+                    self.log.info("Created repository %s", repo_name)
+                    self.results.append(RepositoryAddedEvent(repository))
+                repository.description = repo_desc
+                repository.can_push = remote_repo['permissions']['push']
 
-            for p in session.getProjects():
+            for p in session.getRepositories():
                 if p.name not in remote_repos_names:
-                    self.log.info("Deleted project %s", p.name)
+                    self.log.info("Deleted repository %s", p.name)
                     session.delete(p)
 
-class SyncSubscribedProjectBranchesTask(Task):
+class SyncSubscribedRepositoryBranchesTask(Task):
     def __repr__(self):
-        return '<SyncSubscribedProjectBranchesTask>'
+        return '<SyncSubscribedRepositoryBranchesTask>'
 
     def __eq__(self, other):
         if other.__class__ == self.__class__:
@@ -290,48 +290,48 @@ class SyncSubscribedProjectBranchesTask(Task):
     def run(self, sync):
         app = sync.app
         with app.db.getSession() as session:
-            projects = session.getProjects(subscribed=True)
-        for p in projects:
-            sync.submitTask(SyncProjectBranchesTask(p.name, self.priority))
+            repositories = session.getRepositories(subscribed=True)
+        for p in repositories:
+            sync.submitTask(SyncRepositoryBranchesTask(p.name, self.priority))
 
-class SyncProjectBranchesTask(Task):
-    def __init__(self, project_name, priority=NORMAL_PRIORITY):
-        super(SyncProjectBranchesTask, self).__init__(priority)
-        self.project_name = project_name
+class SyncRepositoryBranchesTask(Task):
+    def __init__(self, repository_name, priority=NORMAL_PRIORITY):
+        super(SyncRepositoryBranchesTask, self).__init__(priority)
+        self.repository_name = repository_name
 
     def __repr__(self):
-        return '<SyncProjectBranchesTask %s>' % (self.project_name,)
+        return '<SyncRepositoryBranchesTask %s>' % (self.repository_name,)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
-            other.project_name == self.project_name):
+            other.repository_name == self.repository_name):
             return True
         return False
 
     def run(self, sync):
         app = sync.app
-        remote = sync.get('repos/%s/branches?per_page=100' % self.project_name)
+        remote = sync.get('repos/%s/branches?per_page=100' % self.repository_name)
         remote_branches = set()
         for b in remote:
             remote_branches.add(b['name'])
         with app.db.getSession() as session:
             local = {}
-            project = session.getProjectByName(self.project_name)
-            for branch in project.branches:
+            repository = session.getRepositoryByName(self.repository_name)
+            for branch in repository.branches:
                 local[branch.name] = branch
             local_branches = set(local.keys())
 
             for name in local_branches-remote_branches:
                 session.delete(local[name])
-                self.log.info("Deleted branch %s from project %s in local DB.", name, project.name)
+                self.log.info("Deleted branch %s from repository %s in local DB.", name, repository.name)
 
             for name in remote_branches-local_branches:
-                project.createBranch(name)
-                self.log.info("Added branch %s to project %s in local DB.", name, project.name)
+                repository.createBranch(name)
+                self.log.info("Added branch %s to repository %s in local DB.", name, repository.name)
 
-class SyncSubscribedProjectLabelsTask(Task):
+class SyncSubscribedRepositoryLabelsTask(Task):
     def __repr__(self):
-        return '<SyncSubscribedProjectLabelsTask>'
+        return '<SyncSubscribedRepositoryLabelsTask>'
 
     def __eq__(self, other):
         if other.__class__ == self.__class__:
@@ -341,35 +341,35 @@ class SyncSubscribedProjectLabelsTask(Task):
     def run(self, sync):
         app = sync.app
         with app.db.getSession() as session:
-            projects = session.getProjects(subscribed=True)
-        for p in projects:
-            sync.submitTask(SyncProjectLabelsTask(p.name, self.priority))
+            repositories = session.getRepositories(subscribed=True)
+        for p in repositories:
+            sync.submitTask(SyncRepositoryLabelsTask(p.name, self.priority))
 
-class SyncProjectLabelsTask(Task):
-    def __init__(self, project_name, priority=NORMAL_PRIORITY):
-        super(SyncProjectLabelsTask, self).__init__(priority)
-        self.project_name = project_name
+class SyncRepositoryLabelsTask(Task):
+    def __init__(self, repository_name, priority=NORMAL_PRIORITY):
+        super(SyncRepositoryLabelsTask, self).__init__(priority)
+        self.repository_name = repository_name
 
     def __repr__(self):
-        return '<SyncProjectLabelsTask %s>' % (self.project_name,)
+        return '<SyncRepositoryLabelsTask %s>' % (self.repository_name,)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
-            other.project_name == self.project_name):
+            other.repository_name == self.repository_name):
             return True
         return False
 
     def run(self, sync):
         app = sync.app
-        remote_labels = sync.get('repos/%s/labels' % (self.project_name,))
+        remote_labels = sync.get('repos/%s/labels' % (self.repository_name,))
         with app.db.getSession() as session:
-            project = session.getProjectByName(self.project_name)
+            repository = session.getRepositoryByName(self.repository_name)
 
             for remote_label in remote_labels:
                 label = session.getLabel(remote_label['id'])
                 if not label:
-                    self.log.info("Created label %s for project %s", remote_label['name'], project.name)
-                    project.createLabel(remote_label['id'], remote_label['name'],
+                    self.log.info("Created label %s for repository %s", remote_label['name'], repository.name)
+                    repository.createLabel(remote_label['id'], remote_label['name'],
                             remote_label['color'], remote_label['description'])
                 else:
                     label.name = remote_label['name']
@@ -378,14 +378,14 @@ class SyncProjectLabelsTask(Task):
 
             # Delete old labels
             remote_label_ids = [l['id'] for l in remote_labels]
-            for l in project.labels:
+            for l in repository.labels:
                 if l.id not in remote_label_ids:
                     self.log.info("Deleted label %s", l.name)
                     session.delete(l)
 
-class SyncSubscribedProjectsTask(Task):
+class SyncSubscribedRepositoriesTask(Task):
     def __repr__(self):
-        return '<SyncSubscribedProjectsTask>'
+        return '<SyncSubscribedRepositoriesTask>'
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__):
@@ -395,26 +395,26 @@ class SyncSubscribedProjectsTask(Task):
     def run(self, sync):
         app = sync.app
         with app.db.getSession() as session:
-            keys = [p.key for p in session.getProjects(subscribed=True)]
-        # Sync projects at most 10 at a time
+            keys = [p.key for p in session.getRepositories(subscribed=True)]
+        # Sync repositories at most 10 at a time
         for i in range(0, len(keys), 10):
-            t = SyncProjectTask(keys[i:i+10], self.priority)
+            t = SyncRepositoryTask(keys[i:i+10], self.priority)
             self.tasks.append(t)
             sync.submitTask(t)
 
-class SyncProjectTask(Task):
-    def __init__(self, project_keys, priority=NORMAL_PRIORITY):
-        super(SyncProjectTask, self).__init__(priority)
-        if type(project_keys) == int:
-            project_keys = [project_keys]
-        self.project_keys = project_keys
+class SyncRepositoryTask(Task):
+    def __init__(self, repository_keys, priority=NORMAL_PRIORITY):
+        super(SyncRepositoryTask, self).__init__(priority)
+        if type(repository_keys) == int:
+            repository_keys = [repository_keys]
+        self.repository_keys = repository_keys
 
     def __repr__(self):
-        return '<SyncProjectTask %s>' % (self.project_keys,)
+        return '<SyncRepositoryTask %s>' % (self.repository_keys,)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
-            other.project_keys == self.project_keys):
+            other.repository_keys == self.repository_keys):
             return True
         return False
 
@@ -425,20 +425,20 @@ class SyncProjectTask(Task):
         partial_sync = []
         sync_from = now
         with app.db.getSession() as session:
-            for project_key in self.project_keys:
-                project = session.getProject(project_key)
-                if project.updated:
-                    partial_sync.append(project.name)
+            for repository_key in self.repository_keys:
+                repository = session.getRepository(repository_key)
+                if repository.updated:
+                    partial_sync.append(repository.name)
                     # We can use the oldest sync time of the bunch, because we
-                    # sync projects individually when subscribing to them.
-                    if project.updated < sync_from:
-                        sync_from = project.updated
+                    # sync repositories individually when subscribing to them.
+                    if repository.updated < sync_from:
+                        sync_from = repository.updated
                 else:
-                    full_sync.append(project.name)
+                    full_sync.append(repository.name)
 
-        def sync_projects(projects, query):
-            for project_name in projects:
-                query += ' repo:%s' % project_name
+        def sync_repositories(repositories, query):
+            for repository_name in repositories:
+                query += ' repo:%s' % repository_name
             pull_requests = sync.query(query)
             pr_ids = [pr['pull_request']['url'].split('repos/')[1] for pr in pull_requests]
             with app.db.getSession() as session:
@@ -453,28 +453,28 @@ class SyncProjectTask(Task):
 
         if full_sync:
             query = 'type:pr state:open'
-            sync_projects(full_sync, query)
+            sync_repositories(full_sync, query)
 
         if partial_sync:
             # Allow 4 seconds for request time, etc.
             query = 'type:pr updated:>%s' % ((sync_from - datetime.timedelta(seconds=4)).replace(microsecond=0).isoformat(),)
-            sync_projects(partial_sync, query)
+            sync_repositories(partial_sync, query)
 
-        for key in self.project_keys:
-            sync.submitTask(SetProjectUpdatedTask(key, now, priority=self.priority))
+        for key in self.repository_keys:
+            sync.submitTask(SetRepositoryUpdatedTask(key, now, priority=self.priority))
 
-class SetProjectUpdatedTask(Task):
-    def __init__(self, project_key, updated, priority=NORMAL_PRIORITY):
-        super(SetProjectUpdatedTask, self).__init__(priority)
-        self.project_key = project_key
+class SetRepositoryUpdatedTask(Task):
+    def __init__(self, repository_key, updated, priority=NORMAL_PRIORITY):
+        super(SetRepositoryUpdatedTask, self).__init__(priority)
+        self.repository_key = repository_key
         self.updated = updated
 
     def __repr__(self):
-        return '<SetProjectUpdatedTask %s %s>' % (self.project_key, self.updated)
+        return '<SetRepositoryUpdatedTask %s %s>' % (self.repository_key, self.updated)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
-            other.project_key == self.project_key and
+            other.repository_key == self.repository_key and
             other.updated == self.updated):
             return True
         return False
@@ -482,8 +482,8 @@ class SetProjectUpdatedTask(Task):
     def run(self, sync):
         app = sync.app
         with app.db.getSession() as session:
-            project = session.getProject(self.project_key)
-            project.updated = self.updated
+            repository = session.getRepository(self.repository_key)
+            repository.updated = self.updated
 
 class SyncOutdatedPullRequestsTask(Task):
     def __init__(self, priority=NORMAL_PRIORITY):
@@ -618,12 +618,12 @@ class SyncPullRequestTask(Task):
         remote_issue_comments = sync.get(('repos/%s/comments?per_page=100'
                                           % self.pr_id).replace('/pulls/', '/issues/'))
 
-        project_name = remote_pr['base']['repo']['full_name']
+        repository_name = remote_pr['base']['repo']['full_name']
 
         # Get commit details
         for commit in remote_commits:
             remote_commit_details = sync.get('repos/%s/commits/%s'
-                    % (project_name, commit['sha']))
+                    % (repository_name, commit['sha']))
             commit['_hubtty_remote_commit_details'] = remote_commit_details
 
         # PR might have been rebased and no longer contain commits
@@ -631,11 +631,11 @@ class SyncPullRequestTask(Task):
             last_commit = remote_commits[-1]
             last_commit['_hubtty_checks'] = []
             remote_commit_status = sync.get(
-                    'repos/%s/commits/%s/status' % (project_name, last_commit['sha']))
+                    'repos/%s/commits/%s/status' % (repository_name, last_commit['sha']))
             for check in remote_commit_status['statuses']:
                 last_commit['_hubtty_checks'].append(self._checkResultFromStatus(check))
             remote_commit_check_runs = sync.get(
-                    'repos/%s/commits/%s/check-runs' % (project_name, last_commit['sha']))
+                    'repos/%s/commits/%s/check-runs' % (repository_name, last_commit['sha']))
             for check in remote_commit_check_runs['check_runs']:
                 last_commit['_hubtty_checks'].append(self._checkResultFromCheck(check))
 
@@ -649,39 +649,39 @@ class SyncPullRequestTask(Task):
                 account = session.getSystemAccount()
 
             if not pr:
-                project = session.getProjectByName(project_name)
-                if not project:
-                    self.log.debug("Project %s unknown while syncing pull request" % (project_name,))
-                    remote_project = sync.get('repos/%s' % (project_name,))
-                    if remote_project:
-                        project = session.createProject(
-                            remote_project['full_name'],
-                            description=remote_project.get('description', ''))
-                        self.log.info("Created project %s", project.name)
-                        self.results.append(ProjectAddedEvent(project))
-                        sync.submitTask(SyncProjectBranchesTask(project.name, self.priority))
-                        sync.submitTask(SyncProjectLabelsTask(project.name, self.priority))
+                repository = session.getRepositoryByName(repository_name)
+                if not repository:
+                    self.log.debug("Repository %s unknown while syncing pull request" % (repository_name,))
+                    remote_repository = sync.get('repos/%s' % (repository_name,))
+                    if remote_repository:
+                        repository = session.createRepository(
+                            remote_repository['full_name'],
+                            description=remote_repository.get('description', ''))
+                        self.log.info("Created repository %s", repository.name)
+                        self.results.append(RepositoryAddedEvent(repository))
+                        sync.submitTask(SyncRepositoryBranchesTask(repository.name, self.priority))
+                        sync.submitTask(SyncRepositoryLabelsTask(repository.name, self.priority))
                 created = dateutil.parser.parse(remote_pr['created_at'])
                 updated = dateutil.parser.parse(remote_pr['updated_at'])
-                pr = project.createPullRequest(remote_pr['id'], account,
-                                               remote_pr['number'],
-                                               remote_pr['base']['ref'],
-                                               self.pr_id,
-                                               remote_pr['title'],
-                                               (remote_pr.get('body','') or '').replace('\r',''),
-                                               created, updated,
-                                               remote_pr['state'],
-                                               remote_pr['additions'],
-                                               remote_pr['deletions'],
-                                               remote_pr['html_url'],
-                                               remote_pr['merged'],
-                                               (remote_pr['mergeable'] or False),
-                                               )
+                pr = repository.createPullRequest(remote_pr['id'], account,
+                                                  remote_pr['number'],
+                                                  remote_pr['base']['ref'],
+                                                  self.pr_id,
+                                                  remote_pr['title'],
+                                                  (remote_pr.get('body','') or '').replace('\r',''),
+                                                  created, updated,
+                                                  remote_pr['state'],
+                                                  remote_pr['additions'],
+                                                  remote_pr['deletions'],
+                                                  remote_pr['html_url'],
+                                                  remote_pr['merged'],
+                                                  (remote_pr['mergeable'] or False),
+                                                  )
                 self.log.info("Created new pull request %s in local DB.", pr.pr_id)
                 result = PullRequestAddedEvent(pr)
             else:
                 result = PullRequestUpdatedEvent(pr)
-            app.project_cache.clear(pr.project)
+            app.repository_cache.clear(pr.repository)
             self.results.append(result)
             pr.author = account
             if pr.state != remote_pr['state']:
@@ -711,11 +711,11 @@ class SyncPullRequestTask(Task):
                     self.log.info("Deleted commit %s", commit.sha)
                     session.delete(commit)
 
-            repo = gitrepo.get_repo(pr.project.name, app.config)
+            repo = gitrepo.get_repo(pr.repository.name, app.config)
             for remote_commit in remote_commits:
                 commit = pr.getCommitBySha(remote_commit['sha'])
                 # TODO: handle multiple parents
-                url = sync.app.config.git_url + pr.project.name
+                url = sync.app.config.git_url + pr.repository.name
                 ref = "pull/%s/head" % (pr.number,)
                 if (not commit) or self.force_fetch:
                     fetches[url].append('+%(ref)s:%(ref)s' % dict(ref=ref))
@@ -850,8 +850,8 @@ class SyncPullRequestTask(Task):
                     repo.fetch(url, ref)
 
 class CheckReposTask(Task):
-    # on startup, check all projects
-    #   for any subscribed project withot a local repo or if
+    # on startup, check all repositories
+    #   for any subscribed repository without a local repo or if
     #   --fetch-missing-refs is supplied, check all local pull requests for
     #   missing refs, and sync the associated pull requests
     def __repr__(self):
@@ -865,37 +865,37 @@ class CheckReposTask(Task):
     def run(self, sync):
         app = sync.app
         with app.db.getSession() as session:
-            projects = session.getProjects(subscribed=True)
-        for project in projects:
+            repositories = session.getRepositories(subscribed=True)
+        for repository in repositories:
             try:
                 missing = False
                 try:
-                    gitrepo.get_repo(project.name, app.config)
+                    gitrepo.get_repo(repository.name, app.config)
                 except gitrepo.GitCloneError:
                     missing = True
                 if missing or app.fetch_missing_refs:
                     sync.submitTask(
-                        CheckCommitsTask(project.key,
+                        CheckCommitsTask(repository.key,
                                            force_fetch=app.fetch_missing_refs,
                                            priority=LOW_PRIORITY)
                     )
             except Exception:
                 self.log.exception("Exception checking repo %s" %
-                                   (project.name,))
+                                   (repository.name,))
 
 class CheckCommitsTask(Task):
-    def __init__(self, project_key, force_fetch=False,
+    def __init__(self, repository_key, force_fetch=False,
                  priority=NORMAL_PRIORITY):
         super(CheckCommitsTask, self).__init__(priority)
-        self.project_key = project_key
+        self.repository_key = repository_key
         self.force_fetch = force_fetch
 
     def __repr__(self):
-        return '<CheckCommitsTask %s>' % (self.project_key,)
+        return '<CheckCommitsTask %s>' % (self.repository_key,)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
-            other.project_key == self.project_key):
+            other.repository_key == self.repository_key):
             return True
         return False
 
@@ -903,13 +903,13 @@ class CheckCommitsTask(Task):
         app = sync.app
         to_sync = set()
         with app.db.getSession() as session:
-            project = session.getProject(self.project_key)
+            repository = session.getRepository(self.repository_key)
             repo = None
             try:
-                repo = gitrepo.get_repo(project.name, app.config)
+                repo = gitrepo.get_repo(repository.name, app.config)
             except gitrepo.GitCloneError:
                 pass
-            for pr in project.open_prs:
+            for pr in repository.open_prs:
                 if repo:
                     for commit in pr.commits:
                         if repo.checkCommits([commit.parent, commit.sha]):
@@ -1193,12 +1193,12 @@ class PrunePullRequestTask(Task):
             pr = session.getPullRequest(self.key)
             if not pr:
                 return
-            repo = gitrepo.get_repo(pr.project.name, app.config)
+            repo = gitrepo.get_repo(pr.repository.name, app.config)
             self.log.info("Pruning %s pull request %s state:%s updated:%s" % (
-                pr.project.name, pr.number, pr.state, pr.updated))
+                pr.repository.name, pr.number, pr.state, pr.updated))
             pr_ref = "pull/%s/head" % (pr.number,)
             self.log.info("Deleting %s ref %s" % (
-                pr.project.name, pr_ref))
+                pr.repository.name, pr_ref))
             try:
                 repo.deleteRef(pr_ref)
             except OSError as e:
@@ -1239,10 +1239,10 @@ class Sync(object):
         if not disable_background_sync:
             self.submitTask(CheckReposTask(HIGH_PRIORITY))
             self.submitTask(UploadReviewsTask(HIGH_PRIORITY))
-            self.submitTask(SyncProjectListTask(HIGH_PRIORITY))
-            self.submitTask(SyncSubscribedProjectsTask(NORMAL_PRIORITY))
-            self.submitTask(SyncSubscribedProjectBranchesTask(LOW_PRIORITY))
-            self.submitTask(SyncSubscribedProjectLabelsTask(LOW_PRIORITY))
+            self.submitTask(SyncRepositoryListTask(HIGH_PRIORITY))
+            self.submitTask(SyncSubscribedRepositoriesTask(NORMAL_PRIORITY))
+            self.submitTask(SyncSubscribedRepositoryBranchesTask(LOW_PRIORITY))
+            self.submitTask(SyncSubscribedRepositoryLabelsTask(LOW_PRIORITY))
             self.submitTask(SyncOutdatedPullRequestsTask(LOW_PRIORITY))
             self.submitTask(PruneDatabaseTask(self.app.config.expire_age, LOW_PRIORITY))
             self.periodic_thread = threading.Thread(target=self.periodicSync)
@@ -1254,7 +1254,7 @@ class Sync(object):
         while True:
             try:
                 time.sleep(60)
-                self.syncSubscribedProjects()
+                self.syncSubscribedRepositories()
                 now = time.time()
                 if now-hourly > 3600:
                     hourly = now
@@ -1447,8 +1447,8 @@ class Sync(object):
         response_callback(r)
         self.log.debug('Received: %s' % (r.text,))
 
-    def syncSubscribedProjects(self):
-        task = SyncSubscribedProjectsTask(LOW_PRIORITY)
+    def syncSubscribedRepositories(self):
+        task = SyncSubscribedRepositoriesTask(LOW_PRIORITY)
         self.submitTask(task)
         if task.wait():
             for subtask in task.tasks:

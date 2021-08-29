@@ -8,10 +8,10 @@ As compared to the web interface, the main advantages are:
  * Workflow -- the interface is designed to support a workflow similar
    to reading network news or mail.  In particular, it is designed to
    deal with a large number of review requests across a large number
-   of projects.
+   of repositories.
 
  * Offline Use -- Hubtty syncs information about pull requests in subscribed
-   projects to a local database and local git repos.  All review
+   repositories to a local database and local git repos.  All review
    operations are performed against that database and then synced back
    to Github.
 

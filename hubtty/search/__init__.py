@@ -52,10 +52,10 @@ class SearchCompiler(object):
             raise Exception("Own account is unknown")
         result = self.parser.parse(data, lexer=self.lexer)
         tables = self.findTables(result)
-        if hubtty.db.project_table in tables:
-            result = and_(hubtty.db.pull_request_table.c.project_key == hubtty.db.project_table.c.key,
+        if hubtty.db.repository_table in tables:
+            result = and_(hubtty.db.pull_request_table.c.repository_key == hubtty.db.repository_table.c.key,
                           result)
-            tables.remove(hubtty.db.project_table)
+            tables.remove(hubtty.db.repository_table)
         if hubtty.db.account_table in tables:
             result = and_(hubtty.db.pull_request_table.c.account_key == hubtty.db.account_table.c.key,
                           result)

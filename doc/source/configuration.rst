@@ -258,7 +258,7 @@ Pull Request List Options
 +++++++++++++++++++++++++
 
 **pr-list-query**
-  This is the query used for the list of pull requests when a project is
+  This is the query used for the list of pull requests when a repository is
   selected.  The default is `state:open`.
 
 **pr-list-options**

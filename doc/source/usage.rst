@@ -8,9 +8,9 @@ which you may wish to add to your shell aliases.  Use ``hubtty
 --help`` to see a list of command line options available.
 
 Once Hubtty is running, you will need to start by subscribing to some
-projects.  Use 'L' to list all of the projects and then 's' to
+repositories.  Use 'L' to list all of the repositories and then 's' to
 subscribe to the ones you are interested in.  Hit 'L' again to shrink
-the list to your subscribed projects.
+the list to your subscribed repositories.
 
 In general, pressing the F1 key will show help text on any screen, and
 ESC will take you to the previous screen.
@@ -26,7 +26,7 @@ The status bar at the top of the screen displays the current number of
 outstanding tasks that Hubtty must perform in order to be fully up to
 date.  Some of these tasks are more complicated than others, and some
 of them will end up creating new tasks (for instance, one task may be
-to search for new pull requests in a project which will then produce
+to search for new pull requests in a repository which will then produce
 5 new tasks if there are 5 new pull requests).
 
 If Hubtty is offline, it will so indicate in the status bar.  It will

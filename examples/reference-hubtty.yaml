@@ -151,7 +151,7 @@ commentlinks:
 #          text: "{id}"
 #          query: "pr:{id}"
 
-# This is the query used for the list of pull-requests when a project is
+# This is the query used for the list of pull-requests when a repository is
 # selected.  The default is "state:open".
 # pr-list-query: "state:open"
 

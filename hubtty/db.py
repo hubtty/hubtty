@@ -32,8 +32,8 @@ from sqlalchemy.sql.expression import and_
 from hubtty import sync
 
 metadata = MetaData()
-project_table = Table(
-    'project', metadata,
+repository_table = Table(
+    'repository', metadata,
     Column('key', Integer, primary_key=True),
     Column('name', String(255), index=True, unique=True, nullable=False),
     Column('subscribed', Boolean, index=True, default=False),
@@ -44,7 +44,7 @@ project_table = Table(
 branch_table = Table(
     'branch', metadata,
     Column('key', Integer, primary_key=True),
-    Column('project_key', Integer, ForeignKey("project.key"), index=True),
+    Column('repository_key', Integer, ForeignKey("repository.key"), index=True),
     Column('name', String(255), index=True, nullable=False),
     )
 topic_table = Table(
@@ -53,10 +53,10 @@ topic_table = Table(
     Column('name', String(255), index=True, nullable=False),
     Column('sequence', Integer, index=True, unique=True, nullable=False),
     )
-project_topic_table = Table(
-    'project_topic', metadata,
+repository_topic_table = Table(
+    'repository_topic', metadata,
     Column('key', Integer, primary_key=True),
-    Column('project_key', Integer, ForeignKey("project.key"), index=True),
+    Column('repository_key', Integer, ForeignKey("repository.key"), index=True),
     Column('topic_key', Integer, ForeignKey("topic.key"), index=True),
     Column('sequence', Integer, nullable=False),
     UniqueConstraint('topic_key', 'sequence', name='topic_key_sequence_const'),
@@ -64,7 +64,7 @@ project_topic_table = Table(
 pull_request_table = Table(
     'pull_request', metadata,
     Column('key', Integer, primary_key=True),
-    Column('project_key', Integer, ForeignKey("project.key"), index=True),
+    Column('repository_key', Integer, ForeignKey("repository.key"), index=True),
     Column('id', Integer, index=True, unique=True, nullable=False),
     Column('number', Integer, index=True, nullable=False),
     Column('branch', String(255), index=True, nullable=False),
@@ -188,7 +188,7 @@ check_table = Table(
 label_table = Table(
     'label', metadata,
     Column('key', Integer, primary_key=True),
-    Column('project_key', Integer, ForeignKey("project.key"), index=True),
+    Column('repository_key', Integer, ForeignKey("repository.key"), index=True),
     Column('id', Integer, nullable=False, index=True),
     Column('name', String(length=255), nullable=False),
     Column('color', String(length=8), nullable=False),
@@ -210,7 +210,7 @@ class Account(object):
         self.username = username
         self.email = email
 
-class Project(object):
+class Repository(object):
     def __init__(self, name, subscribed=False, description='', can_push=False):
         self.name = name
         self.subscribed = subscribed
@@ -245,13 +245,13 @@ class Project(object):
         return l
 
 class Branch(object):
-    def __init__(self, project, name):
-        self.project_key = project.key
+    def __init__(self, repository, name):
+        self.repository_key = repository.key
         self.name = name
 
-class ProjectTopic(object):
-    def __init__(self, project, topic, sequence):
-        self.project_key = project.key
+class RepositoryTopic(object):
+    def __init__(self, repository, topic, sequence):
+        self.repository_key = repository.key
         self.topic_key = topic.key
         self.sequence = sequence
 
@@ -260,27 +260,27 @@ class Topic(object):
         self.name = name
         self.sequence = sequence
 
-    def addProject(self, project):
+    def addRepository(self, repository):
         session = Session.object_session(self)
-        seq = max([x.sequence for x in self.project_topics] + [0])
-        pt = ProjectTopic(project, self, seq+1)
-        self.project_topics.append(pt)
-        self.projects.append(project)
-        session.add(pt)
+        seq = max([x.sequence for x in self.repository_topics] + [0])
+        rt = RepositoryTopic(repository, self, seq+1)
+        self.repository_topics.append(rt)
+        self.repositories.append(repository)
+        session.add(rt)
         session.flush()
 
-    def removeProject(self, project):
+    def removeRepository(self, repository):
         session = Session.object_session(self)
-        for pt in self.project_topics:
-            if pt.project_key == project.key:
-                self.project_topics.remove(pt)
-                session.delete(pt)
-        self.projects.remove(project)
+        for rt in self.repository_topics:
+            if rt.repository_key == repository.key:
+                self.repository_topics.remove(rt)
+                session.delete(rt)
+        self.repositories.remove(repository)
         session.flush()
 
 class Label(object):
-    def __init__(self, project, id, name, color, description=None):
-        self.project_key = project.key
+    def __init__(self, repository, id, name, color, description=None):
+        self.repository_key = repository.key
         self.id = id
         self.name = name
         self.color = color
@@ -292,13 +292,13 @@ class PullRequestLabel(object):
         self.label_key = label.key
 
 class PullRequest(object):
-    def __init__(self, project, id, author, number, branch, pr_id,
+    def __init__(self, repository, id, author, number, branch, pr_id,
                  title, body, created, updated, state, additions, deletions,
                  html_url, merged, mergeable, hidden=False, reviewed=False,
                  starred=False, held=False, pending_rebase=False,
                  pending_edit=False, pending_edit_message=None,
                  pending_labels=False, outdated=False):
-        self.project_key = project.key
+        self.repository_key = repository.key
         self.account_key = author.key
         self.id = id
         self.number = number
@@ -401,7 +401,7 @@ class PullRequest(object):
         return len(self.commits) > 0
 
     def canMerge(self):
-        return self.mergeable and self.project.can_push
+        return self.mergeable and self.repository.can_push
 
     @property
     def author_name(self):
@@ -592,40 +592,40 @@ class Check(object):
         self.updated = updated
 
 mapper(Account, account_table)
-mapper(Project, project_table, properties=dict(
-    branches=relationship(Branch, backref='project',
+mapper(Repository, repository_table, properties=dict(
+    branches=relationship(Branch, backref='repository',
                           order_by=branch_table.c.name,
                           cascade='all, delete-orphan'),
-    pull_requests=relationship(PullRequest, backref='project',
+    pull_requests=relationship(PullRequest, backref='repository',
                          order_by=pull_request_table.c.number,
                          cascade='all, delete-orphan'),
-    labels=relationship(Label, backref='project',
+    labels=relationship(Label, backref='repository',
                           order_by=label_table.c.name,
                           cascade='all, delete-orphan'),
     topics=relationship(Topic,
-                        secondary=project_topic_table,
+                        secondary=repository_topic_table,
                         order_by=topic_table.c.name,
                         viewonly=True),
     unreviewed_prs=relationship(PullRequest,
-                                primaryjoin=and_(project_table.c.key==pull_request_table.c.project_key,
+                                primaryjoin=and_(repository_table.c.key==pull_request_table.c.repository_key,
                                                  pull_request_table.c.hidden==False,
                                                  pull_request_table.c.state=='open',
                                                  pull_request_table.c.reviewed==False),
                                 order_by=pull_request_table.c.number),
     open_prs=relationship(PullRequest,
-                          primaryjoin=and_(project_table.c.key==pull_request_table.c.project_key,
+                          primaryjoin=and_(repository_table.c.key==pull_request_table.c.repository_key,
                                            pull_request_table.c.state=='open'),
                           order_by=pull_request_table.c.number),
 ))
 mapper(Branch, branch_table)
 mapper(Topic, topic_table, properties=dict(
-    projects=relationship(Project,
-                          secondary=project_topic_table,
-                          order_by=project_table.c.name,
+    repositories=relationship(Repository,
+                          secondary=repository_topic_table,
+                          order_by=repository_table.c.name,
                           viewonly=True),
-    project_topics=relationship(ProjectTopic),
+    repository_topics=relationship(RepositoryTopic),
 ))
-mapper(ProjectTopic, project_topic_table)
+mapper(RepositoryTopic, repository_topic_table)
 mapper(PullRequest, pull_request_table, properties=dict(
         author=relationship(Account),
         commits=relationship(Commit, backref='pull_request',
@@ -735,7 +735,7 @@ class Database(object):
         current_rev = context.get_current_revision()
         self.log.debug('Current migration revision: %s' % current_rev)
 
-        has_table = self.engine.dialect.has_table(conn, "project")
+        has_table = self.engine.dialect.has_table(conn, "repository")
 
         config = alembic.config.Config()
         config.set_main_option("script_location", "hubtty:alembic")
@@ -781,35 +781,35 @@ class DatabaseSession(object):
     def vacuum(self):
         self.session().execute("VACUUM")
 
-    def getProjects(self, subscribed=False, unreviewed=False, topicless=False):
-        """Retrieve projects.
+    def getRepositories(self, subscribed=False, unreviewed=False, topicless=False):
+        """Retrieve repositories.
 
-        :param subscribed: If True limit to only subscribed projects.
-        :param unreviewed: If True limit to only projects with unreviewed
+        :param subscribed: If True limit to only subscribed repositories.
+        :param unreviewed: If True limit to only repositories with unreviewed
             pull requests.
-        :param topicless: If True limit to only projects without topics.
+        :param topicless: If True limit to only repositories without topics.
         """
-        query = self.session().query(Project)
+        query = self.session().query(Repository)
         if subscribed:
             query = query.filter_by(subscribed=subscribed)
             if unreviewed:
-                query = query.filter(exists().where(Project.unreviewed_prs))
+                query = query.filter(exists().where(Repository.unreviewed_prs))
         if topicless:
             query = query.filter_by(topics=None)
-        return query.order_by(Project.name).all()
+        return query.order_by(Repository.name).all()
 
     def getTopics(self):
         return self.session().query(Topic).order_by(Topic.sequence).all()
 
-    def getProject(self, key):
+    def getRepository(self, key):
         try:
-            return self.session().query(Project).filter_by(key=key).one()
+            return self.session().query(Repository).filter_by(key=key).one()
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
-    def getProjectByName(self, name):
+    def getRepositoryByName(self, name):
         try:
-            return self.session().query(Project).filter_by(name=name).one()
+            return self.session().query(Repository).filter_by(name=name).one()
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
@@ -875,9 +875,9 @@ class DatabaseSession(object):
                 q = q.order_by(pull_request_table.c.last_seen)
             elif s == 'number':
                 q = q.order_by(pull_request_table.c.number)
-            elif s == 'project':
-                q = q.filter(project_table.c.key == pull_request_table.c.project_key)
-                q = q.order_by(project_table.c.name)
+            elif s == 'repository':
+                q = q.filter(repository_table.c.key == pull_request_table.c.repository_key)
+                q = q.order_by(repository_table.c.name)
         self.database.log.debug("Search SQL: %s" % q)
         try:
             validPullRequests = []
@@ -1025,8 +1025,8 @@ class DatabaseSession(object):
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
-    def createProject(self, *args, **kw):
-        o = Project(*args, **kw)
+    def createRepository(self, *args, **kw):
+        o = Repository(*args, **kw)
         self.session().add(o)
         self.session().flush()
         return o

@@ -55,7 +55,7 @@ class ConfigSchema(object):
 
     servers = [server]
 
-    _sort_by = v.Any('number', 'updated', 'last-seen', 'project')
+    _sort_by = v.Any('number', 'updated', 'last-seen', 'repository')
     sort_by = v.Any(_sort_by, [_sort_by])
 
     text_replacement = {'text': v.Any(str,
@@ -208,7 +208,7 @@ class Config(object):
                                 text="{url}",
                                 url="{url}"))])))
 
-        self.project_pr_list_query = self.config.get('pr-list-query', 'state:open')
+        self.repository_pr_list_query = self.config.get('pr-list-query', 'state:open')
 
         self.diff_view = self.config.get('diff-view', 'side-by-side')
 

@@ -56,7 +56,7 @@ class EditLabelsDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         self.labels_checkboxes = []
 
         rows.append(urwid.Text(u"Labels:"))
-        for label in pr.project.labels:
+        for label in pr.repository.labels:
             b = mywid.FixedCheckBox(label.name, state=(label in pr.labels))
             rows.append(b)
             self.labels_checkboxes.append(b)
@@ -287,7 +287,7 @@ class CommitRow(urwid.WidgetWrap):
         self.app = app
         self.pr_view = pr_view
         self.commit_key = commit.key
-        self.project_name = commit.pull_request.project.name
+        self.repository_name = commit.pull_request.repository.name
         self.commit_sha = commit.sha
         self.can_merge = commit.pull_request.canMerge()
         self.title = mywid.TextButton(u'', on_press = self.expandContract)
@@ -359,10 +359,10 @@ class CommitRow(urwid.WidgetWrap):
         self.pr_view.diff(self.commit_key)
 
     def checkout(self, button):
-        self.app.localCheckoutCommit(self.project_name, self.commit_sha)
+        self.app.localCheckoutCommit(self.repository_name, self.commit_sha)
 
     def cherryPick(self, button):
-        self.app.localCherryPickCommit(self.project_name, self.commit_sha)
+        self.app.localCherryPickCommit(self.repository_name, self.commit_sha)
 
 class PullRequestButton(urwid.Button):
     button_left = urwid.Text(u' ')
@@ -577,7 +577,7 @@ class PullRequestView(urwid.WidgetWrap):
         self.hide_comments = True
         self.marked_seen = False
         self.author_label = mywid.TextButton(u'', on_press=self.searchAuthor)
-        self.project_label = mywid.TextButton(u'', on_press=self.searchProject)
+        self.repository_label = mywid.TextButton(u'', on_press=self.searchRepository)
         self.branch_label = urwid.Text(u'', wrap='clip')
         self.labels_label = mywid.HyperText(u'')
         self.created_label = urwid.Text(u'', wrap='clip')
@@ -589,7 +589,7 @@ class PullRequestView(urwid.WidgetWrap):
         for l, v in [("Author", urwid.Padding(urwid.AttrMap(self.author_label, None,
                                                            focus_map=pr_info_map),
                                              width='pack')),
-                     ("Project", urwid.Padding(urwid.AttrMap(self.project_label, None,
+                     ("Repository", urwid.Padding(urwid.AttrMap(self.repository_label, None,
                                                            focus_map=pr_info_map),
                                              width='pack')),
                      ("Branch", self.branch_label),
@@ -638,13 +638,13 @@ class PullRequestView(urwid.WidgetWrap):
         shas = set()
         with self.app.db.getSession() as session:
             pr = session.getPullRequest(self.pr_key)
-            pr_project_name = pr.project.name
+            pr_repository_name = pr.repository.name
             pr_number = pr.number
             pr_id = pr.pr_id
             for commit in pr.commits:
                 shas.add(commit.parent)
                 shas.add(commit.sha)
-        repo = gitrepo.get_repo(pr_project_name, self.app.config)
+        repo = gitrepo.get_repo(pr_repository_name, self.app.config)
         missing_commits = repo.checkCommits(shas)
         if missing_commits:
             if self.app.sync.offline:
@@ -689,8 +689,8 @@ class PullRequestView(urwid.WidgetWrap):
             self.title = '%sPull request %s%s%s%s' % (starred, pr.number, reviewed,
                                                 hidden, held)
             self.app.status.update(title=self.title)
-            self.project_key = pr.project.key
-            self.project_name = pr.project.name
+            self.repository_key = pr.repository.key
+            self.repository_name = pr.repository.name
             self.pr_rest_id = pr.pr_id
             if pr.author:
                 self.author_login = pr.author.username
@@ -703,7 +703,7 @@ class PullRequestView(urwid.WidgetWrap):
             else:
                 author_string = pr.author_name
             self.author_label.text.set_text(('pr-data', author_string))
-            self.project_label.text.set_text(('pr-data', pr.project.name))
+            self.repository_label.text.set_text(('pr-data', pr.repository.name))
             self.branch_label.set_text(('pr-data', pr.branch))
             label_buttons = []
             for x in pr.labels:
@@ -765,7 +765,7 @@ class PullRequestView(urwid.WidgetWrap):
 
             # self.refreshDependencies(session, pr)
 
-            repo = gitrepo.get_repo(pr.project.name, self.app.config)
+            repo = gitrepo.get_repo(pr.repository.name, self.app.config)
             # The listbox has both commits and messages in it (and
             # may later contain the vote table and pull request header), so
             # keep track of the index separate from the loop.
@@ -927,19 +927,19 @@ class PullRequestView(urwid.WidgetWrap):
         with self.app.db.getSession() as session:
             pr = session.getPullRequest(self.pr_key)
             pr.reviewed = not pr.reviewed
-            self.app.project_cache.clear(pr.project)
+            self.app.repository_cache.clear(pr.repository)
 
     def toggleHidden(self):
         with self.app.db.getSession() as session:
             pr = session.getPullRequest(self.pr_key)
             pr.hidden = not pr.hidden
-            self.app.project_cache.clear(pr.project)
+            self.app.repository_cache.clear(pr.repository)
 
     def toggleStarred(self):
         with self.app.db.getSession() as session:
             pr = session.getPullRequest(self.pr_key)
             pr.starred = not pr.starred
-            self.app.project_cache.clear(pr.project)
+            self.app.repository_cache.clear(pr.repository)
 
     def toggleHeld(self):
         return self.app.toggleHeldPullRequest(self.pr_key)
@@ -1168,7 +1168,7 @@ class PullRequestView(urwid.WidgetWrap):
             labels_to_set = [ cb.label for cb in dialog.labels_checkboxes if cb.state ]
             with self.app.db.getSession() as session:
                 pr = session.getPullRequest(self.pr_key)
-                for label in pr.project.labels:
+                for label in pr.repository.labels:
                     if label.name in labels_to_set and label not in pr.labels:
                         pr.addLabel(label)
                     if label.name not in labels_to_set and label in pr.labels:
@@ -1187,11 +1187,11 @@ class PullRequestView(urwid.WidgetWrap):
         if self.author_login:
             self.app.doSearch("state:open author:%s" % (self.author_login,))
 
-    def searchProject(self, widget):
-        self.app.doSearch("state:open repo:%s" % (self.project_name,))
+    def searchRepository(self, widget):
+        self.app.doSearch("state:open repo:%s" % (self.repository_name,))
 
     def searchLabel(self, name):
-        self.app.doSearch("state:open repo:%s label:%s" % (self.project_name, name,))
+        self.app.doSearch("state:open repo:%s label:%s" % (self.repository_name, name,))
 
     def reviewKey(self, reviewkey):
         approval = reviewkey.get('approval', 'COMMENT')
