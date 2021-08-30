@@ -11,7 +11,7 @@ servers:
     # url: https://github.com/
     # api-url: https://api.github.com/
     # additional-repositories:
-    #   - mandre/hubtty
+    #   - hubtty/hubtty
 
 # Each server section can have the following fields:
 # A name that describes the server, to reference on the command line. [required]
@@ -49,7 +49,7 @@ servers:
 # permission.  You can add extra repositories to this list using the
 # additional-repositories. Example:
 #    additional-repositories:
-#      - mandre/hubtty
+#      - hubtty/hubtty
 
 # Hubtty comes with two palettes defined internally.  The default
 # palette is suitable for use on a terminal with a dark background.
