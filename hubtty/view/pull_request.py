@@ -830,7 +830,7 @@ class PullRequestView(urwid.WidgetWrap):
             self._updateTestResults(pr, result_systems)
 
     def _add_link(self, name, url):
-        link = mywid.Link('{:<42}'.format(name), 'link', 'focused-link')
+        link = mywid.Link('{:<40}'.format(name[:38] + (name[38:] and '…')), 'link', 'focused-link')
         if url:
             urwid.connect_signal(link, 'selected', lambda link:self.app.openURL(url))
         return link
@@ -848,7 +848,7 @@ class PullRequestView(urwid.WidgetWrap):
                 continue
             # link check name/url, color result, in time
             color = 'check-%s' % check.state
-            result = (color, check.message)
+            result = (color, check.message[:39] + (check.message[39:] and '…'))
             line = [self._add_link(check.name, check.url), result]
             if check.finished and check.started:
                 line.append(' in %s' % (check.finished-check.started))
