@@ -100,11 +100,11 @@ def SearchTokenizer():
         return t
 
     def t_DATE(t):
-        r'\d{4}(-\d\d(-\d\d(T\d\d:\d\d(:\d\d)?(\.\d+)?(([+-]\d\d:\d\d)|Z)?)?)?)?'
+        r'\d{4}-\d\d(-\d\d(T\d\d:\d\d(:\d\d)?(\.\d+)?(([+-]\d\d:\d\d)|Z)?)?)?'
         return t
 
     def t_DATECOMP(t):
-        r'[<>]=?\d{4}(-\d\d(-\d\d(T\d\d:\d\d(:\d\d)?(\.\d+)?(([+-]\d\d:\d\d)|Z)?)?)?)?'
+        r'[<>]=?\d{4}-\d\d(-\d\d(T\d\d:\d\d(:\d\d)?(\.\d+)?(([+-]\d\d:\d\d)|Z)?)?)?'
         return t
 
     def t_AND(t):
