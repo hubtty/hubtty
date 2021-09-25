@@ -468,7 +468,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             pr = session.getPullRequest(self.pr_key)
             commit = session.getCommit(self.new_commit_key)
 
-            message = commit.getPendingMessage()
+            message = commit.getDraftMessage()
             if not message:
                 message = pr.createMessage(commit.key, None, account,
                                            datetime.datetime.utcnow(),

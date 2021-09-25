@@ -116,9 +116,7 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                         b = urwid.AttrMap(b, 'negative-label')
                     rows.append(b)
                 rows.append(urwid.Divider())
-            m = commit.getPendingMessage()
-            if not m:
-                m = commit.getDraftMessage()
+            m = commit.getDraftMessage()
             if m:
                 message = m.message
         self.message = mywid.MyEdit(u"Message: \n", edit_text=message,
