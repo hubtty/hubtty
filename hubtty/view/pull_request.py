@@ -257,16 +257,16 @@ class ReviewButton(mywid.FixedButton):
                                    self.commit_row.commit_key,
                                    message=message)
         urwid.connect_signal(self.dialog, 'save',
-            lambda button: self.closeReview(True, False))
+            lambda button: self.closeReview(upload=True, merge=False))
         urwid.connect_signal(self.dialog, 'merge',
-            lambda button: self.closeReview(True, True))
+            lambda button: self.closeReview(upload=True, merge=True))
         urwid.connect_signal(self.dialog, 'cancel',
-            lambda button: self.closeReview(False, False))
+            lambda button: self.closeReview(upload=False, merge=False))
         self.pr_view.app.popup(self.dialog,
                                relative_width=50, relative_height=75,
                                min_width=60, min_height=20)
 
-    def closeReview(self, upload, merge):
+    def closeReview(self, upload=False, merge=False):
         approval, message = self.dialog.getValues()
         self.pr_view.saveReview(self.commit_row.commit_key, approval,
                                     message, upload, False)
