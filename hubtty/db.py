@@ -449,11 +449,11 @@ class Commit(object):
                 self._file_cache[f.path] = f
         return self._file_cache.get(path, None)
 
-    def getPendingMessage(self):
+    def hasPendingMessage(self):
         for m in self.messages:
             if m.pending:
-                return m
-        return None
+                return True
+        return False
 
     def getDraftMessage(self):
         for m in self.messages:
