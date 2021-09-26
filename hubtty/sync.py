@@ -808,7 +808,7 @@ class SyncPullRequestTask(Task):
                 if not comment:
                     created = dateutil.parser.parse(remote_comment['created_at'])
                     parent = False
-                    if remote_comment.get('side', '') == 'PARENT':
+                    if remote_comment.get('side', '') == 'LEFT':
                         parent = True
                     message = session.getMessageByID(remote_comment['pull_request_review_id'])
 
@@ -1104,7 +1104,7 @@ class UploadReviewTask(Task):
                                  line=comment.line,
                                  body=comment.message)
                         if comment.parent:
-                            d['side'] = 'PARENT'
+                            d['side'] = 'LEFT'
                         comments.append(d)
                         session.delete(comment)
             if comments:
