@@ -466,11 +466,12 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         with self.app.db.getSession() as session:
             account = session.getOwnAccount()
             pr = session.getPullRequest(self.pr_key)
+            latest_pr_commit = pr.commits[-1]
             commit = session.getCommit(self.new_commit_key)
 
-            message = commit.getDraftMessage()
+            message = latest_pr_commit.getDraftMessage()
             if not message:
-                message = pr.createMessage(commit.key, None, account,
+                message = pr.createMessage(latest_pr_commit.key, None, account,
                                            datetime.datetime.utcnow(),
                                            '', draft=True)
             comment = message.createComment(file_key, None, account, None,
