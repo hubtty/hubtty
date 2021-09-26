@@ -395,6 +395,9 @@ class PullRequest(object):
         self.labels.remove(label)
         session.flush()
 
+    def hasPendingMessage(self):
+        return self.isValid() and self.commits[-1].hasPendingMessage()
+
     def isValid(self):
         # This might happen when the sync was partial, i.e. we hit rate limit
         # or the connection dropped

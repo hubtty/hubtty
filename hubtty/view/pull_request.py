@@ -335,7 +335,7 @@ class CommitRow(urwid.WidgetWrap):
                 ('commit-name', ' %s' % commit.message.split('\n')[0])]
         num_drafts = sum([len(f.draft_comments) for f in commit.files])
         if num_drafts:
-            if not commit.hasPendingMessage():
+            if not commit.pull_request.hasPendingMessage():
                 line.append(('commit-drafts', ' (%s draft%s)' % (
                             num_drafts, num_drafts>1 and 's' or '')))
         num_comments = sum([len(f.current_comments) for f in commit.files]) - num_drafts
@@ -725,7 +725,7 @@ class PullRequestView(urwid.WidgetWrap):
                 approval_headers.append(urwid.Text(('table-header', state)))
             votes = mywid.Table(approval_headers)
             approvals_for_account = {}
-            pending_message = pr.commits[-1].hasPendingMessage()
+            pending_message = pr.hasPendingMessage()
             for approval in pr.approvals:
                 # Don't display draft approvals unless they are pending-upload
                 if approval.draft and not pending_message:
