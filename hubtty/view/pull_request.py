@@ -829,7 +829,7 @@ class PullRequestView(urwid.WidgetWrap):
                     self.message_rows[message.key] = row
                 else:
                     unseen_keys.remove(message.key)
-                    if message.created != row.original_widget.message_created:
+                    if message.draft or message.created != row.original_widget.message_created:
                         row.original_widget.refresh(pr, message)
                 listbox_index += 1
             # Remove any messages that should not be displayed
