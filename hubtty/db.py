@@ -632,6 +632,7 @@ mapper(RepositoryTopic, repository_topic_table)
 mapper(PullRequest, pull_request_table, properties=dict(
         author=relationship(Account),
         commits=relationship(Commit, backref='pull_request',
+                             order_by=commit_table.c.key,
                              cascade='all, delete-orphan'),
         messages=relationship(Message, backref='pull_request',
                               order_by=message_table.c.created,
