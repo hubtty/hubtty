@@ -1084,37 +1084,51 @@ class UploadReviewTask(Task):
         pr_id = None
         with app.db.getSession() as session:
             message = session.getMessage(self.message_key)
-            commit = message.commit
             pr = message.commit.pull_request
             if pr.held:
                 self.log.debug("Not uploading review to %s because it is held" %
                                (pr.pr_id,))
                 return
             pr_id = pr.pr_id
-            current_commit = pr.commits[-1]
-            data = dict(commit_id=current_commit.sha,
-                        body=message.message)
-            if commit == current_commit:
-                for approval in pr.draft_approvals:
-                    data['event'] = approval.state
-                    session.delete(approval)
-            comments = []
-            for file in commit.files:
-                if file.draft_comments:
-                    for comment in file.draft_comments:
-                        d = dict(path=file.path,
-                                 line=comment.line,
-                                 body=comment.message)
-                        if comment.parent:
-                            d['side'] = 'LEFT'
-                        comments.append(d)
-                        session.delete(comment)
-            if comments:
-                data['comments'] = comments
+
+            # Create one review per commit that has comments. Not ideal but
+            # better than nothing. I wished it was possible to post only one
+            # review.
+            # However, github UI allows to post comments to different commits
+            # in the same review so it might be possible somehow.
+            last_commit = message.commit
+            event = "COMMENT"
+            for approval in pr.draft_approvals:
+                event = approval.state
+                session.delete(approval)
+
+            for commit in pr.commits:
+                data = dict(commit_id=commit.sha,
+                            body='',
+                            event=event)
+                if commit == last_commit:
+                    data['body'] = message.message
+                comments = []
+                for file in commit.files:
+                    if file.draft_comments:
+                        for comment in file.draft_comments:
+                            # TODO(mandre) add ability to reply to a comment
+                            d = dict(path=file.path,
+                                    line=comment.line,
+                                    body=comment.message)
+                            if comment.parent:
+                                d['side'] = 'LEFT'
+                            comments.append(d)
+                            session.delete(comment)
+                if comments:
+                    data['comments'] = comments
+                if comments or commit == last_commit:
+                    # Inside db session for rollback
+                    sync.post('repos/%s/reviews' % (pr_id,), data)
+                if commit == last_commit:
+                    break
+
             session.delete(message)
-            # Inside db session for rollback
-            sync.post('repos/%s/reviews' % (pr_id,),
-                      data)
         sync.submitTask(SyncPullRequestTask(pr_id, priority=self.priority))
 
 class SendMergeTask(Task):
