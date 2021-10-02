@@ -805,6 +805,7 @@ class App(object):
         existing_approval = session.getApproval(pr, account, commit.sha)
         if existing_approval:
             existing_approval.draft = True
+            existing_approval.state = approval
         else:
             pr.createApproval(account, approval, commit.sha, draft=True)
 

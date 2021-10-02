@@ -782,7 +782,9 @@ class SyncPullRequestTask(Task):
                 if review_state:
                     approval = session.getApproval(pr, account, remote_review.get('commit_id'))
                     if approval:
-                        approval.state = review_state
+                        # Only update approval if it hasn't been changed locally
+                        if not approval.draft:
+                            approval.state = review_state
                     else:
                         pr.createApproval(account, review_state, remote_review.get('commit_id'))
                         self.log.info("Created new approval for %s from %s commit %s.", pr.pr_id, account.username, remote_review.get('commit_id'))
