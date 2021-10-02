@@ -126,7 +126,10 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                 rows.append(urwid.Divider())
             m = commit.getDraftMessage()
             if m:
-                message = m.message
+                if message:
+                    message = message + "\n" + m.message
+                else:
+                    message = m.message
         self.message = mywid.MyEdit(u"Message: \n", edit_text=message,
                                     multiline=True, ring=app.ring)
         rows.append(self.message)
