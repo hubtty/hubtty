@@ -100,10 +100,18 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             if commit == pr.commits[-1]:
                 current = None
                 for approval in pr.approvals:
+                    if approval.sha != commit.sha:
+                        continue
                     if self.app.isOwnAccount(approval.reviewer):
                         current = approval.state
+                        if current == 'APPROVED':
+                            current = 'APPROVE'
+                        elif current == 'CHANGES_REQUESTED':
+                            current = 'REQUEST_CHANGES'
+                        elif current == 'COMMENTED':
+                            current = 'COMMENT'
                         break
-                if current is None:
+                if current is None or current == '':
                     current = 'COMMENT'
 
                 rows.append(urwid.Text('Review changes:'))
