@@ -735,9 +735,6 @@ class PullRequestView(urwid.WidgetWrap):
             approvals_for_account = {}
             pending_message = pr.hasPendingMessage()
             for approval in pr.approvals:
-                # Don't display draft approvals unless they are pending-upload
-                if approval.draft and not pending_message:
-                    continue
                 approvals = approvals_for_account.get(approval.reviewer.id)
                 if not approvals:
                     approvals = {}
@@ -756,11 +753,20 @@ class PullRequestView(urwid.WidgetWrap):
                 # Only set approval status if the review is for the current commit
                 if approval.sha == pr.commits[-1].sha:
                     if approval.state in ['APPROVED', 'APPROVE']:
-                        approvals['Approved'].set_text(('positive-label', '✓'))
+                        text = '✓'
+                        if approval.state == 'APPROVE' and not pending_message:
+                            text = '(' + text + ')'
+                        approvals['Approved'].set_text(('positive-label', text))
                     elif approval.state in ['CHANGES_REQUESTED', 'REQUEST_CHANGES']:
-                        approvals['Changes Requested'].set_text(('negative-label', '✗'))
+                        text = '✗'
+                        if approval.state == 'REQUEST_CHANGES' and not pending_message:
+                            text = '(' + text + ')'
+                        approvals['Changes Requested'].set_text(('negative-label', text))
                     else:
-                        approvals['Comment'].set_text('•')
+                        text = '•'
+                        if approval.state == 'COMMENT' and not pending_message:
+                            text = '(' + text + ')'
+                        approvals['Comment'].set_text(text)
             votes = urwid.Padding(votes, width='pack')
 
             # TODO: update the existing table rather than replacing it
