@@ -100,10 +100,18 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             if commit == pr.commits[-1]:
                 current = None
                 for approval in pr.approvals:
+                    if approval.sha != commit.sha:
+                        continue
                     if self.app.isOwnAccount(approval.reviewer):
                         current = approval.state
+                        if current == 'APPROVED':
+                            current = 'APPROVE'
+                        elif current == 'CHANGES_REQUESTED':
+                            current = 'REQUEST_CHANGES'
+                        elif current == 'COMMENTED':
+                            current = 'COMMENT'
                         break
-                if current is None:
+                if current is None or current == '':
                     current = 'COMMENT'
 
                 rows.append(urwid.Text('Review changes:'))
@@ -116,11 +124,12 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                         b = urwid.AttrMap(b, 'negative-label')
                     rows.append(b)
                 rows.append(urwid.Divider())
-            m = commit.getPendingMessage()
-            if not m:
-                m = commit.getDraftMessage()
+            m = commit.getDraftMessage()
             if m:
-                message = m.message
+                if message:
+                    message = message + "\n" + m.message
+                else:
+                    message = m.message
         self.message = mywid.MyEdit(u"Message: \n", edit_text=message,
                                     multiline=True, ring=app.ring)
         rows.append(self.message)
@@ -257,16 +266,16 @@ class ReviewButton(mywid.FixedButton):
                                    self.commit_row.commit_key,
                                    message=message)
         urwid.connect_signal(self.dialog, 'save',
-            lambda button: self.closeReview(True, False))
+            lambda button: self.closeReview(upload=True, merge=False))
         urwid.connect_signal(self.dialog, 'merge',
-            lambda button: self.closeReview(True, True))
+            lambda button: self.closeReview(upload=True, merge=True))
         urwid.connect_signal(self.dialog, 'cancel',
-            lambda button: self.closeReview(False, False))
+            lambda button: self.closeReview(upload=False, merge=False))
         self.pr_view.app.popup(self.dialog,
                                relative_width=50, relative_height=75,
                                min_width=60, min_height=20)
 
-    def closeReview(self, upload, merge):
+    def closeReview(self, upload=False, merge=False):
         approval, message = self.dialog.getValues()
         self.pr_view.saveReview(self.commit_row.commit_key, approval,
                                     message, upload, False)
@@ -337,8 +346,7 @@ class CommitRow(urwid.WidgetWrap):
                 ('commit-name', ' %s' % commit.message.split('\n')[0])]
         num_drafts = sum([len(f.draft_comments) for f in commit.files])
         if num_drafts:
-            pending_message = commit.getPendingMessage()
-            if not pending_message:
+            if not commit.pull_request.hasPendingMessage():
                 line.append(('commit-drafts', ' (%s draft%s)' % (
                             num_drafts, num_drafts>1 and 's' or '')))
         num_comments = sum([len(f.current_comments) for f in commit.files]) - num_drafts
@@ -728,11 +736,8 @@ class PullRequestView(urwid.WidgetWrap):
                 approval_headers.append(urwid.Text(('table-header', state)))
             votes = mywid.Table(approval_headers)
             approvals_for_account = {}
-            pending_message = pr.commits[-1].getPendingMessage()
+            pending_message = pr.hasPendingMessage()
             for approval in pr.approvals:
-                # Don't display draft approvals unless they are pending-upload
-                if approval.draft and not pending_message:
-                    continue
                 approvals = approvals_for_account.get(approval.reviewer.id)
                 if not approvals:
                     approvals = {}
@@ -751,11 +756,20 @@ class PullRequestView(urwid.WidgetWrap):
                 # Only set approval status if the review is for the current commit
                 if approval.sha == pr.commits[-1].sha:
                     if approval.state in ['APPROVED', 'APPROVE']:
-                        approvals['Approved'].set_text(('positive-label', '✓'))
+                        text = '✓'
+                        if approval.state == 'APPROVE' and not pending_message:
+                            text = '(' + text + ')'
+                        approvals['Approved'].set_text(('positive-label', text))
                     elif approval.state in ['CHANGES_REQUESTED', 'REQUEST_CHANGES']:
-                        approvals['Changes Requested'].set_text(('negative-label', '✗'))
+                        text = '✗'
+                        if approval.state == 'REQUEST_CHANGES' and not pending_message:
+                            text = '(' + text + ')'
+                        approvals['Changes Requested'].set_text(('negative-label', text))
                     else:
-                        approvals['Comment'].set_text('•')
+                        text = '•'
+                        if approval.state == 'COMMENT' and not pending_message:
+                            text = '(' + text + ')'
+                        approvals['Comment'].set_text(text)
             votes = urwid.Padding(votes, width='pack')
 
             # TODO: update the existing table rather than replacing it
@@ -818,7 +832,7 @@ class PullRequestView(urwid.WidgetWrap):
                     self.message_rows[message.key] = row
                 else:
                     unseen_keys.remove(message.key)
-                    if message.created != row.original_widget.message_created:
+                    if message.draft or message.created != row.original_widget.message_created:
                         row.original_widget.refresh(pr, message)
                 listbox_index += 1
             # Remove any messages that should not be displayed

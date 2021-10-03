@@ -805,12 +805,11 @@ class App(object):
         existing_approval = session.getApproval(pr, account, commit.sha)
         if existing_approval:
             existing_approval.draft = True
+            existing_approval.state = approval
         else:
             pr.createApproval(account, approval, commit.sha, draft=True)
 
-        draft_message = commit.getPendingMessage()
-        if not draft_message:
-            draft_message = commit.getDraftMessage()
+        draft_message = commit.getDraftMessage()
         if not draft_message:
             if message or upload:
                 draft_message = pr.createMessage(commit.key, None, account,

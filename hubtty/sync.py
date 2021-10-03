@@ -781,8 +781,27 @@ class SyncPullRequestTask(Task):
                 review_state = remote_review.get('state')
                 if review_state:
                     approval = session.getApproval(pr, account, remote_review.get('commit_id'))
+                    own_approval = session.getApproval(pr, session.getOwnAccount(), remote_review.get('commit_id'))
+
+                    # Someone left a negative vote after the local
+                    # user created a draft positive vote.  Hold the
+                    # change so that it doesn't look like the local
+                    # user is ignoring negative feedback.
+                    if own_approval \
+                            and own_approval != approval \
+                            and own_approval.draft \
+                            and own_approval.state not in ["CHANGES_REQUESTED", "REQUEST_CHANGES"] \
+                            and review_state == "CHANGES_REQUESTED" \
+                            and not (approval and approval.state == "CHANGES_REQUESTED") \
+                            and not pr.held:
+                                pr.held = True
+                                result.held_changed = True
+                                self.log.info("Setting pull request %s to held due to negative review after positive", pr.pr_id)
+
                     if approval:
-                        approval.state = review_state
+                        # Only update approval if it hasn't been changed locally
+                        if not approval.draft:
+                            approval.state = review_state
                     else:
                         pr.createApproval(account, review_state, remote_review.get('commit_id'))
                         self.log.info("Created new approval for %s from %s commit %s.", pr.pr_id, account.username, remote_review.get('commit_id'))
@@ -808,7 +827,7 @@ class SyncPullRequestTask(Task):
                 if not comment:
                     created = dateutil.parser.parse(remote_comment['created_at'])
                     parent = False
-                    if remote_comment.get('side', '') == 'PARENT':
+                    if remote_comment.get('side', '') == 'LEFT':
                         parent = True
                     message = session.getMessageByID(remote_comment['pull_request_review_id'])
 
@@ -1082,37 +1101,51 @@ class UploadReviewTask(Task):
         pr_id = None
         with app.db.getSession() as session:
             message = session.getMessage(self.message_key)
-            commit = message.commit
             pr = message.commit.pull_request
             if pr.held:
                 self.log.debug("Not uploading review to %s because it is held" %
                                (pr.pr_id,))
                 return
             pr_id = pr.pr_id
-            current_commit = pr.commits[-1]
-            data = dict(commit_id=current_commit.sha,
-                        body=message.message)
-            if commit == current_commit:
-                for approval in pr.draft_approvals:
-                    data['event'] = approval.state
-                    session.delete(approval)
-            comments = []
-            for file in commit.files:
-                if file.draft_comments:
-                    for comment in file.draft_comments:
-                        d = dict(path=file.path,
-                                 line=comment.line,
-                                 body=comment.message)
-                        if comment.parent:
-                            d['side'] = 'PARENT'
-                        comments.append(d)
-                        session.delete(comment)
-            if comments:
-                data['comments'] = comments
+
+            # Create one review per commit that has comments. Not ideal but
+            # better than nothing. I wished it was possible to post only one
+            # review.
+            # However, github UI allows to post comments to different commits
+            # in the same review so it might be possible somehow.
+            last_commit = message.commit
+            event = "COMMENT"
+            for approval in pr.draft_approvals:
+                event = approval.state
+                session.delete(approval)
+
+            for commit in pr.commits:
+                data = dict(commit_id=commit.sha,
+                            body='',
+                            event=event)
+                if commit == last_commit:
+                    data['body'] = message.message
+                comments = []
+                for file in commit.files:
+                    if file.draft_comments:
+                        for comment in file.draft_comments:
+                            # TODO(mandre) add ability to reply to a comment
+                            d = dict(path=file.path,
+                                    line=comment.line,
+                                    body=comment.message)
+                            if comment.parent:
+                                d['side'] = 'LEFT'
+                            comments.append(d)
+                            session.delete(comment)
+                if comments:
+                    data['comments'] = comments
+                if comments or commit == last_commit:
+                    # Inside db session for rollback
+                    sync.post('repos/%s/reviews' % (pr_id,), data)
+                if commit == last_commit:
+                    break
+
             session.delete(message)
-            # Inside db session for rollback
-            sync.post('repos/%s/reviews' % (pr_id,),
-                      data)
         sync.submitTask(SyncPullRequestTask(pr_id, priority=self.priority))
 
 class SendMergeTask(Task):

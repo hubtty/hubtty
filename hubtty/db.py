@@ -395,6 +395,9 @@ class PullRequest(object):
         self.labels.remove(label)
         session.flush()
 
+    def hasPendingMessage(self):
+        return self.isValid() and self.commits[-1].hasPendingMessage()
+
     def isValid(self):
         # This might happen when the sync was partial, i.e. we hit rate limit
         # or the connection dropped
@@ -449,11 +452,11 @@ class Commit(object):
                 self._file_cache[f.path] = f
         return self._file_cache.get(path, None)
 
-    def getPendingMessage(self):
+    def hasPendingMessage(self):
         for m in self.messages:
             if m.pending:
-                return m
-        return None
+                return True
+        return False
 
     def getDraftMessage(self):
         for m in self.messages:
@@ -629,6 +632,7 @@ mapper(RepositoryTopic, repository_topic_table)
 mapper(PullRequest, pull_request_table, properties=dict(
         author=relationship(Account),
         commits=relationship(Commit, backref='pull_request',
+                             order_by=commit_table.c.key,
                              cascade='all, delete-orphan'),
         messages=relationship(Message, backref='pull_request',
                               order_by=message_table.c.created,
