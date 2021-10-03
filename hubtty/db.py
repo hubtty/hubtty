@@ -744,7 +744,7 @@ class Database(object):
 
         if current_rev is None and has_table:
             self.log.debug('Stamping database as initial revision')
-            alembic.command.stamp(config, "44402069e137")
+            alembic.command.stamp(config, "a2af1e2e44ee")
         alembic.command.upgrade(config, 'head')
 
 class DatabaseSession(object):
