@@ -104,6 +104,7 @@ line.
 Example:
 
 .. code-block:: yaml
+
    servers:
      - name: CHANGEME
        git-root: ~/git/
@@ -133,6 +134,7 @@ The following example alters two colors in the default palette, one
 color in the light palette, and one color in a custom palette.
 
 .. code-block:: yaml
+
    palettes:
      - name: default
        added-line: ['dark green', '']
@@ -165,6 +167,7 @@ Run `hubtty --print-keymap` for a list of commands that can be bound.
 The following example modifies the `default` keymap:
 
 .. code-block:: yaml
+
    keymaps:
      - name: default
        diff: 'd'
@@ -178,6 +181,7 @@ To specify a sequence of keys, they must be a list of keystrokes
 within a list of key series.  For example:
 
 .. code-block:: yaml
+
    keymaps:
      - name: vi
        quit: [[':', 'q']]
@@ -247,6 +251,7 @@ This example matches Github usernames, and replaces them with a link
 to an internal Hubtty search for pull requests authored by that user.
 
 .. code-block:: yaml
+
    commentlinks:
      - match: "(?P<mention_str>[^\\w]@(?P<username>[\\w-]+))"
        replacements:
@@ -276,6 +281,7 @@ Pull Request List Options
 Example:
 
 .. code-block:: yaml
+
    pr-list-options:
      sort-by: 'number'
      reverse: false
