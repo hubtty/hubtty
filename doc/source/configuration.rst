@@ -5,7 +5,7 @@ Hubtty uses a YAML based configuration file that it looks for at
 ``~/.config/hubtty/hubtty.yaml``.  Several sample configuration files
 are included.  You can find them in the examples/ directory of the
 `source distribution
-<https://opendev.org/ttygroup/hubtty/src/branch/master/examples>`_ or
+<https://github.com/hubtty/hubtty/tree/master/examples>`_ or
 the share/hubtty/examples directory after installation.
 
 Select one of the sample config files, copy it to ~/.config/hubtty/hubtty.yaml
@@ -103,7 +103,7 @@ line.
 
 Example:
 
-.. code-block: yaml
+.. code-block:: yaml
    servers:
      - name: CHANGEME
        git-root: ~/git/
@@ -132,7 +132,7 @@ To see the list of possible palette entries, run `hubtty --print-palette`.
 The following example alters two colors in the default palette, one
 color in the light palette, and one color in a custom palette.
 
-.. code-block: yaml
+.. code-block:: yaml
    palettes:
      - name: default
        added-line: ['dark green', '']
@@ -164,7 +164,7 @@ Run `hubtty --print-keymap` for a list of commands that can be bound.
 
 The following example modifies the `default` keymap:
 
-.. code-block: yaml
+.. code-block:: yaml
    keymaps:
      - name: default
        diff: 'd'
@@ -177,7 +177,7 @@ The following example modifies the `default` keymap:
 To specify a sequence of keys, they must be a list of keystrokes
 within a list of key series.  For example:
 
-.. code-block: yaml
+.. code-block:: yaml
    keymaps:
      - name: vi
        quit: [[':', 'q']]
@@ -246,7 +246,7 @@ Replacement are applied in order.
 This example matches Github usernames, and replaces them with a link
 to an internal Hubtty search for pull requests authored by that user.
 
-.. code-block: yaml
+.. code-block:: yaml
    commentlinks:
      - match: "(?P<mention_str>[^\\w]@(?P<username>[\\w-]+))"
        replacements:
@@ -275,7 +275,7 @@ Pull Request List Options
 
 Example:
 
-.. code-block: yaml
+.. code-block:: yaml
    pr-list-options:
      sort-by: 'number'
      reverse: false
@@ -295,7 +295,7 @@ The only supported criterion is `author`.
 
 For example, to hide comments from a CI system:
 
-.. code-block: yaml
+.. code-block:: yaml
 
    hide-comments:
      - author: "^(.*CI|Jenkins)$"
@@ -332,7 +332,7 @@ run the query and display the results.
 
 Example:
 
-.. code-block: yaml
+.. code-block:: yaml
 
    dashboards:
      - name: "My pull requests"
@@ -376,7 +376,7 @@ The following example includes a reviewkey that leaves a "/retest" message on
 a review, one that approves the PR, and another one that creates a draft message
 requesting for changes.
 
-.. code-block: yaml
+.. code-block:: yaml
 
     reviewkeys:
       - key: 'meta 0'
@@ -455,7 +455,7 @@ General Options
 
 Example:
 
-.. code-block: yaml
+.. code-block:: yaml
 
    size-column:
      type: graph

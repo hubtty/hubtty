@@ -46,7 +46,7 @@ Hubtty uses a YAML based configuration file that it looks for at
 ``~/.config/hubtty/hubtty.yaml``.  Several sample configuration files
 are included.  You can find them in the examples/ directory of the
 `source distribution
-<https://opendev.org/ttygroup/hubtty/src/branch/master/examples>`_ or
+<https://github.com/hubtty/hubtty/tree/master/examples>`_ or
 the share/hubtty/examples directory after installation.
 
 Select one of the sample config files, copy it to
@@ -111,14 +111,14 @@ retry requests if needed, and will switch between offline and online
 mode automatically.
 
 If you review a pull request while offline with a positive vote, and someone
-else leaves a negative vote on that pull request in the same category before
-Hubtty is able to upload your review, Hubtty will detect the situation
-and mark the pull request as "held" so that you may re-inspect the pull request
-and any new comments before uploading the review.  The status bar will
-alert you to any held pull requests and direct you to a list of them (the
-`F12` key by default).  When viewing a pull request, the "held" flag may be
-toggled with the exclamation key (`!`).  Once held, a pull request must be
-explicitly un-held in this manner for your review to be uploaded.
+else leaves a negative vote on that pull request before Hubtty is able to
+upload your review, Hubtty will detect the situation and mark the pull request
+as "held" so that you may re-inspect the pull request and any new comments
+before uploading the review.  The status bar will alert you to any held pull
+requests and direct you to a list of them (the `F12` key by default).  When
+viewing a pull request, the "held" flag may be toggled with the exclamation key
+(`!`).  Once held, a pull request must be explicitly un-held in this manner for
+your review to be uploaded.
 
 If Hubtty encounters an error, this will also be indicated in the
 status bar.  You may wish to examine ~/.hubtty.log to see what the
