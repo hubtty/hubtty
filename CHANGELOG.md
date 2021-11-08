@@ -1,5 +1,9 @@
 # Hubtty changelog
 
+## Release 0.1.1 - 2021/11/08
+
+- Fix issue with alembic >= 1.7 ([#73](https://github.com/hubtty/hubtty/pull/73))
+
 ## Release 0.1 - Mostly Works - 2021/10/08
 
 Very first release of Hubtty:
