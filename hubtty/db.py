@@ -20,6 +20,7 @@ import threading
 
 import alembic
 import alembic.config
+import alembic.migration
 import six
 import sqlalchemy
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, Text, UniqueConstraint
