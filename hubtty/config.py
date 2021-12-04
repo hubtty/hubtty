@@ -16,6 +16,7 @@
 import collections
 import os
 import re
+import site
 from shutil import copyfile
 import sys
 try:
@@ -282,7 +283,16 @@ class Config(object):
 
 
     def copyDefault(self):
-        filename = os.path.join(sys.prefix, 'share', 'hubtty', 'examples',
-                                'reference-hubtty.yaml')
-        copyfile(filename, CONFIG_PATH)
+        relative_ref_config_path = os.path.join('share', 'hubtty', 'examples', 'reference-hubtty.yaml')
+
+        # Try user installation path first
+        ref_config_path = os.path.join(site.USER_BASE, relative_ref_config_path)
+        if not os.path.exists(ref_config_path):
+            # Fallback to system installation path
+            ref_config_path = os.path.join(sys.prefix, relative_ref_config_path)
+
+        if not os.path.exists(ref_config_path):
+            sys.exit("Could not find the %s configuration file, check your hubtty installation" % relative_ref_config_path)
+
+        copyfile(ref_config_path, CONFIG_PATH)
         print("Copied a default configuration file to %s" % CONFIG_PATH)
