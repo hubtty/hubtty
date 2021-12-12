@@ -43,7 +43,7 @@ To install from a git checkout::
   pip install .
 
 Hubtty uses a YAML based configuration file that it looks for at
-``~/.config/hubtty/hubtty.yaml``.  Several sample configuration files
+``$XDG_CONFIG_HOME/hubtty/hubtty.yaml``.  Several sample configuration files
 are included.  You can find them in the examples/ directory of the
 `source distribution
 <https://github.com/hubtty/hubtty/tree/master/examples>`_ or
@@ -90,7 +90,7 @@ In general, pressing the F1 key will show help text on any screen, and
 ESC will take you to the previous screen.
 
 Hubtty works seamlessly offline or online.  All of the actions that it
-performs are first recorded in a local database (in ``~/.local/share/hubtty/hubtty.db``
+performs are first recorded in a local database (in ``$XDG_DATA_HOME/hubtty/hubtty.db``
 by default), and are then transmitted to Github.  If Hubtty is unable
 to contact Github for any reason, it will continue to operate against
 the local database, and once it re-establishes contact, it will
@@ -117,11 +117,10 @@ viewing a pull request, the "held" flag may be toggled with the exclamation key
 (`!`).  Once held, a pull request must be explicitly un-held in this manner for
 your review to be uploaded.
 
-If Hubtty encounters an error, this will also be indicated in the
-status bar.  You may wish to examine ~/.hubtty.log to see what the
-error was.  In many cases, Hubtty can continue after encountering an
-error.  The error flag will be cleared when you leave the current
-screen.
+If Hubtty encounters an error, this will also be indicated in the status bar.
+You may wish to examine ``$XDG_DATA_HOME/hubtty/hubtty.log`` to see what the
+error was.  In many cases, Hubtty can continue after encountering an error.
+The error flag will be cleared when you leave the current screen.
 
 To select text (e.g., to copy to the clipboard), hold Shift while
 selecting the text.

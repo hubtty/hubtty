@@ -2,7 +2,7 @@ Configuration
 -------------
 
 Hubtty uses a YAML based configuration file that it looks for at
-``~/.config/hubtty/hubtty.yaml``.  Several sample configuration files
+``$XDG_CONFIG_HOME/hubtty/hubtty.yaml``.  Several sample configuration files
 are included.  You can find them in the examples/ directory of the
 `source distribution
 <https://github.com/hubtty/hubtty/tree/master/examples>`_ or
