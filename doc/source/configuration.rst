@@ -76,7 +76,7 @@ line.
   **dburi**
     The location of Hubtty's sqlite database.  If you have more than
     one server, you should specify a dburi for any additional servers.
-    By default a SQLite database called $XDG_DATA_HOME/hubtty/hubtty.db
+    By default a SQLite database called ``$XDG_DATA_HOME/hubtty/hubtty.db``
     is used.
 
   **log-file**
@@ -87,12 +87,13 @@ line.
 
   **socket**
     Hubtty listens on a unix domain socket for remote commands at
-    $XDG_RUNTIME_DIR/hubtty.sock.  This option may be used to change the path.
+    ``$XDG_RUNTIME_DIR/hubtty.sock``.  This option may be used to change the
+    path.
 
   **lock-file**
     Hubtty uses a lock file per server to prevent multiple processes
     from running at the same time. The default is
-    $XDG_RUNTIME_DIR/hubtty.servername.lock
+    ``$XDG_RUNTIME_DIR/hubtty.servername.lock``.
 
   **additional-repositories**
     By default hubtty lists all repositories to which the user has explicit
