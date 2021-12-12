@@ -1,5 +1,11 @@
 # Hubtty changelog
 
+## Release 0.1.2 - 2021/12/12
+
+- Fix example config file search path when installing with `pip install --user` ([#76](https://github.com/hubtty/hubtty/pull/76))
+- Document limitation with OAuth apps ([#77](https://github.com/hubtty/hubtty/pull/77))
+- Minor documentation fixes ([#78](https://github.com/hubtty/hubtty/pull/78))
+
 ## Release 0.1.1 - 2021/11/08
 
 - Fix issue with alembic >= 1.7 ([#73](https://github.com/hubtty/hubtty/pull/73))
