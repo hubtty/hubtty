@@ -21,6 +21,7 @@ import threading
 import json
 import time
 import datetime
+import re
 
 import dateutil.parser
 try:
@@ -42,6 +43,9 @@ LOW_PRIORITY=2
 TIMEOUT=30
 
 class OfflineError(Exception):
+    pass
+
+class RestrictedError(Exception):
     pass
 
 class RateLimitError(Exception):
@@ -1328,6 +1332,11 @@ class Sync(object):
             os.write(pipe, six.b('refresh\n'))
             time.sleep(30)
             return task
+        except RestrictedError as e:
+            task.complete(False)
+            self.queue.complete(task)
+            self.log.warning("Failed to run task %s: %s" % (task, e,))
+            self.app.status.update(error=True, refresh=False)
         except Exception:
             task.complete(False)
             self.queue.complete(task)
@@ -1347,6 +1356,16 @@ class Sync(object):
         self.log.debug('HTTP status code: %d', response.status_code)
         if response.status_code == 503:
             raise OfflineError("Received 503 status code")
+        elif response.status_code == 403:
+            result = re.search(r"the `([\w-]+)` organization has enabled OAuth App access restrictions", response.text)
+            if result:
+                org = result.group(1)
+                error_msg = "The '%s' organization has enabled third-party restrictions and has not yet approved Hubtty. Your review will be submitted again next time Hubtty starts. Create yourself a Personal Access Token to continue using Hubtty with this organization: https://hubtty.readthedocs.io/en/latest/authentication.html" % (org,)
+                self.app.error(error_msg)
+                raise RestrictedError("The '%s' organization has enabled third-party restrictions and has not yet approved hubtty" % (org,))
+            else:
+                raise Exception("Received %s status code: %s"
+                        % (response.status_code, response.text))
         elif response.status_code >= 400:
             raise Exception("Received %s status code: %s"
                             % (response.status_code, response.text))

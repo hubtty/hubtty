@@ -30,6 +30,7 @@ Contents:
 
    installation.rst
    configuration.rst
+   authentication.rst
    usage.rst
    contributing.rst
 
