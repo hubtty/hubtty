@@ -49,10 +49,7 @@ are included.  You can find them in the examples/ directory of the
 <https://github.com/hubtty/hubtty/tree/master/examples>`_ or
 the share/hubtty/examples directory after installation.
 
-Select one of the sample config files, copy it to
-~/.config/hubtty/hubtty.yaml and edit as necessary.  Search for
-``CHANGEME`` to find parameters that need to be supplied.  The sample
-config files are as follows:
+The sample config files are as follows:
 
 **minimal-hubtty.yaml**
   Only contains the parameters required for Hubtty to actually run.
