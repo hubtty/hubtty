@@ -5,5 +5,5 @@
 # list with explanations, see the 'reference-hubtty.yaml' file.
 
 servers:
-  - name: CHANGEME
-    git-root: ~/git/
+  - name: github.com
+    git-root: ~/hubtty/

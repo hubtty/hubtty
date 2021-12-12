@@ -2,15 +2,13 @@ Configuration
 -------------
 
 Hubtty uses a YAML based configuration file that it looks for at
-``~/.config/hubtty/hubtty.yaml``.  Several sample configuration files
+``$XDG_CONFIG_HOME/hubtty/hubtty.yaml``.  Several sample configuration files
 are included.  You can find them in the examples/ directory of the
 `source distribution
 <https://github.com/hubtty/hubtty/tree/master/examples>`_ or
 the share/hubtty/examples directory after installation.
 
-Select one of the sample config files, copy it to ~/.config/hubtty/hubtty.yaml
-and edit as necessary.  Search for ``CHANGEME`` to find parameters that need to
-be supplied.  The sample config files are as follows:
+The sample config files are as follows:
 
 **minimal-hubtty.yaml**
   Only contains the parameters required for Hubtty to actually run.
@@ -78,23 +76,24 @@ line.
   **dburi**
     The location of Hubtty's sqlite database.  If you have more than
     one server, you should specify a dburi for any additional servers.
-    By default a SQLite database called $XDG_DATA_HOME/hubtty/hubtty.db
+    By default a SQLite database called ``$XDG_DATA_HOME/hubtty/hubtty.db``
     is used.
 
   **log-file**
     By default Hubtty logs errors to a file and truncates that file
     each time it starts (so that it does not grow without bound).  If
     you would like to log to a different location, you may specify it
-    with this option.
+    with this option. Defaults to ``$XDG_DATA_HOME/hubtty/hubtty.log``.
 
   **socket**
     Hubtty listens on a unix domain socket for remote commands at
-    $XDG_RUNTIME_DIR/hubtty.sock.  This option may be used to change the path.
+    ``$XDG_RUNTIME_DIR/hubtty.sock``.  This option may be used to change the
+    path.
 
   **lock-file**
     Hubtty uses a lock file per server to prevent multiple processes
     from running at the same time. The default is
-    $XDG_RUNTIME_DIR/hubtty.servername.lock
+    ``$XDG_RUNTIME_DIR/hubtty.servername.lock``.
 
   **additional-repositories**
     By default hubtty lists all repositories to which the user has explicit
