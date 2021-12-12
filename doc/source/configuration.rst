@@ -83,7 +83,7 @@ line.
     By default Hubtty logs errors to a file and truncates that file
     each time it starts (so that it does not grow without bound).  If
     you would like to log to a different location, you may specify it
-    with this option.
+    with this option. Defaults to ``$XDG_DATA_HOME/hubtty/hubtty.log``.
 
   **socket**
     Hubtty listens on a unix domain socket for remote commands at
