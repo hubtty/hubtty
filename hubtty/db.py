@@ -91,6 +91,7 @@ pull_request_table = Table(
     Column('outdated', Boolean, index=True, nullable=False),
     Column('merged', Boolean, index=True, nullable=False),
     Column('mergeable', Boolean, index=True, nullable=False),
+    Column('draft', Boolean, index=True, nullable=False),
     )
 commit_table = Table(
     'commit', metadata,
@@ -295,10 +296,11 @@ class PullRequestLabel(object):
 class PullRequest(object):
     def __init__(self, repository, id, author, number, branch, pr_id,
                  title, body, created, updated, state, additions, deletions,
-                 html_url, merged, mergeable, hidden=False, reviewed=False,
-                 starred=False, held=False, pending_rebase=False,
-                 pending_edit=False, pending_edit_message=None,
-                 pending_labels=False, outdated=False):
+                 html_url, merged, mergeable, draft=False, hidden=False,
+                 reviewed=False, starred=False, held=False,
+                 pending_rebase=False, pending_edit=False,
+                 pending_edit_message=None, pending_labels=False,
+                 outdated=False):
         self.repository_key = repository.key
         self.account_key = author.key
         self.id = id
@@ -310,6 +312,7 @@ class PullRequest(object):
         self.created = created
         self.updated = updated
         self.state = state
+        self.draft = draft
         self.additions = additions
         self.deletions = deletions
         self.html_url = html_url

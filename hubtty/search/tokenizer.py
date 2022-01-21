@@ -42,6 +42,7 @@ operators = {
     'in': 'OP_IN',
     'is': 'OP_IS',
     'state': 'OP_STATE',
+    'draft': 'OP_DRAFT',
     'limit': 'OP_LIMIT',
     'label': 'OP_LABEL',
     }

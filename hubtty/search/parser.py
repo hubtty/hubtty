@@ -95,6 +95,7 @@ def SearchParser():
                 | in_term
                 | is_term
                 | state_term
+                | draft_term
                 | file_term
                 | path_term
                 | limit_term
@@ -427,6 +428,15 @@ def SearchParser():
         elif p[2] == 'unmerged' or p[2] == 'abandoned':
             p[0] = and_(hubtty.db.pull_request_table.c.state == 'closed',
                         hubtty.db.pull_request_table.c.merged == False)
+        else:
+            p[0] = hubtty.db.pull_request_table.c.state == p[2]
+
+    def p_draft_term(p):
+        '''draft_term : OP_DRAFT string'''
+        if p[2] == 'true':
+            p[0] = hubtty.db.pull_request_table.c.draft == True
+        elif p[2] == 'false':
+            p[0] = hubtty.db.pull_request_table.c.draft == False
         else:
             p[0] = hubtty.db.pull_request_table.c.state == p[2]
 
