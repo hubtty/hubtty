@@ -725,7 +725,8 @@ class PullRequestView(urwid.WidgetWrap):
             self.labels_label.set_text(('pr-data', label_buttons or u''))
             self.created_label.set_text(('pr-data', str(self.app.time(pr.created))))
             self.updated_label.set_text(('pr-data', str(self.app.time(pr.updated))))
-            self.status_label.set_text(('pr-data', pr.state))
+            stat = pr.draft and ('state-draft', 'Draft') or pr.state
+            self.status_label.set_text(('pr-data', stat))
             self.permalink_url = str(pr.html_url)
             self.permalink_label.text.set_text(('pr-data', self.permalink_url))
             self.pr_description.set_text('\n'.join([pr.title, '', pr.body]))
