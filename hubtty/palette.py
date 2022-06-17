@@ -125,7 +125,7 @@ DEFAULT_PALETTE={
     'md-heading': ['underline,bold', ''],
     'md-blockquote': ['light gray', ''],
     'md-blockcode': ['', 'dark gray'],
-    'md-codespan': ['standout', ''],
+    'md-codespan': ['', 'dark gray'],
     'md-strikethrough': ['strikethrough', ''],
     }
 
