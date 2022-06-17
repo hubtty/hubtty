@@ -67,10 +67,8 @@ class Renderer:
             elif element['type'] == 'list_item':
                 text.extend(self.toUrwidMarkup(element['children']))
             elif element['type'] == 'block_text':
-                block_text = ""
-                for child in element['children']:
-                    block_text += child['text']
-                text.append("%s\n" % block_text)
+                text.extend(self.toUrwidMarkup(element['children']))
+                text.append("\n")
             elif element['type'] == 'link':
                 url = element['link']
                 link_text = ""
