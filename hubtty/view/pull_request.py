@@ -445,7 +445,6 @@ class PullRequestMessageBox(mywid.HyperText):
         self.message_author = message.author_name
         self.message_text = message.message
         created = self.app.time(message.created)
-        comment_text = self.md.render("\n%s" % message.message)
         if self.app.isOwnAccount(message.author):
             name_style = 'pr-message-own-name'
             header_style = 'pr-message-own-header'
@@ -474,6 +473,12 @@ class PullRequestMessageBox(mywid.HyperText):
             text.append(' ')
             text.append(link)
 
+        comment_text = self.md.render(message.message)
+        if len(comment_text) > 0:
+            if isinstance(comment_text[0], tuple):
+                comment_text = ["\n"] + comment_text
+            else:
+                comment_text[0] = "\n%s" % comment_text[0]
         for commentlink in self.app.config.commentlinks:
             comment_text = commentlink.run(self.app, comment_text)
 
