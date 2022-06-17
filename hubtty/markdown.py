@@ -75,7 +75,10 @@ class Renderer:
                 url = element['link']
                 link_text = ""
                 for child in element['children']:
-                    link_text += child['text']
+                    if child.get('text'):
+                        link_text += child['text']
+                    elif child.get('alt'):
+                        link_text += child['alt']
                 link = mywid.Link(link_text, 'link', 'focused-link')
                 urwid.connect_signal(link, 'selected',
                     lambda link:self.app.openURL(url))
