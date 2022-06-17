@@ -515,7 +515,8 @@ class PrDescriptionBox(mywid.HyperText):
         super(PrDescriptionBox, self).__init__(message)
 
     def set_text(self, text):
-        text = [text]
+        if len(text) == 0:
+            text = [text]
         for commentlink in self.app.config.commentlinks:
             text = commentlink.run(self.app, text)
         super(PrDescriptionBox, self).set_text(text)
