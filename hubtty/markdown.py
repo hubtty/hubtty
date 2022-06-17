@@ -44,7 +44,10 @@ class Renderer:
             elif element['type'] == 'block_quote':
                 text.append(('md-blockquote', ["| ", self.toUrwidMarkup(element['children'])]))
             elif element['type'] == 'block_code':
-                text.append(('md-blockcode', ["```%s\n" % element.get('info'), element['text'], "```\n"]))
+                info = element['info']
+                if info == None:
+                    info = ""
+                text.append(('md-blockcode', ["```%s\n" % info, element['text'], "```\n"]))
             elif element['type'] == 'block_html':
                 # HTML comments - do nothing
                 pass
