@@ -119,6 +119,14 @@ DEFAULT_PALETTE={
     'focused-line-count-threshold-7': ['dark red,standout', ''],
     'line-count-threshold-8': ['light red', ''],
     'focused-line-count-threshold-8': ['light red,standout', ''],
+    # Markdown
+    'md-strong': ['bold', ''],
+    'md-emphasis': ['italics', ''],
+    'md-heading': ['underline,bold', ''],
+    'md-blockquote': ['light gray', ''],
+    'md-blockcode': ['', 'dark gray'],
+    'md-codespan': ['standout', ''],
+    'md-strikethrough': ['strikethrough', ''],
     }
 
 # A delta from the default palette

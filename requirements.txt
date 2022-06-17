@@ -12,3 +12,4 @@ voluptuous>=0.7
 ply>=3.4
 six
 pyxdg
+mistune

@@ -28,6 +28,7 @@ from hubtty import gitrepo
 from hubtty import keymap
 from hubtty import mywid
 from hubtty import sync
+from hubtty import markdown
 from hubtty.view import side_diff as view_side_diff
 from hubtty.view import unified_diff as view_unified_diff
 from hubtty.view import mouse_scroll_decorator
@@ -398,6 +399,7 @@ class PullRequestMessageBox(mywid.HyperText):
         super(PullRequestMessageBox, self).__init__(u'')
         self.pr_view = pr_view
         self.app = pr_view.app
+        self.md = markdown.Renderer(self.app)
         self.refresh(pr, message)
 
     def formatReply(self):
@@ -500,7 +502,9 @@ class PullRequestMessageBox(mywid.HyperText):
                     location_str += str(line)
                 if location_str:
                     location_str += ": "
-                comment_text.append(u'\n  %s%s\n' % (location_str, comment))
+                comment_text.append(u'\n  %s' % (location_str))
+                comment_text.extend(self.md.render(comment))
+                comment_text.append('\n')
 
         self.set_text(text+comment_text)
 
