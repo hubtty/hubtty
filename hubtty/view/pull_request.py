@@ -592,6 +592,7 @@ class PullRequestView(urwid.WidgetWrap):
         self.updated_label = urwid.Text(u'', wrap='clip')
         self.status_label = urwid.Text(u'', wrap='clip')
         self.permalink_label = mywid.TextButton(u'', on_press=self.openPermalink)
+        self.md = markdown.Renderer(self.app)
         pr_info = []
         pr_info_map={'pr-data': 'focused-pr-data'}
         for l, v in [("Author", urwid.Padding(urwid.AttrMap(self.author_label, None,
@@ -729,7 +730,7 @@ class PullRequestView(urwid.WidgetWrap):
             self.status_label.set_text(('pr-data', stat))
             self.permalink_url = str(pr.html_url)
             self.permalink_label.text.set_text(('pr-data', self.permalink_url))
-            self.pr_description.set_text('\n'.join([pr.title, '', pr.body]))
+            self.pr_description.set_text(["%s\n\n" % pr.title] + self.md.render(pr.body))
 
             review_states = ['Changes Requested', 'Comment', 'Approved']
             approval_headers = [urwid.Text(('table-header', 'Name'))]
