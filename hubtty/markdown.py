@@ -90,5 +90,8 @@ class Renderer:
 
     def render(self, text):
         md = mistune.create_markdown(renderer=mistune.AstRenderer(), plugins=['strikethrough'])
+        # Misture returns newline for empty text, we don't want that
+        if not text:
+            return []
         ast = md(text)
         return self.toUrwidMarkup(ast)
