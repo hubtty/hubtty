@@ -504,7 +504,12 @@ class PullRequestMessageBox(mywid.HyperText):
                 if location_str:
                     location_str += ": "
                 comment_text.append(u'\n  %s' % (location_str))
-                comment_text.extend(self.md.render(comment))
+                # Let's pass the rendered comment through commentlinks, but not
+                # location_str
+                rendered_comment = self.md.render(comment)
+                for commentlink in self.app.config.commentlinks:
+                    rendered_comment = commentlink.run(self.app, rendered_comment)
+                comment_text.extend(rendered_comment)
                 comment_text.append('\n')
 
         self.set_text(text+comment_text)
