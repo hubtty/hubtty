@@ -28,6 +28,7 @@ from hubtty import gitrepo
 from hubtty import keymap
 from hubtty import mywid
 from hubtty import sync
+from hubtty import markdown
 from hubtty.view import side_diff as view_side_diff
 from hubtty.view import unified_diff as view_unified_diff
 from hubtty.view import mouse_scroll_decorator
@@ -398,6 +399,7 @@ class PullRequestMessageBox(mywid.HyperText):
         super(PullRequestMessageBox, self).__init__(u'')
         self.pr_view = pr_view
         self.app = pr_view.app
+        self.md = markdown.Renderer(self.app)
         self.refresh(pr, message)
 
     def formatReply(self):
@@ -443,7 +445,6 @@ class PullRequestMessageBox(mywid.HyperText):
         self.message_author = message.author_name
         self.message_text = message.message
         created = self.app.time(message.created)
-        lines = message.message.split('\n')
         if self.app.isOwnAccount(message.author):
             name_style = 'pr-message-own-name'
             header_style = 'pr-message-own-header'
@@ -472,10 +473,12 @@ class PullRequestMessageBox(mywid.HyperText):
             text.append(' ')
             text.append(link)
 
-        if lines and lines[-1]:
-            lines.insert(0, '')
-            lines.append('')
-        comment_text = ['\n'.join(lines)]
+        comment_text = self.md.render(message.message)
+        if len(comment_text) > 0:
+            if isinstance(comment_text[0], tuple):
+                comment_text = ["\n"] + comment_text
+            else:
+                comment_text[0] = "\n%s" % comment_text[0]
         for commentlink in self.app.config.commentlinks:
             comment_text = commentlink.run(self.app, comment_text)
 
@@ -500,7 +503,14 @@ class PullRequestMessageBox(mywid.HyperText):
                     location_str += str(line)
                 if location_str:
                     location_str += ": "
-                comment_text.append(u'\n  %s%s\n' % (location_str, comment))
+                comment_text.append(u'\n  %s' % (location_str))
+                # Let's pass the rendered comment through commentlinks, but not
+                # location_str
+                rendered_comment = self.md.render(comment)
+                for commentlink in self.app.config.commentlinks:
+                    rendered_comment = commentlink.run(self.app, rendered_comment)
+                comment_text.extend(rendered_comment)
+                comment_text.append('\n')
 
         self.set_text(text+comment_text)
 
@@ -510,7 +520,8 @@ class PrDescriptionBox(mywid.HyperText):
         super(PrDescriptionBox, self).__init__(message)
 
     def set_text(self, text):
-        text = [text]
+        if len(text) == 0:
+            text = [text]
         for commentlink in self.app.config.commentlinks:
             text = commentlink.run(self.app, text)
         super(PrDescriptionBox, self).set_text(text)
@@ -592,6 +603,7 @@ class PullRequestView(urwid.WidgetWrap):
         self.updated_label = urwid.Text(u'', wrap='clip')
         self.status_label = urwid.Text(u'', wrap='clip')
         self.permalink_label = mywid.TextButton(u'', on_press=self.openPermalink)
+        self.md = markdown.Renderer(self.app)
         pr_info = []
         pr_info_map={'pr-data': 'focused-pr-data'}
         for l, v in [("Author", urwid.Padding(urwid.AttrMap(self.author_label, None,
@@ -729,7 +741,7 @@ class PullRequestView(urwid.WidgetWrap):
             self.status_label.set_text(('pr-data', stat))
             self.permalink_url = str(pr.html_url)
             self.permalink_label.text.set_text(('pr-data', self.permalink_url))
-            self.pr_description.set_text('\n'.join([pr.title, '', pr.body]))
+            self.pr_description.set_text(["%s\n\n" % pr.title] + self.md.render(pr.body))
 
             review_states = ['Changes Requested', 'Comment', 'Approved']
             approval_headers = [urwid.Text(('table-header', 'Name'))]
