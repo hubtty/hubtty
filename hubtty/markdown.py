@@ -50,6 +50,9 @@ class Renderer:
                 if info == None:
                     info = ""
                 text.append(('md-blockcode', ["```%s\n" % info, element['text'], "```\n"]))
+            elif element['type'] == 'image':
+                # image - do nothing
+                pass
             elif element['type'] == 'block_html':
                 # HTML comments - do nothing
                 pass
