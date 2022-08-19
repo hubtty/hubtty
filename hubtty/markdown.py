@@ -37,6 +37,9 @@ class Renderer:
             elif element['type'] == 'heading':
                 text.append(('md-heading', ["#" * element['level'], " ", self.toUrwidMarkup(element['children']), "\n"]))
             elif element['type'] == 'paragraph':
+                # Add newline before paragraphs if needed
+                if self.needsNewLine(text):
+                    text.append("\n")
                 text.extend(self.toUrwidMarkup(element['children']))
                 text.append("\n")
             elif element['type'] == 'newline':
@@ -91,6 +94,53 @@ class Renderer:
                 if 'children' in element:
                     text.extend(self.toUrwidMarkup(element['children']))
         return text
+
+    def needsNewLine(self, text):
+        if len(text) == 0 or text == ["\n"]:
+            return False
+
+        last_element = text[-1]
+        second_to_last_element = ""
+        if len(text) > 1:
+            second_to_last_element = text[-2]
+
+        while not isinstance(last_element, str):
+            while isinstance(last_element, list):
+                if len(last_element) > 1:
+                    second_to_last_element = last_element[-2]
+                if len(last_element) > 0:
+                    last_element = last_element[-1]
+                else:
+                    # Should not get empty list
+                    return False
+            while isinstance(last_element, tuple):
+                last_element = last_element[-1]
+            # Just to make sure we don't enter an infinite loop
+            if not (isinstance(last_element, list) or isinstance(last_element, str)):
+                return False
+
+        if last_element.endswith("\n\n"):
+            return False
+
+        if last_element == "\n":
+            # Need to look in second to last element
+            while not isinstance(second_to_last_element, str):
+                while isinstance(second_to_last_element, list):
+                    if len(second_to_last_element) > 0:
+                        second_to_last_element = second_to_last_element[-1]
+                    else:
+                        # Should not get empty list
+                        return False
+                while isinstance(second_to_last_element, tuple):
+                    second_to_last_element = second_to_last_element[-1]
+                # Just to make sure we don't enter an infinite loop
+                if not (isinstance(second_to_last_element, list) or isinstance(second_to_last_element, str)):
+                    return False
+
+            if second_to_last_element.endswith("\n"):
+                return False
+
+        return True
         
 
     def render(self, text):
