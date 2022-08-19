@@ -41,6 +41,8 @@ class Renderer:
                 text.append("\n")
             elif element['type'] == 'newline':
                 text.append("\n")
+            elif element['type'] == 'thematic_break':
+                text.append(('md-thematicbreak', "\n———————————————\n\n"))
             elif element['type'] == 'block_quote':
                 text.append(('md-blockquote', ["| ", self.toUrwidMarkup(element['children'])]))
             elif element['type'] == 'block_code':

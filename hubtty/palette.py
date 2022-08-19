@@ -127,6 +127,7 @@ DEFAULT_PALETTE={
     'md-blockcode': ['', 'dark gray'],
     'md-codespan': ['', 'dark gray'],
     'md-strikethrough': ['strikethrough', ''],
+    'md-thematicbreak': ['light gray', ''],
     }
 
 # A delta from the default palette
