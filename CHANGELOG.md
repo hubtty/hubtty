@@ -1,5 +1,10 @@
 # Hubtty changelog
 
+## Release 0.2 - 2022/08/20
+
+- Highlight and search for draft PRs ([#79](https://github.com/hubtty/hubtty/pull/79))
+- Render markdown ([#81](https://github.com/hubtty/hubtty/pull/81)) and ([#82](https://github.com/hubtty/hubtty/pull/82))
+
 ## Release 0.1.2 - 2021/12/12
 
 - Fix example config file search path when installing with `pip install --user` ([#76](https://github.com/hubtty/hubtty/pull/76))
