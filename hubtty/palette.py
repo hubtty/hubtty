@@ -127,6 +127,7 @@ DEFAULT_PALETTE={
     'md-blockcode': ['', 'dark gray'],
     'md-codespan': ['', 'dark gray'],
     'md-strikethrough': ['strikethrough', ''],
+    'md-thematicbreak': ['light gray', ''],
     }
 
 # A delta from the default palette
@@ -148,6 +149,11 @@ LIGHT_PALETTE = {
     'pr-message-own-header': ['black,bold', ''],
     'focused-link': ['dark blue,bold', ''],
     'filename': ['dark cyan', ''],
+    # Markdown
+    'md-blockquote': ['dark gray', ''],
+    'md-blockcode': ['', 'light gray'],
+    'md-codespan': ['', 'light gray'],
+    'md-thematicbreak': ['dark gray', ''],
     }
 
 class Palette(object):
