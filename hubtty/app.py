@@ -14,6 +14,7 @@
 # under the License.
 
 import argparse
+import colorsys
 import datetime
 import dateutil
 import fcntl
@@ -341,7 +342,13 @@ class App(object):
             for label in session.getLabels():
                 name = "label" + str(label.id)
                 color = "#" + str(label.color)
-                self.loop.screen.register_palette_entry(name, '', 'dark cyan', background_high=color)
+                r,g,b = tuple(int(label.color[i:i+2], 16) for i in (0, 2, 4))
+                _,l,_ = colorsys.rgb_to_hls(r, g, b)
+                if l > 100:
+                    fg = "#111"
+                else:
+                    fg = "#eee"
+                self.loop.screen.register_palette_entry(name, '', 'dark cyan', foreground_high=fg, background_high=color)
 
 
         self.startSocketListener()
