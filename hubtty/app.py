@@ -336,7 +336,13 @@ class App(object):
             self.welcome()
 
         self.loop.screen.tty_signal_keys(start='undefined', stop='undefined')
-        #self.loop.screen.set_terminal_properties(colors=88)
+        self.loop.screen.set_terminal_properties(colors=2**24)
+        with self.db.getSession() as session:
+            for label in session.getLabels():
+                name = "label" + str(label.id)
+                color = "#" + str(label.color)
+                self.loop.screen.register_palette_entry(name, '', 'dark cyan', background_high=color)
+
 
         self.startSocketListener()
 

@@ -729,7 +729,8 @@ class PullRequestView(urwid.WidgetWrap):
             for x in pr.labels:
                 if label_buttons:
                     label_buttons.append(', ')
-                link = mywid.Link(x.name, 'pr-data', 'focused-pr-data')
+                label_name = "label" + str(x.id)
+                link = mywid.Link(x.name, label_name, 'focused-pr-data')
                 urwid.connect_signal(
                     link, 'selected',
                     lambda link, x=x: self.searchLabel(x.name))
