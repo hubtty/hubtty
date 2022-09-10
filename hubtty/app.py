@@ -356,13 +356,15 @@ class App(object):
     def registerPaletteEntry(self, label_id, label_color):
         name = "label_" + str(label_id)
         color = "#" + str(label_color)
+        # Get the luminance of the color. We convert hex to RGB, then RGB to HLS.
         r,g,b = tuple(int(label_color[i:i+2], 16) for i in (0, 2, 4))
         _,l,_ = colorsys.rgb_to_hls(r, g, b)
         if l > 110:
             fg = "#111"
         else:
             fg = "#eee"
-        self.loop.screen.register_palette_entry(name, '', 'dark cyan', foreground_high=fg, background_high=color)
+        default_fg, default_bg = self.config.palette.getPaletteItem('pr-data')
+        self.loop.screen.register_palette_entry(name, default_fg, default_bg, foreground_high=fg, background_high=color)
 
     def getOwnAccountId(self):
         return self.own_account_id

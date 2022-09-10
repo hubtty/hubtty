@@ -173,3 +173,6 @@ class Palette(object):
         for k,v in self.palette.items():
             ret.append(tuple([k]+v))
         return ret
+
+    def getPaletteItem(self, name):
+        return self.palette.get(name, ['',''])
