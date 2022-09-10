@@ -58,7 +58,9 @@ class EditLabelsDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
 
         rows.append(urwid.Text(u"Labels:"))
         for label in pr.repository.labels:
+            palette_item = "label_" + str(label.id)
             b = mywid.FixedCheckBox(label.name, state=(label in pr.labels))
+            b.set_label((palette_item, label.name))
             rows.append(b)
             self.labels_checkboxes.append(b)
         rows.append(urwid.Divider())
