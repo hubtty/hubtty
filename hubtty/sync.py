@@ -375,6 +375,7 @@ class SyncRepositoryLabelsTask(Task):
                     self.log.info("Created label %s for repository %s", remote_label['name'], repository.name)
                     repository.createLabel(remote_label['id'], remote_label['name'],
                             remote_label['color'], remote_label['description'])
+                    app.registerPaletteEntry(remote_label['id'], remote_label['color'])
                 else:
                     label.name = remote_label['name']
                     label.color = remote_label['color']

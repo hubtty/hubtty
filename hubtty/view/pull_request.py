@@ -20,6 +20,7 @@ try:
     import ordereddict
 except:
     pass
+import os
 import textwrap
 
 import urwid
@@ -57,8 +58,12 @@ class EditLabelsDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         self.labels_checkboxes = []
 
         rows.append(urwid.Text(u"Labels:"))
+        truecolors = (os.environ.get('COLORTERM') == 'truecolor')
         for label in pr.repository.labels:
             b = mywid.FixedCheckBox(label.name, state=(label in pr.labels))
+            if truecolors:
+                palette_item = "label_" + str(label.id)
+                b.set_label((palette_item, label.name))
             rows.append(b)
             self.labels_checkboxes.append(b)
         rows.append(urwid.Divider())
@@ -729,7 +734,8 @@ class PullRequestView(urwid.WidgetWrap):
             for x in pr.labels:
                 if label_buttons:
                     label_buttons.append(', ')
-                link = mywid.Link(x.name, 'pr-data', 'focused-pr-data')
+                label_name = "label_" + str(x.id)
+                link = mywid.Link(x.name, label_name, 'focused-pr-data')
                 urwid.connect_signal(
                     link, 'selected',
                     lambda link, x=x: self.searchLabel(x.name))

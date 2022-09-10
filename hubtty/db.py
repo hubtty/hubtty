@@ -1033,6 +1033,9 @@ class DatabaseSession(object):
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
+    def getLabels(self):
+        return self.session().query(Label).all()
+
     def createRepository(self, *args, **kw):
         o = Repository(*args, **kw)
         self.session().add(o)
