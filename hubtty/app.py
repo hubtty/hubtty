@@ -340,16 +340,7 @@ class App(object):
         self.loop.screen.set_terminal_properties(colors=2**24)
         with self.db.getSession() as session:
             for label in session.getLabels():
-                name = "label" + str(label.id)
-                color = "#" + str(label.color)
-                r,g,b = tuple(int(label.color[i:i+2], 16) for i in (0, 2, 4))
-                _,l,_ = colorsys.rgb_to_hls(r, g, b)
-                if l > 100:
-                    fg = "#111"
-                else:
-                    fg = "#eee"
-                self.loop.screen.register_palette_entry(name, '', 'dark cyan', foreground_high=fg, background_high=color)
-
+                self.registerPaletteEntry(label.id, label.color)
 
         self.startSocketListener()
 
@@ -361,6 +352,17 @@ class App(object):
             self.sync_thread = None
             self.sync.offline = True
             self.status.update(offline=True)
+
+    def registerPaletteEntry(self, label_id, label_color):
+        name = "label_" + str(label_id)
+        color = "#" + str(label_color)
+        r,g,b = tuple(int(label_color[i:i+2], 16) for i in (0, 2, 4))
+        _,l,_ = colorsys.rgb_to_hls(r, g, b)
+        if l > 110:
+            fg = "#111"
+        else:
+            fg = "#eee"
+        self.loop.screen.register_palette_entry(name, '', 'dark cyan', foreground_high=fg, background_high=color)
 
     def getOwnAccountId(self):
         return self.own_account_id
