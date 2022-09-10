@@ -337,7 +337,8 @@ class App(object):
             self.welcome()
 
         self.loop.screen.tty_signal_keys(start='undefined', stop='undefined')
-        self.loop.screen.set_terminal_properties(colors=2**24)
+        if os.environ.get('COLORTERM') == 'truecolor':
+            self.loop.screen.set_terminal_properties(colors=2**24)
         with self.db.getSession() as session:
             for label in session.getLabels():
                 self.registerPaletteEntry(label.id, label.color)
