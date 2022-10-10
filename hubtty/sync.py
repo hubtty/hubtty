@@ -727,10 +727,10 @@ class SyncPullRequestTask(Task):
                 if (not commit) or self.force_fetch:
                     fetches[url].append('+%(ref)s:%(ref)s' % dict(ref=ref))
                 if not commit:
-                    if len(remote_commit['parents']) == 0:
-                        parent_sha = "0000000000000000000000000000000000000000"
-                    else:
+                    if remote_commit['parents']:
                         parent_sha = remote_commit['parents'][0]['sha']
+                    else:
+                        parent_sha = None
 
                     commit = pr.createCommit((remote_commit['commit']['message'] or '').replace('\r',''),
                                               remote_commit['sha'],
