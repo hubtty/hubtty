@@ -727,9 +727,14 @@ class SyncPullRequestTask(Task):
                 if (not commit) or self.force_fetch:
                     fetches[url].append('+%(ref)s:%(ref)s' % dict(ref=ref))
                 if not commit:
+                    if len(remote_commit['parents']) == 0:
+                        parent_sha = "0000000000000000000000000000000000000000"
+                    else:
+                        parent_sha = remote_commit['parents'][0]['sha']
+
                     commit = pr.createCommit((remote_commit['commit']['message'] or '').replace('\r',''),
                                               remote_commit['sha'],
-                                              remote_commit['parents'][0]['sha'])
+                                              parent_sha)
                     self.log.info("Created new commit %s for pull request %s in local DB.",
                                   commit.key, self.pr_id)
 
