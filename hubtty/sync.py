@@ -711,13 +711,6 @@ class SyncPullRequestTask(Task):
                 if label.id not in remote_label_ids:
                     pr.removeLabel(label)
 
-            # Delete commits that no longer belong to the pull request
-            remote_commits_sha = [c['sha'] for c in remote_commits]
-            for commit in pr.commits:
-                if commit.sha not in remote_commits_sha:
-                    self.log.info("Deleted commit %s", commit.sha)
-                    session.delete(commit)
-
             repo = gitrepo.get_repo(pr.repository.name, app.config)
             for remote_commit in remote_commits:
                 commit = pr.getCommitBySha(remote_commit['sha'])
@@ -866,6 +859,15 @@ class SyncPullRequestTask(Task):
                     if comment.file_key != file_id:
                         comment.file_key = file_id
                     comment.body = (remote_comment.get('body','') or '').replace('\r','')
+
+            # Delete commits that no longer belong to the pull request
+            # Do it at the end so that we don't inadvertently delete
+            # associated comments or message in the session
+            remote_commits_sha = [c['sha'] for c in remote_commits]
+            for commit in pr.commits:
+                if commit.sha not in remote_commits_sha:
+                    self.log.error("Deleted commit %s", commit.sha)
+                    session.delete(commit)
 
             pr.outdated = False
         for url, refs in fetches.items():
