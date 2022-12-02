@@ -1,5 +1,13 @@
 # Hubtty changelog
 
+## Release 0.3 - 2022/12/02
+
+- Show colored labels for terminals that support it ([#85](https://github.com/hubtty/hubtty/pull/85))
+- Add example commentlink for openshift's Jira ([#84](https://github.com/hubtty/hubtty/pull/84))
+- Fix sync failure for parent-less commits ([#88](https://github.com/hubtty/hubtty/pull/88)) and ([#89](https://github.com/hubtty/hubtty/pull/89))
+- Fix possible sync failure for force-pushed PR ([#91](https://github.com/hubtty/hubtty/pull/91))
+- Use Github's versioned REST API ([#92](https://github.com/hubtty/hubtty/pull/92))
+
 ## Release 0.2 - 2022/08/20
 
 - Highlight and search for draft PRs ([#79](https://github.com/hubtty/hubtty/pull/79))
