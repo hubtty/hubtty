@@ -1274,6 +1274,7 @@ class Sync(object):
     def __init__(self, app, disable_background_sync):
         self.user_agent = 'Hubtty/%s %s' % (hubtty.version.version_info.release_string(),
                                             requests.utils.default_user_agent())
+        self.github_api_version = '2022-11-28'
         self.offline = False
         self.account_id = None
         self.app = app
@@ -1388,7 +1389,8 @@ class Sync(object):
         default_headers = {
                 'Accept': 'application/vnd.github.v3+json',
                 'Accept-Encoding': 'gzip',
-                'User-Agent': self.user_agent
+                'User-Agent': self.user_agent,
+                'X-GitHub-Api-Version': self.github_api_version
                 }
 
         if not response_callback:
@@ -1436,7 +1438,8 @@ class Sync(object):
         default_headers = {
                 'Accept': 'application/vnd.github.v3+json',
                 'Content-Type': 'application/json;charset=UTF-8',
-                'User-Agent': self.user_agent
+                'User-Agent': self.user_agent,
+                'X-GitHub-Api-Version': self.github_api_version
                 }
         if not response_callback:
             response_callback = self.checkResponse
@@ -1462,7 +1465,8 @@ class Sync(object):
         url = self.url(path)
         default_headers = {
                 'Content-Type': 'application/json;charset=UTF-8',
-                'User-Agent': self.user_agent
+                'User-Agent': self.user_agent,
+                'X-GitHub-Api-Version': self.github_api_version
                 }
         if not response_callback:
             response_callback = self.checkResponse
@@ -1479,7 +1483,8 @@ class Sync(object):
         url = self.url(path)
         default_headers = {
                 'Content-Type': 'application/json;charset=UTF-8',
-                'User-Agent': self.user_agent
+                'User-Agent': self.user_agent,
+                'X-GitHub-Api-Version': self.github_api_version
                 }
         if not response_callback:
             response_callback = self.checkResponse
@@ -1496,7 +1501,8 @@ class Sync(object):
         url = self.url(path)
         default_headers = {
                 'Content-Type': 'application/json;charset=UTF-8',
-                'User-Agent': self.user_agent
+                'User-Agent': self.user_agent,
+                'X-GitHub-Api-Version': self.github_api_version
                 }
         if not response_callback:
             response_callback = self.checkResponse
