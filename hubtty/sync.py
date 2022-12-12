@@ -866,7 +866,6 @@ class SyncPullRequestTask(Task):
             remote_commits_sha = [c['sha'] for c in remote_commits]
             for commit in pr.commits:
                 if commit.sha not in remote_commits_sha:
-                    self.log.error("Deleted commit %s", commit.sha)
                     session.delete(commit)
 
             pr.outdated = False
