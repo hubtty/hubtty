@@ -784,7 +784,7 @@ class SyncPullRequestTask(Task):
                     message.body = (remote_review.get('body','') or '').replace('\r','')
 
                 review_state = remote_review.get('state')
-                if review_state:
+                if review_state and remote_review.get('commit_id'):
                     approval = session.getApproval(pr, account, remote_review.get('commit_id'))
                     own_approval = session.getApproval(pr, session.getOwnAccount(), remote_review.get('commit_id'))
 
