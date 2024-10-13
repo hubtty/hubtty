@@ -619,11 +619,13 @@ mapper.map_imperatively(Repository, repository_table, properties=dict(
                                                  pull_request_table.c.hidden==False,
                                                  pull_request_table.c.state=='open',
                                                  pull_request_table.c.reviewed==False),
-                                order_by=pull_request_table.c.number),
+                                order_by=pull_request_table.c.number,
+                                overlaps="pull_requests,repository"),
     open_prs=relationship(PullRequest,
                           primaryjoin=and_(repository_table.c.key==pull_request_table.c.repository_key,
                                            pull_request_table.c.state=='open'),
-                          order_by=pull_request_table.c.number),
+                          order_by=pull_request_table.c.number,
+                          overlaps="pull_requests,repository,unreviewed_prs"),
 ))
 mapper.map_imperatively(Branch, branch_table)
 mapper.map_imperatively(Topic, topic_table, properties=dict(
@@ -655,7 +657,8 @@ mapper.map_imperatively(PullRequest, pull_request_table, properties=dict(
         draft_approvals=relationship(Approval,
                                      primaryjoin=and_(pull_request_table.c.key==approval_table.c.pr_key,
                                                       approval_table.c.draft==True),
-                                     order_by=approval_table.c.state)
+                                     order_by=approval_table.c.state,
+                                     overlaps="approvals,pull_request")
         ))
 mapper.map_imperatively(Commit, commit_table, properties=dict(
         messages=relationship(Message, backref='commit',
@@ -683,12 +686,14 @@ mapper.map_imperatively(File, file_table, properties=dict(
                                      primaryjoin=and_(file_table.c.key==comment_table.c.file_key,
                                                       comment_table.c.line>0),
                                      order_by=(comment_table.c.line,
-                                               comment_table.c.created)),
+                                               comment_table.c.created),
+                                     overlaps="comments,file"),
        draft_comments=relationship(Comment,
                                    primaryjoin=and_(file_table.c.key==comment_table.c.file_key,
                                                     comment_table.c.draft==True),
                                    order_by=(comment_table.c.line,
-                                             comment_table.c.created)),
+                                             comment_table.c.created),
+                                   overlaps="comments,current_comments,file"),
        ))
 
 mapper.map_imperatively(Comment, comment_table, properties=dict(
