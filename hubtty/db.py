@@ -27,7 +27,7 @@ from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, 
 from sqlalchemy.schema import ForeignKey
 from sqlalchemy.orm import registry, sessionmaker, relationship, scoped_session, joinedload
 from sqlalchemy.orm.session import Session
-from sqlalchemy.sql import exists
+from sqlalchemy.sql import exists, text
 from sqlalchemy.sql.expression import and_
 
 from hubtty import sync
@@ -793,7 +793,7 @@ class DatabaseSession(object):
         self.session().delete(obj)
 
     def vacuum(self):
-        self.session().execute("VACUUM")
+        self.session().execute(text("VACUUM"))
 
     def getRepositories(self, subscribed=False, unreviewed=False, topicless=False):
         """Retrieve repositories.
