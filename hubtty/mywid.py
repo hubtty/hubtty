@@ -69,6 +69,10 @@ class FixedCheckBox(urwid.CheckBox):
         return (len(self.get_label())+4, 1)
 
 class TableColumn(urwid.Pile):
+    def sizing(self):
+        """Explicit declare flow sizing due to the custom pack method."""
+        return frozenset((urwid.FLOW,))
+
     def pack(self, size, focus=False):
         maxcol = size[0]
         mx = max([i[0].pack((maxcol,), focus)[0] for i in self.contents])
@@ -111,7 +115,6 @@ class MyEdit(urwid.Edit):
         super(MyEdit, self).__init__(*args, **kw)
 
     def keypress(self, size, key):
-        (maxcol,) = size
         if self._command_map[key] == keymap.YANK:
             text = self.ring.yank()
             if text:
@@ -355,6 +358,13 @@ class Searchable(object):
 
 class HyperText(urwid.Text):
     _selectable = True
+
+    def sizing(self):
+        """Explicit declare flow sizing due to the custom pack method.
+
+        Normal Text can be rendered as FIXED.
+        """
+        return frozenset((urwid.FLOW,))
 
     def __init__(self, markup, align=urwid.LEFT, wrap=urwid.SPACE, layout=None):
         self._mouse_press_item = None
