@@ -69,6 +69,10 @@ class FixedCheckBox(urwid.CheckBox):
         return (len(self.get_label())+4, 1)
 
 class TableColumn(urwid.Pile):
+    def sizing(self):
+        """Explicit declare flow sizing due to the custom pack method."""
+        return frozenset((urwid.FLOW,))
+
     def pack(self, size, focus=False):
         maxcol = size[0]
         mx = max([i[0].pack((maxcol,), focus)[0] for i in self.contents])
@@ -111,7 +115,6 @@ class MyEdit(urwid.Edit):
         super(MyEdit, self).__init__(*args, **kw)
 
     def keypress(self, size, key):
-        (maxcol,) = size
         if self._command_map[key] == keymap.YANK:
             text = self.ring.yank()
             if text:
@@ -356,6 +359,13 @@ class Searchable(object):
 class HyperText(urwid.Text):
     _selectable = True
 
+    def sizing(self):
+        """Explicit declare flow sizing due to the custom pack method.
+
+        Normal Text can be rendered as FIXED.
+        """
+        return frozenset((urwid.FLOW,))
+
     def __init__(self, markup, align=urwid.LEFT, wrap=urwid.SPACE, layout=None):
         self._mouse_press_item = None
         self.selectable_items = []
@@ -520,20 +530,3 @@ class Link(urwid.Widget):
         if focus:
             return self.focused_attr
         return self.attr
-
-# A workaround for the issue fixed in
-# https://github.com/wardi/urwid/pull/74
-# included here until thi fix is released
-class MyGridFlow(urwid.GridFlow):
-    def generate_display_widget(self, size):
-        p = super(MyGridFlow, self).generate_display_widget(size)
-        for item in p.contents:
-            if isinstance(item[0], urwid.Padding):
-                c = item[0].original_widget
-                if isinstance(c, urwid.Columns):
-                    if c.focus_position == 0 and not c.contents[0][0].selectable():
-                        for i, w in enumerate(c.contents):
-                            if w[0].selectable():
-                                c.focus_position = i
-                                break
-        return p

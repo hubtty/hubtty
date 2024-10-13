@@ -637,7 +637,7 @@ class PullRequestView(urwid.WidgetWrap):
         self.needed_by_rows = {}
         self.related_prs = urwid.Pile([self.depends_on, self.needed_by])
         self.results = mywid.HyperText(u'') # because it scrolls better than a table
-        self.grid = mywid.MyGridFlow([pr_info, self.pr_description, votes, self.results],
+        self.grid = urwid.GridFlow([pr_info, self.pr_description, votes, self.results],
                                      cell_width=80, h_sep=2, v_sep=1, align='left')
         self.listbox = urwid.ListBox(urwid.SimpleFocusListWalker([]))
         self._w.contents.append((self.app.header, ('pack', 1)))
