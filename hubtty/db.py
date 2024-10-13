@@ -25,13 +25,14 @@ import six
 import sqlalchemy
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, Text, UniqueConstraint
 from sqlalchemy.schema import ForeignKey
-from sqlalchemy.orm import mapper, sessionmaker, relationship, scoped_session, joinedload
+from sqlalchemy.orm import registry, sessionmaker, relationship, scoped_session, joinedload
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql import exists
 from sqlalchemy.sql.expression import and_
 
 from hubtty import sync
 
+mapper = registry()
 metadata = MetaData()
 repository_table = Table(
     'repository', metadata,
@@ -598,8 +599,8 @@ class Check(object):
         self.created = created
         self.updated = updated
 
-mapper(Account, account_table)
-mapper(Repository, repository_table, properties=dict(
+mapper.map_imperatively(Account, account_table)
+mapper.map_imperatively(Repository, repository_table, properties=dict(
     branches=relationship(Branch, backref='repository',
                           order_by=branch_table.c.name,
                           cascade='all, delete-orphan'),
@@ -618,22 +619,24 @@ mapper(Repository, repository_table, properties=dict(
                                                  pull_request_table.c.hidden==False,
                                                  pull_request_table.c.state=='open',
                                                  pull_request_table.c.reviewed==False),
-                                order_by=pull_request_table.c.number),
+                                order_by=pull_request_table.c.number,
+                                overlaps="pull_requests,repository"),
     open_prs=relationship(PullRequest,
                           primaryjoin=and_(repository_table.c.key==pull_request_table.c.repository_key,
                                            pull_request_table.c.state=='open'),
-                          order_by=pull_request_table.c.number),
+                          order_by=pull_request_table.c.number,
+                          overlaps="pull_requests,repository,unreviewed_prs"),
 ))
-mapper(Branch, branch_table)
-mapper(Topic, topic_table, properties=dict(
+mapper.map_imperatively(Branch, branch_table)
+mapper.map_imperatively(Topic, topic_table, properties=dict(
     repositories=relationship(Repository,
                           secondary=repository_topic_table,
                           order_by=repository_table.c.name,
                           viewonly=True),
     repository_topics=relationship(RepositoryTopic),
 ))
-mapper(RepositoryTopic, repository_topic_table)
-mapper(PullRequest, pull_request_table, properties=dict(
+mapper.map_imperatively(RepositoryTopic, repository_topic_table)
+mapper.map_imperatively(PullRequest, pull_request_table, properties=dict(
         author=relationship(Account),
         commits=relationship(Commit, backref='pull_request',
                              order_by=commit_table.c.key,
@@ -654,9 +657,10 @@ mapper(PullRequest, pull_request_table, properties=dict(
         draft_approvals=relationship(Approval,
                                      primaryjoin=and_(pull_request_table.c.key==approval_table.c.pr_key,
                                                       approval_table.c.draft==True),
-                                     order_by=approval_table.c.state)
+                                     order_by=approval_table.c.state,
+                                     overlaps="approvals,pull_request")
         ))
-mapper(Commit, commit_table, properties=dict(
+mapper.map_imperatively(Commit, commit_table, properties=dict(
         messages=relationship(Message, backref='commit',
                               order_by=message_table.c.created,
                               cascade='all, delete-orphan'),
@@ -667,13 +671,13 @@ mapper(Commit, commit_table, properties=dict(
                             cascade='all, delete-orphan'),
 
         ))
-mapper(Message, message_table, properties=dict(
+mapper.map_imperatively(Message, message_table, properties=dict(
         author=relationship(Account),
         comments=relationship(Comment, backref='pull_request',
                               order_by=comment_table.c.created,
                               cascade='all, delete-orphan'),
         ))
-mapper(File, file_table, properties=dict(
+mapper.map_imperatively(File, file_table, properties=dict(
        comments=relationship(Comment, backref='file',
                              order_by=(comment_table.c.line,
                                        comment_table.c.created),
@@ -682,25 +686,27 @@ mapper(File, file_table, properties=dict(
                                      primaryjoin=and_(file_table.c.key==comment_table.c.file_key,
                                                       comment_table.c.line>0),
                                      order_by=(comment_table.c.line,
-                                               comment_table.c.created)),
+                                               comment_table.c.created),
+                                     overlaps="comments,file"),
        draft_comments=relationship(Comment,
                                    primaryjoin=and_(file_table.c.key==comment_table.c.file_key,
                                                     comment_table.c.draft==True),
                                    order_by=(comment_table.c.line,
-                                             comment_table.c.created)),
+                                             comment_table.c.created),
+                                   overlaps="comments,current_comments,file"),
        ))
 
-mapper(Comment, comment_table, properties=dict(
+mapper.map_imperatively(Comment, comment_table, properties=dict(
         author=relationship(Account)))
-mapper(Approval, approval_table, properties=dict(
+mapper.map_imperatively(Approval, approval_table, properties=dict(
         reviewer=relationship(Account)))
-mapper(PendingMerge, pending_merge_table)
-mapper(Server, server_table, properties=dict(
+mapper.map_imperatively(PendingMerge, pending_merge_table)
+mapper.map_imperatively(Server, server_table, properties=dict(
     own_account=relationship(Account)
     ))
-mapper(Check, check_table)
-mapper(Label, label_table)
-mapper(PullRequestLabel, pull_request_label_table)
+mapper.map_imperatively(Check, check_table)
+mapper.map_imperatively(Label, label_table)
+mapper.map_imperatively(PullRequestLabel, pull_request_label_table)
 
 
 def match(expr, item):
