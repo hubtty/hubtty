@@ -33,8 +33,8 @@ def sqlite_alter_columns(table_name, column_defs):
     * rename temp table to the old table name.
     """
     connection = op.get_bind()
-    meta = sqlalchemy.MetaData(bind=connection)
-    meta.reflect()
+    meta = sqlalchemy.MetaData()
+    meta.reflect(connection)
 
     changed_columns = {}
     indexes = []
@@ -85,11 +85,11 @@ def sqlite_alter_columns(table_name, column_defs):
     # create temp table
     tmp_table_name = "%s_%s" % (table_name, six.text_type(uuid.uuid4()))
     op.create_table(tmp_table_name, *new_columns)
-    meta.reflect()
+    meta.reflect(connection)
 
     try:
         # copy data from the old table to the temp one
-        sql_select = sqlalchemy.sql.select(old_columns)
+        sql_select = sqlalchemy.sql.select(*old_columns)
         connection.execute(sqlalchemy.sql.insert(meta.tables[tmp_table_name])
                            .from_select(column_names, sql_select))
     except Exception:
@@ -117,8 +117,8 @@ def sqlite_drop_columns(table_name, drop_columns):
     * rename temp table to the old table name.
     """
     connection = op.get_bind()
-    meta = sqlalchemy.MetaData(bind=connection)
-    meta.reflect()
+    meta = sqlalchemy.MetaData()
+    meta.reflect(connection)
 
     # construct lists of all columns and their names
     old_columns = []
@@ -168,11 +168,11 @@ def sqlite_drop_columns(table_name, drop_columns):
     # create temp table
     tmp_table_name = "%s_%s" % (table_name, six.text_type(uuid.uuid4()))
     op.create_table(tmp_table_name, *new_columns)
-    meta.reflect()
+    meta.reflect(connection)
 
     try:
         # copy data from the old table to the temp one
-        sql_select = sqlalchemy.sql.select(old_columns)
+        sql_select = sqlalchemy.sql.select(*old_columns)
         connection.execute(sqlalchemy.sql.insert(meta.tables[tmp_table_name])
                            .from_select(column_names, sql_select))
     except Exception:
