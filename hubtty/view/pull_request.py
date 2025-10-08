@@ -489,7 +489,10 @@ class PullRequestMessageBox(mywid.HyperText):
 
         inline_comments = {}
         for comment in message.comments:
-            path = comment.file.path
+            if comment.file:
+                path = comment.file.path
+            else:
+                path = "outdated"
             inline_comments.setdefault(path, [])
             inline_comments[path].append((comment.original_commit_id[0:7], comment.original_line or 0, comment.message))
         for v in inline_comments.values():
