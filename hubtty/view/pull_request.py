@@ -16,10 +16,6 @@
 import collections
 import datetime
 import logging
-try:
-    import ordereddict
-except:
-    pass
 import os
 import textwrap
 
@@ -34,11 +30,6 @@ from hubtty.view import side_diff as view_side_diff
 from hubtty.view import unified_diff as view_unified_diff
 from hubtty.view import mouse_scroll_decorator
 import hubtty.view
-
-try:
-    OrderedDict = collections.OrderedDict
-except AttributeError:
-    OrderedDict = ordereddict.OrderedDict
 
 class EditLabelsDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
     signals = ['save', 'cancel']
@@ -831,7 +822,7 @@ class PullRequestView(urwid.WidgetWrap):
                         results = commentlink.getTestResults(self.app, message.message)
                         if results:
                             result_system = result_systems.get(message.author.name,
-                                                               OrderedDict())
+                                                               collections.OrderedDict())
                             result_systems[message.author.name] = result_system
                             result_system.update(results)
                 skip = False

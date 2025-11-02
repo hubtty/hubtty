@@ -19,10 +19,6 @@ import re
 import site
 from shutil import copyfile
 import sys
-try:
-    import ordereddict
-except:
-    pass
 from xdg import BaseDirectory
 import yaml
 
@@ -32,11 +28,6 @@ import hubtty.auth
 import hubtty.commentlink
 import hubtty.palette
 import hubtty.keymap
-
-try:
-    OrderedDict = collections.OrderedDict
-except AttributeError:
-    OrderedDict = ordereddict.OrderedDict
 
 CONFIG_PATH = os.path.join(BaseDirectory.save_config_path('hubtty'), 'hubtty.yaml')
 SECURE_CONFIG_PATH = os.path.join(BaseDirectory.save_config_path('hubtty'), 'hubtty_auth.yaml')
@@ -213,12 +204,12 @@ class Config(object):
 
         self.diff_view = self.config.get('diff-view', 'side-by-side')
 
-        self.dashboards = OrderedDict()
+        self.dashboards = collections.OrderedDict()
         for d in self.config.get('dashboards', []):
             self.dashboards[d['key']] = d
             self.dashboards[d['key']]
 
-        self.reviewkeys = OrderedDict()
+        self.reviewkeys = collections.OrderedDict()
         for k in self.config.get('reviewkeys', []):
             self.reviewkeys[k['key']] = k
 

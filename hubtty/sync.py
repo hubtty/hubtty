@@ -24,10 +24,6 @@ import datetime
 import re
 
 import dateutil.parser
-try:
-    import ordereddict
-except:
-    pass
 import requests
 import requests.utils
 import queue
@@ -52,10 +48,7 @@ class RateLimitError(Exception):
 
 class MultiQueue(object):
     def __init__(self, priorities):
-        try:
-            self.queues = collections.OrderedDict()
-        except AttributeError:
-            self.queues = ordereddict.OrderedDict()
+        self.queues = collections.OrderedDict()
         for key in priorities:
             self.queues[key] = collections.deque()
         self.condition = threading.Condition()

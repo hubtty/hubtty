@@ -13,20 +13,12 @@
 # under the License.
 
 import collections
-try:
-    import ordereddict
-except:
-    pass
 import re
 
 import urwid
 
 from hubtty import mywid
 
-try:
-    OrderedDict = collections.OrderedDict
-except AttributeError:
-    OrderedDict = ordereddict.OrderedDict
 
 class TextReplacement(object):
     def __init__(self, config):
@@ -86,7 +78,7 @@ class CommentLink(object):
     def getTestResults(self, app, text):
         if self.test_result is None:
             return {}
-        ret = OrderedDict()
+        ret = collections.OrderedDict()
         for line in text.split('\n'):
             m = self.match.search(line)
             if m:
