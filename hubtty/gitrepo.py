@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 OpenStack Foundation
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -93,9 +92,9 @@ class CommitContext:
         else:
             committer_email = committer.email.decode('utf8')
         return ["Parent: %s\n" % parentsha,
-                "Author: %s <%s>\n" % (author.name, author_email),
+                "Author: {} <{}>\n".format(author.name, author_email),
                 "AuthorDate: %s\n" % author_date,
-                "Commit: %s <%s>\n" % (committer.name, committer_email),
+                "Commit: {} <{}>\n".format(committer.name, committer_email),
                 "CommitDate: %s\n" % commit_date,
                 "\n"] + commit.message.splitlines(True)
 
@@ -130,7 +129,7 @@ class DiffChunk:
         self.calcRange()
 
     def __repr__(self):
-        return '<%s old lines %s-%s / new lines %s-%s>' % (
+        return '<{} old lines {}-{} / new lines {}-{}>'.format(
             self.__class__.__name__,
             self.range[OLD][START], self.range[OLD][END],
             self.range[NEW][START], self.range[NEW][END])
@@ -261,12 +260,12 @@ class DiffFile:
 
 class GitCheckoutError(Exception):
     def __init__(self, msg):
-        super(GitCheckoutError, self).__init__(msg)
+        super().__init__(msg)
         self.msg = msg
 
 class GitCloneError(Exception):
     def __init__(self, msg):
-        super(GitCloneError, self).__init__(msg)
+        super().__init__(msg)
         self.msg = msg
 
 class Repo:

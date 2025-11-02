@@ -42,7 +42,7 @@ def sqlite_alter_columns(table_name, column_defs):
         # immediately, instead, add it to a list of indexes to create
         # after the table rename.
         if col.index:
-            indexes.append(('ix_%s_%s' % (table_name, col.name),
+            indexes.append(('ix_{}_{}'.format(table_name, col.name),
                             table_name,
                             [col.name],
                             col.unique))
@@ -82,7 +82,7 @@ def sqlite_alter_columns(table_name, column_defs):
                         index.unique))
 
     # create temp table
-    tmp_table_name = "%s_%s" % (table_name, str(uuid.uuid4()))
+    tmp_table_name = "{}_{}".format(table_name, str(uuid.uuid4()))
     op.create_table(tmp_table_name, *new_columns)
     meta.reflect(connection)
 
@@ -165,7 +165,7 @@ def sqlite_drop_columns(table_name, drop_columns):
                         index.unique))
 
     # create temp table
-    tmp_table_name = "%s_%s" % (table_name, str(uuid.uuid4()))
+    tmp_table_name = "{}_{}".format(table_name, str(uuid.uuid4()))
     op.create_table(tmp_table_name, *new_columns)
     meta.reflect(connection)
 

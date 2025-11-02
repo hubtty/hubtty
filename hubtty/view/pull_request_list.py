@@ -96,7 +96,7 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
 
     def __init__(self, app, pr, prefix, categories,
                  enabled_columns, callback=None):
-        super(PullRequestRow, self).__init__('', on_press=callback, user_data=pr.key)
+        super().__init__('', on_press=callback, user_data=pr.key)
         self.app = app
         self.pr_key = pr.key
         self.prefix = prefix
@@ -195,7 +195,7 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
             style = 'reviewed-pr'
         else:
             style = 'unreviewed-pr'
-        title = '%s%s' % (self.prefix, pr.title)
+        title = '{}{}'.format(self.prefix, pr.title)
         flag = ' '
         if pr.starred:
             flag = '*'
@@ -279,7 +279,7 @@ class PullRequestListHeader(urwid.WidgetWrap, PullRequestListColumns):
         self.branch = urwid.Text('Branch', wrap='clip')
         self.columns = urwid.Columns([], dividechars=1)
         self.category_columns = []
-        super(PullRequestListHeader, self).__init__(self.columns)
+        super().__init__(self.columns)
 
     def update(self, categories):
         self.category_columns = []
@@ -291,9 +291,9 @@ class PullRequestListHeader(urwid.WidgetWrap, PullRequestListColumns):
 
 @mouse_scroll_decorator.ScrollByWheel
 class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
-    required_columns = set(['Number', 'Title', 'Updated'])
+    required_columns = {'Number', 'Title', 'Updated'}
     # FIXME(masayukig): Disable 'Size' column when configured
-    optional_columns = set(['Branch', 'Size'])
+    optional_columns = {'Branch', 'Size'}
 
     def getCommands(self):
         if self.repository_key:
@@ -342,7 +342,7 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
 
     def __init__(self, app, query, query_desc=None, repository_key=None,
                  unreviewed=False, sort_by=None, reverse=None):
-        super(PullRequestListView, self).__init__(urwid.Pile([]))
+        super().__init__(urwid.Pile([]))
         self.log = logging.getLogger('hubtty.view.pull_request_list')
         self.searchInit()
         self.app = app
@@ -393,9 +393,9 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
                 or
                 (isinstance(event, sync.PullRequestUpdatedEvent) and
                  event.pr_key in self.pr_rows.keys())):
-            self.log.debug("Ignoring refresh pull request list due to event %s" % (event,))
+            self.log.debug("Ignoring refresh pull request list due to event {}".format(event))
             return False
-        self.log.debug("Refreshing pull request list due to event %s" % (event,))
+        self.log.debug("Refreshing pull request list due to event {}".format(event))
         return True
 
     def refresh(self):
@@ -477,7 +477,7 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
 
     def getQueryString(self):
         if self.repository_key is not None:
-            return "repo:%s %s" % (self.query_desc, self.app.config.repository_pr_list_query)
+            return "repo:{} {}".format(self.query_desc, self.app.config.repository_pr_list_query)
         return self.query
 
     def clearPullRequestList(self):
@@ -549,7 +549,7 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
             return None
 
         if not self.app.input_buffer:
-            key = super(PullRequestListView, self).keypress(size, key)
+            key = super().keypress(size, key)
         keys = self.app.input_buffer + [key]
         commands = self.app.config.keymap.getCommands(keys)
         ret = self.handleCommands(commands)

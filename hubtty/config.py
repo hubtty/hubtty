@@ -258,7 +258,7 @@ class Config:
         path = SECURE_CONFIG_PATH
         # Ensure the file exists
         open(path, 'a+').close()
-        with open(path, 'r') as f:
+        with open(path) as f:
             auth = yaml.safe_load(f) or {}
         conf = auth.get(name, {})
         token = conf.get('token')

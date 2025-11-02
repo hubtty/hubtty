@@ -70,7 +70,7 @@ class SearchCompiler:
         return result
 
 if __name__ == '__main__':
-    class Dummy(object):
+    class Dummy:
         pass
     query = 'recentlyseen:24 hours'
     lexer = tokenizer.SearchTokenizer()

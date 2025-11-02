@@ -23,7 +23,7 @@ LN_COL_WIDTH = 5
 
 class SideDiffCommentEdit(BaseDiffCommentEdit):
     def __init__(self, app, context, old_key=None, new_key=None, old='', new=''):
-        super(SideDiffCommentEdit, self).__init__([])
+        super().__init__([])
         self.app = app
         self.context = context
         # If we save a comment, the resulting key will be stored here
@@ -50,7 +50,7 @@ class SideDiffCommentEdit(BaseDiffCommentEdit):
 
     def keypress(self, size, key):
         if not self.app.input_buffer:
-            key = super(SideDiffCommentEdit, self).keypress(size, key)
+            key = super().keypress(size, key)
         keys = self.app.input_buffer + [key]
         commands = self.app.config.keymap.getCommands(keys)
 
@@ -68,7 +68,7 @@ class SideDiffCommentEdit(BaseDiffCommentEdit):
 
 class SideDiffComment(BaseDiffComment):
     def __init__(self, context, old, new):
-        super(SideDiffComment, self).__init__([])
+        super().__init__([])
         self.context = context
         oldt = urwid.Text(old)
         newt = urwid.Text(new)
@@ -83,7 +83,7 @@ class SideDiffComment(BaseDiffComment):
 
 class SideDiffLine(BaseDiffLine):
     def __init__(self, app, context, old, new, callback=None):
-        super(SideDiffLine, self).__init__('', on_press=callback)
+        super().__init__('', on_press=callback)
         self.context = context
         self.text_widgets = []
         columns = []
@@ -120,7 +120,7 @@ class SideDiffLine(BaseDiffLine):
 
 class SideFileHeader(BaseFileHeader):
     def __init__(self, app, context, old, new, callback=None):
-        super(SideFileHeader, self).__init__('', on_press=callback)
+        super().__init__('', on_press=callback)
         self.context = context
         col = urwid.Columns([
                 urwid.Text(('filename', old)),
@@ -134,7 +134,7 @@ class SideFileReminder(BaseFileReminder):
         self.old_text = urwid.Text(('filename', ''))
         self.new_text = urwid.Text(('filename', ''))
         col = urwid.Columns([self.old_text, self.new_text])
-        super(SideFileReminder, self).__init__(col)
+        super().__init__(col)
 
     def set(self, old, new):
         self.old_text.set_text(('filename', old))
@@ -148,9 +148,9 @@ class SideDiffView(BaseDiffView):
             lines.append(SideDiffLine(self.app, context, old, new,
                                       callback=self.onSelect))
             # see if there are any comments for this line
-            key = 'old-%s-%s' % (old[0], diff.oldname)
+            key = 'old-{}-{}'.format(old[0], diff.oldname)
             old_list = comment_lists.pop(key, [])
-            key = 'new-%s-%s' % (new[0], diff.newname)
+            key = 'new-{}-{}'.format(new[0], diff.newname)
             new_list = comment_lists.pop(key, [])
             while old_list or new_list:
                 old_comment_key = new_comment_key = None
@@ -161,9 +161,9 @@ class SideDiffView(BaseDiffView):
                     (new_comment_key, new_comment) = new_list.pop(0)
                 lines.append(SideDiffComment(context, old_comment, new_comment))
             # see if there are any draft comments for this line
-            key = 'olddraft-%s-%s' % (old[0], diff.oldname)
+            key = 'olddraft-{}-{}'.format(old[0], diff.oldname)
             old_list = comment_lists.pop(key, [])
-            key = 'newdraft-%s-%s' % (new[0], diff.newname)
+            key = 'newdraft-{}-{}'.format(new[0], diff.newname)
             new_list = comment_lists.pop(key, [])
             while old_list or new_list:
                 old_comment_key = new_comment_key = None
@@ -188,9 +188,9 @@ class SideDiffView(BaseDiffView):
                                     callback=self.onSelect))
 
         # see if there are any comments for this file
-        key = 'old-None-%s' % (diff.oldname,)
+        key = 'old-None-{}'.format(diff.oldname)
         old_list = comment_lists.pop(key, [])
-        key = 'new-None-%s' % (diff.newname,)
+        key = 'new-None-{}'.format(diff.newname)
         new_list = comment_lists.pop(key, [])
         while old_list or new_list:
             old_comment_key = new_comment_key = None
@@ -201,9 +201,9 @@ class SideDiffView(BaseDiffView):
                 (new_comment_key, new_comment) = new_list.pop(0)
             lines.append(SideDiffComment(context, old_comment, new_comment))
         # see if there are any draft comments for this file
-        key = 'olddraft-None-%s' % (diff.oldname,)
+        key = 'olddraft-None-{}'.format(diff.oldname)
         old_list = comment_lists.pop(key, [])
-        key = 'newdraft-None-%s' % (diff.newname,)
+        key = 'newdraft-None-{}'.format(diff.newname)
         new_list = comment_lists.pop(key, [])
         while old_list or new_list:
             old_comment_key = new_comment_key = None

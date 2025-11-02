@@ -65,7 +65,7 @@ Press the F1 key anywhere to get help.  Your terminal emulator may require you t
 
 class StatusHeader(urwid.WidgetWrap):
     def __init__(self, app):
-        super(StatusHeader, self).__init__(urwid.Columns([]))
+        super().__init__(urwid.Columns([]))
         self.app = app
         self.title_widget = urwid.Text('Start')
         self.error_widget = urwid.Text('')
@@ -117,7 +117,7 @@ class StatusHeader(urwid.WidgetWrap):
         if self._held != self.held:
             self._held = self.held
             if self._held:
-                self.held_widget.set_text(('error', 'Held: %s (%s)' % (self._held, self.held_key)))
+                self.held_widget.set_text(('error', 'Held: {} ({})'.format(self._held, self.held_key)))
             else:
                 self.held_widget.set_text('')
         if self._error != self.error:
@@ -146,13 +146,13 @@ class BreadCrumbBar(urwid.WidgetWrap):
         self.breadcrumbs = urwid.Columns([], dividechars=3)
         self.display_widget = urwid.Columns(
             [('pack', self.prefix_text), self.breadcrumbs])
-        super(BreadCrumbBar, self).__init__(self.display_widget)
+        super().__init__(self.display_widget)
 
     def _get_breadcrumb_text(self, screen):
         title = getattr(screen, 'short_title', None)
         if not title:
             title = getattr(screen, 'title', str(screen))
-        text = "%s %s" % (BreadCrumbBar.BREADCRUMB_SYMBOL, title)
+        text = "{} {}".format(BreadCrumbBar.BREADCRUMB_SYMBOL, title)
         if len(text) > 23:
             text = "%s..." % text[:20]
         return urwid.Text(text, wrap='clip')
@@ -184,7 +184,7 @@ class SearchDialog(mywid.ButtonDialog):
                              lambda button:self._emit('search'))
         urwid.connect_signal(cancel_button, 'click',
                              lambda button:self._emit('cancel'))
-        super(SearchDialog, self).__init__("Search",
+        super().__init__("Search",
                                            "Enter a pull request or search string.",
                                            entry_prompt="Search: ",
                                            entry_text=default,
@@ -194,7 +194,7 @@ class SearchDialog(mywid.ButtonDialog):
 
     def keypress(self, size, key):
         if not self.app.input_buffer:
-            key = super(SearchDialog, self).keypress(size, key)
+            key = super().keypress(size, key)
         keys = self.app.input_buffer + [key]
         commands = self.app.config.keymap.getCommands(keys)
         if keymap.ACTIVATE in commands:
@@ -271,7 +271,7 @@ class App:
         self.lock_fd = open(self.config.lock_file, 'w')
         try:
             fcntl.lockf(self.lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except IOError:
+        except OSError:
             print("error: another instance of hubtty is running for: %s" % self.config.server['name'])
             sys.exit(1)
 
@@ -396,14 +396,14 @@ class App:
         while True:
             try:
                 s, addr = self.socket.accept()
-                self.log.debug("Accepted socket connection %s" % (s,))
+                self.log.debug("Accepted socket connection {}".format(s))
                 buf = b''
                 while True:
                     buf += s.recv(1)
                     if buf[-1] == 10:
                         break
                 buf = buf.decode('utf8').strip()
-                self.log.debug("Received %s from socket" % (buf,))
+                self.log.debug("Received {} from socket".format(buf))
                 s.close()
                 parts = buf.split()
                 self.command_queue.put((parts[0], parts[1:]))
@@ -417,7 +417,7 @@ class App:
             self.status.update(message='')
 
     def changeScreen(self, widget, push=True):
-        self.log.debug("Changing screen to %s" % (widget,))
+        self.log.debug("Changing screen to {}".format(widget))
         self.status.update(error=False, title=widget.title)
         if push:
             self.screens.append(self.frame.body)
@@ -436,7 +436,7 @@ class App:
             widget = self.screens.pop()
             if (not target_widget) or (widget is target_widget):
                 break
-        self.log.debug("Popping screen to %s" % (widget,))
+        self.log.debug("Popping screen to {}".format(widget))
         if hasattr(widget, 'title'):
             self.status.update(title=widget.title)
         self.clearInputBuffer()
@@ -497,7 +497,7 @@ class App:
                                 min_width=min_width, min_height=min_height)
         if hasattr(widget, 'title'):
             overlay.title = widget.title
-        self.log.debug("Overlaying %s on screen %s" % (widget, self.frame.body))
+        self.log.debug("Overlaying {} on screen {}".format(widget, self.frame.body))
         self.screens.append(self.frame.body)
         self.frame.body = overlay
 
@@ -525,7 +525,7 @@ class App:
             if text:
                 text += '\n'
             text += title+'\n'
-            text += '%s\n' % ('='*len(title),)
+            text += '{}\n'.format('='*len(title))
             for cmd, keys, cmdtext in items:
                 text += '{keys:{width}} {text}\n'.format(
                     keys=keys, width=keylen, text=cmdtext)
@@ -704,7 +704,7 @@ class App:
                     if cmd in commands:
                         completions.append(key)
             completions = ' '.join(completions)
-            msg = '%s: %s' % (msg, completions)
+            msg = '{}: {}'.format(msg, completions)
             self.status.update(message=msg)
             return
         self.clearInputBuffer()
@@ -748,12 +748,12 @@ class App:
         (command, data) = self.command_queue.get()
         if command == 'open':
             url = data[0]
-            self.log.debug("Opening URL %s" % (url,))
+            self.log.debug("Opening URL {}".format(url))
             result = self.parseInternalURL(url)
             if result is not None:
                 self.openInternalURL(result)
         else:
-            self.log.error("Unable to parse command %s with data %s" % (command, data))
+            self.log.error("Unable to parse command {} with data {}".format(command, data))
 
     def toggleHeldPullRequest(self, pr_key):
         with self.db.getSession() as session:
@@ -863,7 +863,7 @@ class OpenPullRequestAction(argparse.Action):
                            namespace.keymap, namespace.path)
         url = values[0]
         if not url.startswith(cf.url):
-            print('Supplied URL must start with %s' % (cf.url,))
+            print('Supplied URL must start with {}'.format(cf.url))
             sys.exit(1)
 
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)

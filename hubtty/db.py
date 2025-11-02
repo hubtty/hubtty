@@ -578,13 +578,13 @@ class File:
             else:
                 break
         post = ''.join(post)
-        mid = '{%s => %s}' % (self.old_path[start:0-end+1], self.path[start:0-end+1])
+        mid = '{{{} => {}}}'.format(self.old_path[start:0-end+1], self.path[start:0-end+1])
         if pre and post:
-            mid = '{%s => %s}' % (self.old_path[start:0-end+1],
+            mid = '{{{} => {}}}'.format(self.old_path[start:0-end+1],
                                   self.path[start:0-end+1])
             return pre + mid + post
         else:
-            return '%s => %s' % (self.old_path, self.path)
+            return '{} => {}'.format(self.old_path, self.path)
 
 class Server:
     def __init__(self):
@@ -779,7 +779,7 @@ class DatabaseSession:
         self.session().close()
         self.session = None
         end = time.time()
-        self.database.log.debug("Database lock held %s seconds" % (end-self.start,))
+        self.database.log.debug("Database lock held {} seconds".format(end-self.start))
         self.database.lock.release()
 
     def abort(self):
@@ -875,7 +875,7 @@ class DatabaseSession:
             return None
 
     def getPullRequests(self, query, unreviewed=False, sort_by='number'):
-        self.database.log.debug("Search query: %s sort: %s" % (query, sort_by))
+        self.database.log.debug("Search query: {} sort: {}".format(query, sort_by))
         q = self.session().query(PullRequest).filter(self.search.parse(query))
         if not isinstance(sort_by, (list, tuple)):
             sort_by = [sort_by]

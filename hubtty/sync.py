@@ -125,15 +125,15 @@ class UpdateEvent:
 
 class RepositoryAddedEvent(UpdateEvent):
     def __repr__(self):
-        return '<RepositoryAddedEvent repository_key:%s>' % (
-            self.repository_key,)
+        return '<RepositoryAddedEvent repository_key:{}>'.format(
+            self.repository_key)
 
     def __init__(self, repository):
         self.repository_key = repository.key
 
 class PullRequestAddedEvent(UpdateEvent):
     def __repr__(self):
-        return '<PullRequestAddedEvent repository_key:%s pr_key:%s>' % (
+        return '<PullRequestAddedEvent repository_key:{} pr_key:{}>'.format(
             self.repository_key, self.pr_key)
 
     def __init__(self, pr):
@@ -146,7 +146,7 @@ class PullRequestAddedEvent(UpdateEvent):
 
 class PullRequestUpdatedEvent(UpdateEvent):
     def __repr__(self):
-        return '<PullRequestUpdatedEvent repository_key:%s pr_key:%s review_flag_changed:%s state_changed:%s>' % (
+        return '<PullRequestUpdatedEvent repository_key:{} pr_key:{} review_flag_changed:{} state_changed:{}>'.format(
             self.repository_key, self.pr_key, self.review_flag_changed, self.state_changed)
 
     def __init__(self, pr):
@@ -200,11 +200,11 @@ class SyncOwnAccountTask(Task):
 
 class SyncAccountTask(Task):
     def __init__(self, username, priority=NORMAL_PRIORITY):
-        super(SyncAccountTask, self).__init__(priority)
+        super().__init__(priority)
         self.username = username
 
     def __repr__(self):
-        return '<SyncAccountTask %s>' % (self.username,)
+        return '<SyncAccountTask {}>'.format(self.username)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -292,11 +292,11 @@ class SyncSubscribedRepositoryBranchesTask(Task):
 
 class SyncRepositoryBranchesTask(Task):
     def __init__(self, repository_name, priority=NORMAL_PRIORITY):
-        super(SyncRepositoryBranchesTask, self).__init__(priority)
+        super().__init__(priority)
         self.repository_name = repository_name
 
     def __repr__(self):
-        return '<SyncRepositoryBranchesTask %s>' % (self.repository_name,)
+        return '<SyncRepositoryBranchesTask {}>'.format(self.repository_name)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -343,11 +343,11 @@ class SyncSubscribedRepositoryLabelsTask(Task):
 
 class SyncRepositoryLabelsTask(Task):
     def __init__(self, repository_name, priority=NORMAL_PRIORITY):
-        super(SyncRepositoryLabelsTask, self).__init__(priority)
+        super().__init__(priority)
         self.repository_name = repository_name
 
     def __repr__(self):
-        return '<SyncRepositoryLabelsTask %s>' % (self.repository_name,)
+        return '<SyncRepositoryLabelsTask {}>'.format(self.repository_name)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -357,7 +357,7 @@ class SyncRepositoryLabelsTask(Task):
 
     def run(self, sync):
         app = sync.app
-        remote_labels = sync.get('repos/%s/labels' % (self.repository_name,))
+        remote_labels = sync.get('repos/{}/labels'.format(self.repository_name))
         with app.db.getSession() as session:
             repository = session.getRepositoryByName(self.repository_name)
 
@@ -401,13 +401,13 @@ class SyncSubscribedRepositoriesTask(Task):
 
 class SyncRepositoryTask(Task):
     def __init__(self, repository_keys, priority=NORMAL_PRIORITY):
-        super(SyncRepositoryTask, self).__init__(priority)
+        super().__init__(priority)
         if type(repository_keys) == int:
             repository_keys = [repository_keys]
         self.repository_keys = repository_keys
 
     def __repr__(self):
-        return '<SyncRepositoryTask %s>' % (self.repository_keys,)
+        return '<SyncRepositoryTask {}>'.format(self.repository_keys)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -454,7 +454,7 @@ class SyncRepositoryTask(Task):
 
         if partial_sync:
             # Allow 4 seconds for request time, etc.
-            query = 'type:pr updated:>%s' % ((sync_from - datetime.timedelta(seconds=4)).replace(microsecond=0).isoformat(),)
+            query = 'type:pr updated:>{}'.format((sync_from - datetime.timedelta(seconds=4)).replace(microsecond=0).isoformat())
             sync_repositories(partial_sync, query)
 
         for key in self.repository_keys:
@@ -462,12 +462,12 @@ class SyncRepositoryTask(Task):
 
 class SetRepositoryUpdatedTask(Task):
     def __init__(self, repository_key, updated, priority=NORMAL_PRIORITY):
-        super(SetRepositoryUpdatedTask, self).__init__(priority)
+        super().__init__(priority)
         self.repository_key = repository_key
         self.updated = updated
 
     def __repr__(self):
-        return '<SetRepositoryUpdatedTask %s %s>' % (self.repository_key, self.updated)
+        return '<SetRepositoryUpdatedTask {} {}>'.format(self.repository_key, self.updated)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -484,7 +484,7 @@ class SetRepositoryUpdatedTask(Task):
 
 class SyncOutdatedPullRequestsTask(Task):
     def __init__(self, priority=NORMAL_PRIORITY):
-        super(SyncOutdatedPullRequestsTask, self).__init__(priority)
+        super().__init__(priority)
 
     def __eq__(self, other):
         if other.__class__ == self.__class__:
@@ -497,17 +497,17 @@ class SyncOutdatedPullRequestsTask(Task):
     def run(self, sync):
         with sync.app.db.getSession() as session:
             for pr in session.getOutdated():
-                self.log.debug("Sync outdated pull request %s" % (pr.pr_id,))
+                self.log.debug("Sync outdated pull request {}".format(pr.pr_id))
                 sync.submitTask(SyncPullRequestTask(pr.pr_id, priority=self.priority))
 
 class SyncPullRequestTask(Task):
     def __init__(self, pr_id, force_fetch=False, priority=NORMAL_PRIORITY):
-        super(SyncPullRequestTask, self).__init__(priority)
+        super().__init__(priority)
         self.pr_id = pr_id
         self.force_fetch = force_fetch
 
     def __repr__(self):
-        return '<SyncPullRequestTask %s>' % (self.pr_id,)
+        return '<SyncPullRequestTask {}>'.format(self.pr_id)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -595,13 +595,13 @@ class SyncPullRequestTask(Task):
             self.log.info("Synced pull request %s in %0.5f seconds.", self.pr_id, total_time)
         except Exception:
             try:
-                self.log.error("Marking pull request %s outdated" % (self.pr_id,))
+                self.log.error("Marking pull request {} outdated".format(self.pr_id))
                 with sync.app.db.getSession() as session:
                     pr = session.getPullRequestByPullRequestID(self.pr_id)
                     if pr:
                         pr.outdated = True
             except Exception:
-                self.log.exception("Error while marking pull request %s as outdated" % (self.pr_id,))
+                self.log.exception("Error while marking pull request {} as outdated".format(self.pr_id))
             raise
 
     def _syncPullRequest(self, sync):
@@ -628,11 +628,11 @@ class SyncPullRequestTask(Task):
             last_commit = remote_commits[-1]
             last_commit['_hubtty_checks'] = []
             remote_commit_status = sync.get(
-                    'repos/%s/commits/%s/status' % (repository_name, last_commit['sha']))
+                    'repos/{}/commits/{}/status'.format(repository_name, last_commit['sha']))
             for check in remote_commit_status['statuses']:
                 last_commit['_hubtty_checks'].append(self._checkResultFromStatus(check))
             remote_commit_check_runs = sync.get(
-                    'repos/%s/commits/%s/check-runs' % (repository_name, last_commit['sha']))
+                    'repos/{}/commits/{}/check-runs'.format(repository_name, last_commit['sha']))
             for check in remote_commit_check_runs['check_runs']:
                 last_commit['_hubtty_checks'].append(self._checkResultFromCheck(check))
 
@@ -648,8 +648,8 @@ class SyncPullRequestTask(Task):
             if not pr:
                 repository = session.getRepositoryByName(repository_name)
                 if not repository:
-                    self.log.debug("Repository %s unknown while syncing pull request" % (repository_name,))
-                    remote_repository = sync.get('repos/%s' % (repository_name,))
+                    self.log.debug("Repository {} unknown while syncing pull request".format(repository_name))
+                    remote_repository = sync.get('repos/{}'.format(repository_name))
                     if remote_repository:
                         repository = session.createRepository(
                             remote_repository['full_name'],
@@ -708,7 +708,7 @@ class SyncPullRequestTask(Task):
                 commit = pr.getCommitBySha(remote_commit['sha'])
                 # TODO: handle multiple parents
                 url = sync.app.config.git_url + pr.repository.name
-                ref = "pull/%s/head" % (pr.number,)
+                ref = "pull/{}/head".format(pr.number)
                 if (not commit) or self.force_fetch:
                     fetches[url].append('+%(ref)s:%(ref)s' % dict(ref=ref))
                 if not commit:
@@ -902,12 +902,12 @@ class CheckReposTask(Task):
 class CheckCommitsTask(Task):
     def __init__(self, repository_key, force_fetch=False,
                  priority=NORMAL_PRIORITY):
-        super(CheckCommitsTask, self).__init__(priority)
+        super().__init__(priority)
         self.repository_key = repository_key
         self.force_fetch = force_fetch
 
     def __repr__(self):
-        return '<CheckCommitsTask %s>' % (self.repository_key,)
+        return '<CheckCommitsTask {}>'.format(self.repository_key)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -962,11 +962,11 @@ class UploadReviewsTask(Task):
 
 class SetLabelsTask(Task):
     def __init__(self, pr_key, priority=NORMAL_PRIORITY):
-        super(SetLabelsTask, self).__init__(priority)
+        super().__init__(priority)
         self.pr_key = pr_key
 
     def __repr__(self):
-        return '<SetLabelsTask %s>' % (self.pr_key,)
+        return '<SetLabelsTask {}>'.format(self.pr_key)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -991,11 +991,11 @@ class SetLabelsTask(Task):
 
 class RebasePullRequestTask(Task):
     def __init__(self, pr_key, priority=NORMAL_PRIORITY):
-        super(RebasePullRequestTask, self).__init__(priority)
+        super().__init__(priority)
         self.pr_key = pr_key
 
     def __repr__(self):
-        return '<RebasePullRequestTask %s>' % (self.pr_key,)
+        return '<RebasePullRequestTask {}>'.format(self.pr_key)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -1011,7 +1011,7 @@ class RebasePullRequestTask(Task):
             if response.status_code == 503:
                 raise OfflineError("Received 503 status code")
             elif response.status_code == 422:
-                error_msg = 'Failed to rebase pull request %s: %s' % (pr.pr_id, response.json()['message'])
+                error_msg = 'Failed to rebase pull request {}: {}'.format(pr.pr_id, response.json()['message'])
                 app.error(error_msg)
                 self.log.error(error_msg)
             elif response.status_code >= 400:
@@ -1025,18 +1025,18 @@ class RebasePullRequestTask(Task):
             if latest_commit:
                 headers = {'Accept': 'application/vnd.github.lydian-preview+json'}
                 # Inside db session for rollback
-                sync.put('repos/%s/update-branch' % (pr.pr_id,), {
+                sync.put('repos/{}/update-branch'.format(pr.pr_id), {
                     'expected_head_sha': latest_commit.sha,
                     }, headers=headers, response_callback=checkResponse)
                 sync.submitTask(SyncPullRequestTask(pr.pr_id, priority=self.priority))
 
 class EditPullRequestTask(Task):
     def __init__(self, pr_key, priority=NORMAL_PRIORITY):
-        super(EditPullRequestTask, self).__init__(priority)
+        super().__init__(priority)
         self.pr_key = pr_key
 
     def __repr__(self):
-        return '<EditPullRequestTask %s>' % (self.pr_key,)
+        return '<EditPullRequestTask {}>'.format(self.pr_key)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -1063,16 +1063,16 @@ class EditPullRequestTask(Task):
             elif pr.state == 'open':
                 edit_params['state'] = 'open'
             # Inside db session for rollback
-            sync.patch('repos/%s' % (pr.pr_id,), edit_params)
+            sync.patch('repos/{}'.format(pr.pr_id), edit_params)
             sync.submitTask(SyncPullRequestTask(pr.pr_id, priority=self.priority))
 
 class UploadReviewTask(Task):
     def __init__(self, message_key, priority=NORMAL_PRIORITY):
-        super(UploadReviewTask, self).__init__(priority)
+        super().__init__(priority)
         self.message_key = message_key
 
     def __repr__(self):
-        return '<UploadReviewTask %s>' % (self.message_key,)
+        return '<UploadReviewTask {}>'.format(self.message_key)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -1091,7 +1091,7 @@ class UploadReviewTask(Task):
                 return
             pr = message.commit.pull_request
         if not pr.held:
-            self.log.debug("Syncing %s to find out if it should be held" % (pr.pr_id,))
+            self.log.debug("Syncing {} to find out if it should be held".format(pr.pr_id))
             t = SyncPullRequestTask(pr.pr_id)
             t.run(sync)
             self.results += t.results
@@ -1138,7 +1138,7 @@ class UploadReviewTask(Task):
                     data['comments'] = comments
                 if comments or commit == last_commit:
                     # Inside db session for rollback
-                    sync.post('repos/%s/reviews' % (pr_id,), data)
+                    sync.post('repos/{}/reviews'.format(pr_id), data)
                 if commit == last_commit:
                     break
 
@@ -1147,11 +1147,11 @@ class UploadReviewTask(Task):
 
 class SendMergeTask(Task):
     def __init__(self, pending_merge_key, priority=NORMAL_PRIORITY):
-        super(SendMergeTask, self).__init__(priority)
+        super().__init__(priority)
         self.pending_merge_key = pending_merge_key
 
     def __repr__(self):
-        return '<SendMergeTask %s>' % (self.pending_merge_key,)
+        return '<SendMergeTask {}>'.format(self.pending_merge_key)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -1172,17 +1172,17 @@ class SendMergeTask(Task):
             pr_id = pm.pull_request.pr_id
             session.delete(pm)
             # Inside db session for rollback
-            sync.put('repos/%s/merge' % (pr_id,), data)
+            sync.put('repos/{}/merge'.format(pr_id), data)
 
         sync.submitTask(SyncPullRequestTask(pr_id, priority=self.priority))
 
 class PruneDatabaseTask(Task):
     def __init__(self, age, priority=NORMAL_PRIORITY):
-        super(PruneDatabaseTask, self).__init__(priority)
+        super().__init__(priority)
         self.age = age
 
     def __repr__(self):
-        return '<PruneDatabaseTask %s>' % (self.age,)
+        return '<PruneDatabaseTask {}>'.format(self.age)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -1205,11 +1205,11 @@ class PruneDatabaseTask(Task):
 
 class PrunePullRequestTask(Task):
     def __init__(self, key, priority=NORMAL_PRIORITY):
-        super(PrunePullRequestTask, self).__init__(priority)
+        super().__init__(priority)
         self.key = key
 
     def __repr__(self):
-        return '<PrunePullRequestTask %s>' % (self.key,)
+        return '<PrunePullRequestTask {}>'.format(self.key)
 
     def __eq__(self, other):
         if (other.__class__ == self.__class__ and
@@ -1224,10 +1224,10 @@ class PrunePullRequestTask(Task):
             if not pr:
                 return
             repo = gitrepo.get_repo(pr.repository.name, app.config)
-            self.log.info("Pruning %s pull request %s state:%s updated:%s" % (
+            self.log.info("Pruning {} pull request {} state:{} updated:{}".format(
                 pr.repository.name, pr.number, pr.state, pr.updated))
-            pr_ref = "pull/%s/head" % (pr.number,)
-            self.log.info("Deleting %s ref %s" % (
+            pr_ref = "pull/{}/head".format(pr.number)
+            self.log.info("Deleting {} ref {}".format(
                 pr.repository.name, pr_ref))
             try:
                 repo.deleteRef(pr_ref)
@@ -1238,7 +1238,7 @@ class PrunePullRequestTask(Task):
 
 class VacuumDatabaseTask(Task):
     def __init__(self, priority=NORMAL_PRIORITY):
-        super(VacuumDatabaseTask, self).__init__(priority)
+        super().__init__(priority)
 
     def __repr__(self):
         return '<VacuumDatabaseTask>'
@@ -1255,7 +1255,7 @@ class VacuumDatabaseTask(Task):
 
 class Sync:
     def __init__(self, app, disable_background_sync):
-        self.user_agent = 'Hubtty/%s %s' % (hubtty.version.version_info.release_string(),
+        self.user_agent = 'Hubtty/{} {}'.format(hubtty.version.version_info.release_string(),
                                             requests.utils.default_user_agent())
         self.github_api_version = '2022-11-28'
         self.offline = False
@@ -1309,7 +1309,7 @@ class Sync:
     def _run(self, pipe, task=None):
         if not task:
             task = self.queue.get()
-        self.log.debug('Run: %s' % (task,))
+        self.log.debug('Run: {}'.format(task))
         try:
             task.run(self)
             task.complete(True)
@@ -1318,7 +1318,7 @@ class Sync:
                 requests.exceptions.ChunkedEncodingError,
                 requests.exceptions.ReadTimeout
         ) as e:
-            self.log.warning("Offline due to: %s" % (e,))
+            self.log.warning("Offline due to: {}".format(e))
             if not self.offline:
                 self.submitTask(UploadReviewsTask(HIGH_PRIORITY))
             self.offline = True
@@ -1329,12 +1329,12 @@ class Sync:
         except RestrictedError as e:
             task.complete(False)
             self.queue.complete(task)
-            self.log.warning("Failed to run task %s: %s" % (task, e,))
+            self.log.warning("Failed to run task {}: {}".format(task, e))
             self.app.status.update(error=True, refresh=False)
         except Exception:
             task.complete(False)
             self.queue.complete(task)
-            self.log.exception('Exception running task %s' % (task,))
+            self.log.exception('Exception running task {}'.format(task))
             self.app.status.update(error=True, refresh=False)
         self.offline = False
         self.app.status.update(offline=False, refresh=False)
@@ -1354,9 +1354,9 @@ class Sync:
             result = re.search(r"the `([\w-]+)` organization has enabled OAuth App access restrictions", response.text)
             if result:
                 org = result.group(1)
-                error_msg = "The '%s' organization has enabled third-party restrictions and has not yet approved Hubtty. Your review will be submitted again next time Hubtty starts. Create yourself a Personal Access Token to continue using Hubtty with this organization: https://hubtty.readthedocs.io/en/latest/authentication.html" % (org,)
+                error_msg = "The '{}' organization has enabled third-party restrictions and has not yet approved Hubtty. Your review will be submitted again next time Hubtty starts. Create yourself a Personal Access Token to continue using Hubtty with this organization: https://hubtty.readthedocs.io/en/latest/authentication.html".format(org)
                 self.app.error(error_msg)
-                raise RestrictedError("The '%s' organization has enabled third-party restrictions and has not yet approved hubtty" % (org,))
+                raise RestrictedError("The '{}' organization has enabled third-party restrictions and has not yet approved hubtty".format(org))
             else:
                 raise Exception("Received %s status code: %s"
                         % (response.status_code, response.text))
@@ -1380,7 +1380,7 @@ class Sync:
             response_callback = self.checkResponse
 
         while not done:
-            self.log.debug('GET: %s' % (url,))
+            self.log.debug('GET: {}'.format(url))
 
             r = self.session.get(url,
                                  timeout=TIMEOUT,
@@ -1407,7 +1407,7 @@ class Sync:
                 else:
                     ret = result
                 if len(result):
-                    self.log.debug('200 OK, Received: %s' % (result,))
+                    self.log.debug('200 OK, Received: {}'.format(result))
                 else:
                     self.log.debug('200 OK, No body.')
             if 'next' in r.links.keys():
@@ -1427,13 +1427,13 @@ class Sync:
         if not response_callback:
             response_callback = self.checkResponse
 
-        self.log.debug('POST: %s' % (url,))
-        self.log.debug('data: %s' % (data,))
+        self.log.debug('POST: {}'.format(url))
+        self.log.debug('data: {}'.format(data))
         r = self.session.post(url, data=json.dumps(data).encode('utf8'),
                               timeout=TIMEOUT,
                               headers = {**default_headers, **headers})
         response_callback(r)
-        self.log.debug('Received: %s' % (r.text,))
+        self.log.debug('Received: {}'.format(r.text))
         ret = None
         if r.text and len(r.text)>0:
             try:
@@ -1454,13 +1454,13 @@ class Sync:
         if not response_callback:
             response_callback = self.checkResponse
 
-        self.log.debug('PUT: %s' % (url,))
-        self.log.debug('data: %s' % (data,))
+        self.log.debug('PUT: {}'.format(url))
+        self.log.debug('data: {}'.format(data))
         r = self.session.put(url, data=json.dumps(data).encode('utf8'),
                              timeout=TIMEOUT,
                              headers = {**default_headers, **headers})
         response_callback(r)
-        self.log.debug('Received: %s' % (r.text,))
+        self.log.debug('Received: {}'.format(r.text))
 
     def patch(self, path, data, headers={}, response_callback=None):
         url = self.url(path)
@@ -1472,13 +1472,13 @@ class Sync:
         if not response_callback:
             response_callback = self.checkResponse
 
-        self.log.debug('PATCH: %s' % (url,))
-        self.log.debug('data: %s' % (data,))
+        self.log.debug('PATCH: {}'.format(url))
+        self.log.debug('data: {}'.format(data))
         r = self.session.patch(url, data=json.dumps(data).encode('utf8'),
                              timeout=TIMEOUT,
                              headers = {**default_headers, **headers})
         response_callback(r)
-        self.log.debug('Received: %s' % (r.text,))
+        self.log.debug('Received: {}'.format(r.text))
 
     def delete(self, path, data, headers={}, response_callback=None):
         url = self.url(path)
@@ -1490,13 +1490,13 @@ class Sync:
         if not response_callback:
             response_callback = self.checkResponse
 
-        self.log.debug('DELETE: %s' % (url,))
-        self.log.debug('data: %s' % (data,))
+        self.log.debug('DELETE: {}'.format(url))
+        self.log.debug('data: {}'.format(data))
         r = self.session.delete(url, data=json.dumps(data).encode('utf8'),
                                 timeout=TIMEOUT,
                                 headers = {**default_headers, **headers})
         response_callback(r)
-        self.log.debug('Received: %s' % (r.text,))
+        self.log.debug('Received: {}'.format(r.text))
 
     def syncSubscribedRepositories(self):
         task = SyncSubscribedRepositoriesTask(LOW_PRIORITY)
@@ -1521,5 +1521,5 @@ class Sync:
 
     def query(self, query):
         q = 'search/issues?per_page=100&q=%s' % query
-        self.log.debug('Query: %s' % (q,))
+        self.log.debug('Query: {}'.format(q))
         return self.get(q)

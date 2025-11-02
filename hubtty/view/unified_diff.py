@@ -24,7 +24,7 @@ LN_COL_WIDTH = 5
 
 class UnifiedDiffCommentEdit(BaseDiffCommentEdit):
     def __init__(self, app, context, oldnew, key=None, comment=''):
-        super(UnifiedDiffCommentEdit, self).__init__([])
+        super().__init__([])
         self.context = context
         self.oldnew = oldnew
         # If we save a comment, the resulting key will be stored here
@@ -38,7 +38,7 @@ class UnifiedDiffCommentEdit(BaseDiffCommentEdit):
 
 class UnifiedDiffComment(BaseDiffComment):
     def __init__(self, context, oldnew, comment):
-        super(UnifiedDiffComment, self).__init__([])
+        super().__init__([])
         self.context = context
         text = urwid.AttrMap(urwid.Text(comment), 'comment')
         self.contents.append((urwid.Text(''), ('given', 8, False)))
@@ -46,7 +46,7 @@ class UnifiedDiffComment(BaseDiffComment):
 
 class UnifiedDiffLine(BaseDiffLine):
     def __init__(self, app, context, oldnew, old, new, callback=None):
-        super(UnifiedDiffLine, self).__init__('', on_press=callback)
+        super().__init__('', on_press=callback)
         self.context = context
         self.oldnew = oldnew
         (old_ln, old_action, old_line) = old
@@ -94,7 +94,7 @@ class UnifiedDiffLine(BaseDiffLine):
 
 class UnifiedFileHeader(BaseFileHeader):
     def __init__(self, app, context, oldnew, old, new, callback=None):
-        super(UnifiedFileHeader, self).__init__('', on_press=callback)
+        super().__init__('', on_press=callback)
         self.context = context
         self.oldnew = oldnew
         if oldnew == gitrepo.OLD:
@@ -115,7 +115,7 @@ class UnifiedFileReminder(BaseFileReminder):
         self.col = urwid.Columns([('pack', self.old_text),
                                   ('pack', self.new_text),
                                   urwid.Text('')], dividechars=2)
-        super(UnifiedFileReminder, self).__init__(self.col)
+        super().__init__(self.col)
 
     def set(self, old, new):
         self.old_text.set_text(('filename', old))
@@ -138,13 +138,13 @@ class UnifiedDiffView(BaseDiffView):
                 old_cache = []
                 new_cache = []
             # see if there are any comments for this line
-            key = 'old-%s-%s' % (old[0], diff.oldname)
+            key = 'old-{}-{}'.format(old[0], diff.oldname)
             old_list = comment_lists.pop(key, [])
             while old_list:
                 (old_comment_key, old_comment) = old_list.pop(0)
                 old_cache.append(UnifiedDiffComment(context, gitrepo.OLD, old_comment))
             # see if there are any draft comments for this line
-            key = 'olddraft-%s-%s' % (old[0], diff.oldname)
+            key = 'olddraft-{}-{}'.format(old[0], diff.oldname)
             old_list = comment_lists.pop(key, [])
             while old_list:
                 (old_comment_key, old_comment) = old_list.pop(0)
@@ -162,7 +162,7 @@ class UnifiedDiffView(BaseDiffView):
                     lines.append(UnifiedDiffLine(self.app, context, gitrepo.NEW, old, new,
                                                  callback=self.onSelect))
             # see if there are any comments for this line
-            key = 'new-%s-%s' % (new[0], diff.newname)
+            key = 'new-{}-{}'.format(new[0], diff.newname)
             new_list = comment_lists.pop(key, [])
             while new_list:
                 (new_comment_key, new_comment) = new_list.pop(0)
@@ -171,7 +171,7 @@ class UnifiedDiffView(BaseDiffView):
                 else:
                     lines.append(UnifiedDiffComment(context, gitrepo.NEW, new_comment))
             # see if there are any draft comments for this line
-            key = 'newdraft-%s-%s' % (new[0], diff.newname)
+            key = 'newdraft-{}-{}'.format(new[0], diff.newname)
             new_list = comment_lists.pop(key, [])
             while new_list:
                 (new_comment_key, new_comment) = new_list.pop(0)
@@ -204,13 +204,13 @@ class UnifiedDiffView(BaseDiffView):
                                        diff.oldname, diff.newname,
                                        callback=self.onSelect))
         # see if there are any comments for this file
-        key = 'old-None-%s' % (diff.oldname,)
+        key = 'old-None-{}'.format(diff.oldname)
         old_list = comment_lists.pop(key, [])
         while old_list:
             (old_comment_key, old_comment) = old_list.pop(0)
             lines.append(UnifiedDiffComment(context, gitrepo.OLD, old_comment))
         # see if there are any draft comments for this file
-        key = 'olddraft-None-%s' % (diff.oldname,)
+        key = 'olddraft-None-{}'.format(diff.oldname)
         old_list = comment_lists.pop(key, [])
         while old_list:
             (old_comment_key, old_comment) = old_list.pop(0)
@@ -225,13 +225,13 @@ class UnifiedDiffView(BaseDiffView):
                                        callback=self.onSelect))
 
         # see if there are any comments for this file
-        key = 'new-None-%s' % (diff.newname,)
+        key = 'new-None-{}'.format(diff.newname)
         new_list = comment_lists.pop(key, [])
         while new_list:
             (new_comment_key, new_comment) = new_list.pop(0)
             lines.append(UnifiedDiffComment(context, gitrepo.NEW, new_comment))
         # see if there are any draft comments for this file
-        key = 'newdraft-None-%s' % (diff.newname,)
+        key = 'newdraft-None-{}'.format(diff.newname)
         new_list = comment_lists.pop(key, [])
         while new_list:
             (new_comment_key, new_comment) = new_list.pop(0)
