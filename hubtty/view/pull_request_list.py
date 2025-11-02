@@ -101,13 +101,13 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
         self.pr_key = pr.key
         self.prefix = prefix
         self.enabled_columns = enabled_columns
-        self.title = mywid.SearchableText(u'', wrap='clip')
-        self.number = mywid.SearchableText(u'')
-        self.updated = mywid.SearchableText(u'')
-        self.size = mywid.SearchableText(u'', align='right')
-        self.repository = mywid.SearchableText(u'', wrap='clip')
-        self.author = mywid.SearchableText(u'', wrap='clip')
-        self.branch = mywid.SearchableText(u'', wrap='clip')
+        self.title = mywid.SearchableText('', wrap='clip')
+        self.number = mywid.SearchableText('')
+        self.updated = mywid.SearchableText('')
+        self.size = mywid.SearchableText('', align='right')
+        self.repository = mywid.SearchableText('', wrap='clip')
+        self.author = mywid.SearchableText('', wrap='clip')
+        self.branch = mywid.SearchableText('', wrap='clip')
         self.mark = False
         self.columns = urwid.Columns([], dividechars=1)
         self.row_style = urwid.AttrMap(self.columns, '')
@@ -142,8 +142,8 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
         # appropriately.  This is so that the reverse-video which
         # operates on the line when focused works as expected.
 
-        lower_box = u'\u2584'
-        upper_box = u'\u2580'
+        lower_box = '\u2584'
+        upper_box = '\u2580'
         ret = []
         # The graph is logarithmic -- one cell for each order of
         # magnitude.
@@ -168,14 +168,14 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
         # You can see the character table at the wikipedia[1] or somewhere.
         # [1] https://en.wikipedia.org/wiki/Block_Elements#Character_table
         conf_thresholds = self.app.config.size_column['thresholds']
-        thresholds = [(conf_thresholds[7], u'\u2588'),
-                      (conf_thresholds[6], u'\u2589'),
-                      (conf_thresholds[5], u'\u258a'),
-                      (conf_thresholds[4], u'\u258b'),
-                      (conf_thresholds[3], u'\u258c'),
-                      (conf_thresholds[2], u'\u258d'),
-                      (conf_thresholds[1], u'\u258e'),
-                      (conf_thresholds[0], u'\u258f')]
+        thresholds = [(conf_thresholds[7], '\u2588'),
+                      (conf_thresholds[6], '\u2589'),
+                      (conf_thresholds[5], '\u258a'),
+                      (conf_thresholds[4], '\u258b'),
+                      (conf_thresholds[3], '\u258c'),
+                      (conf_thresholds[2], '\u258d'),
+                      (conf_thresholds[1], '\u258e'),
+                      (conf_thresholds[0], '\u258f')]
         ret = []
         # The graph is logarithmic -- one cell for each order of
         # magnitude.
@@ -270,13 +270,13 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
 class PullRequestListHeader(urwid.WidgetWrap, PullRequestListColumns):
     def __init__(self, enabled_columns):
         self.enabled_columns = enabled_columns
-        self.title = urwid.Text(u'Title', wrap='clip')
-        self.number = urwid.Text(u'Number')
-        self.updated = urwid.Text(u'Updated')
-        self.size = urwid.Text(u'Size')
-        self.repository = urwid.Text(u'Repository', wrap='clip')
-        self.author = urwid.Text(u'Author', wrap='clip')
-        self.branch = urwid.Text(u'Branch', wrap='clip')
+        self.title = urwid.Text('Title', wrap='clip')
+        self.number = urwid.Text('Number')
+        self.updated = urwid.Text('Updated')
+        self.size = urwid.Text('Size')
+        self.repository = urwid.Text('Repository', wrap='clip')
+        self.author = urwid.Text('Author', wrap='clip')
+        self.branch = urwid.Text('Branch', wrap='clip')
         self.columns = urwid.Columns([], dividechars=1)
         self.category_columns = []
         super(PullRequestListHeader, self).__init__(self.columns)
@@ -404,10 +404,10 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
             pr_list = session.getPullRequests(self.query, self.unreviewed,
                                               sort_by=self.sort_by)
             if self.unreviewed:
-                self.title = (u'Unreviewed %d pull requests in %s' %
+                self.title = ('Unreviewed %d pull requests in %s' %
                     (len(pr_list), self.query_desc))
             else:
-                self.title = (u'All %d pull requests in %s' %
+                self.title = ('All %d pull requests in %s' %
                     (len(pr_list), self.query_desc))
             self.short_title = self.query_desc
             if '/' in self.short_title and ' ' not in self.short_title:
@@ -742,16 +742,16 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
         self.app.backScreen()
 
     def closePullRequest(self):
-        dialog = mywid.TextEditDialog(u'Close pull request', u'Message:',
-                                      u'Close pull request', u'')
+        dialog = mywid.TextEditDialog('Close pull request', 'Message:',
+                                      'Close pull request', '')
         urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
         urwid.connect_signal(dialog, 'save', lambda button:
                                  self.doCloseReopenPullRequest(dialog, 'closed'))
         self.app.popup(dialog)
 
     def reopenPullRequest(self):
-        dialog = mywid.TextEditDialog(u'Reopen pull request', u'Message:',
-                                      u'Reopen pull request', u'')
+        dialog = mywid.TextEditDialog('Reopen pull request', 'Message:',
+                                      'Reopen pull request', '')
         urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
         urwid.connect_signal(dialog, 'save', lambda button:
                              self.doCloseReopenPullRequest(dialog, 'open'))

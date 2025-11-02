@@ -151,7 +151,7 @@ class LineBoxTitlePropertyMixin(object):
 class SystemMessage(urwid.WidgetWrap, LineBoxTitlePropertyMixin):
     def __init__(self, message):
         w = urwid.Filler(urwid.Text(message, align='center'))
-        super(SystemMessage, self).__init__(urwid.LineBox(w, u'System Message'))
+        super(SystemMessage, self).__init__(urwid.LineBox(w, 'System Message'))
 
 @mouse_scroll_decorator.ScrollByWheel
 class ButtonDialog(urwid.WidgetWrap, LineBoxTitlePropertyMixin):

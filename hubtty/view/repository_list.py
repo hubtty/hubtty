@@ -94,8 +94,8 @@ class RepositoryRow(urwid.Button):
         self.name = mywid.SearchableText('')
         self._setName(repository.name, self.indent)
         self.name.set_wrap_mode('clip')
-        self.unreviewed_prs = urwid.Text(u'', align=urwid.RIGHT)
-        self.open_prs = urwid.Text(u'', align=urwid.RIGHT)
+        self.unreviewed_prs = urwid.Text('', align=urwid.RIGHT)
+        self.open_prs = urwid.Text('', align=urwid.RIGHT)
         col = urwid.Columns([
                 self.name,
                 ('fixed', 11, self.unreviewed_prs),
@@ -160,8 +160,8 @@ class TopicRow(urwid.Button):
         self.name = urwid.Text('')
         self._setName(topic.name)
         self.name.set_wrap_mode('clip')
-        self.unreviewed_prs = urwid.Text(u'', align=urwid.RIGHT)
-        self.open_prs = urwid.Text(u'', align=urwid.RIGHT)
+        self.unreviewed_prs = urwid.Text('', align=urwid.RIGHT)
+        self.open_prs = urwid.Text('', align=urwid.RIGHT)
         col = urwid.Columns([
                 self.name,
                 ('fixed', 11, self.unreviewed_prs),
@@ -195,9 +195,9 @@ class TopicRow(urwid.Button):
 
 class RepositoryListHeader(urwid.WidgetWrap):
     def __init__(self):
-        cols = [urwid.Text(u' Repository'),
-                (11, urwid.Text(u'Unreviewed')),
-                (5, urwid.Text(u'Open'))]
+        cols = [urwid.Text(' Repository'),
+                (11, urwid.Text('Unreviewed')),
+                (5, urwid.Text('Open'))]
         super(RepositoryListHeader, self).__init__(urwid.Columns(cols))
 
 @mouse_scroll_decorator.ScrollByWheel
@@ -324,12 +324,12 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
 
     def refresh(self):
         if self.subscribed:
-            self.title = u'Subscribed repositories'
+            self.title = 'Subscribed repositories'
             self.short_title = self.title[:]
             if self.unreviewed:
-                self.title += u' with unreviewed pull requests'
+                self.title += ' with unreviewed pull requests'
         else:
-            self.title = u'All repositories'
+            self.title = 'All repositories'
             self.short_title = self.title[:]
         self.app.status.update(title=self.title)
         with self.app.db.getSession() as session:

@@ -67,13 +67,13 @@ class StatusHeader(urwid.WidgetWrap):
     def __init__(self, app):
         super(StatusHeader, self).__init__(urwid.Columns([]))
         self.app = app
-        self.title_widget = urwid.Text(u'Start')
+        self.title_widget = urwid.Text('Start')
         self.error_widget = urwid.Text('')
         self.offline_widget = urwid.Text('')
-        self.sync_widget = urwid.Text(u'Sync: 0')
-        self.held_widget = urwid.Text(u'')
+        self.sync_widget = urwid.Text('Sync: 0')
+        self.held_widget = urwid.Text('')
         self._w.contents.append((self.title_widget, ('pack', None, False)))
-        self._w.contents.append((urwid.Text(u''), ('weight', 1, False)))
+        self._w.contents.append((urwid.Text(''), ('weight', 1, False)))
         self._w.contents.append((self.held_widget, ('pack', None, False)))
         self._w.contents.append((self.error_widget, ('pack', None, False)))
         self._w.contents.append((self.offline_widget, ('pack', None, False)))
@@ -117,32 +117,32 @@ class StatusHeader(urwid.WidgetWrap):
         if self._held != self.held:
             self._held = self.held
             if self._held:
-                self.held_widget.set_text(('error', u'Held: %s (%s)' % (self._held, self.held_key)))
+                self.held_widget.set_text(('error', 'Held: %s (%s)' % (self._held, self.held_key)))
             else:
-                self.held_widget.set_text(u'')
+                self.held_widget.set_text('')
         if self._error != self.error:
             self._error = self.error
             if self._error:
-                self.error_widget.set_text(('error', u' Error'))
+                self.error_widget.set_text(('error', ' Error'))
             else:
-                self.error_widget.set_text(u'')
+                self.error_widget.set_text('')
         if self._offline != self.offline:
             self._offline = self.offline
             if self._offline:
-                self.offline_widget.set_text(u' Offline')
+                self.offline_widget.set_text(' Offline')
             else:
-                self.offline_widget.set_text(u'')
+                self.offline_widget.set_text('')
         if self._sync != self.sync:
             self._sync = self.sync
-            self.sync_widget.set_text(u' Sync: %i' % self._sync)
+            self.sync_widget.set_text(' Sync: %i' % self._sync)
 
 
 class BreadCrumbBar(urwid.WidgetWrap):
-    BREADCRUMB_SYMBOL = u'\N{BLACK RIGHT-POINTING SMALL TRIANGLE}'
+    BREADCRUMB_SYMBOL = '\N{BLACK RIGHT-POINTING SMALL TRIANGLE}'
     BREADCRUMB_WIDTH = 25
 
     def __init__(self):
-        self.prefix_text = urwid.Text(u' \N{WATCH}  ')
+        self.prefix_text = urwid.Text(' \N{WATCH}  ')
         self.breadcrumbs = urwid.Columns([], dividechars=3)
         self.display_widget = urwid.Columns(
             [('pack', self.prefix_text), self.breadcrumbs])
@@ -382,8 +382,8 @@ class App(object):
         raise urwid.ExitMainLoop()
 
     def quit(self):
-        dialog = mywid.YesNoDialog(u'Quit',
-                                   u'Are you sure you want to quit?')
+        dialog = mywid.YesNoDialog('Quit',
+                                   'Are you sure you want to quit?')
         urwid.connect_signal(dialog, 'no', self.backScreen)
         urwid.connect_signal(dialog, 'yes', self._quit)
 

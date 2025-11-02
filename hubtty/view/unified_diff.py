@@ -23,7 +23,7 @@ from hubtty.view.diff import BaseFileHeader, BaseFileReminder, BaseDiffView
 LN_COL_WIDTH = 5
 
 class UnifiedDiffCommentEdit(BaseDiffCommentEdit):
-    def __init__(self, app, context, oldnew, key=None, comment=u''):
+    def __init__(self, app, context, oldnew, key=None, comment=''):
         super(UnifiedDiffCommentEdit, self).__init__([])
         self.context = context
         self.oldnew = oldnew
@@ -31,7 +31,7 @@ class UnifiedDiffCommentEdit(BaseDiffCommentEdit):
         self.key = key
         self.comment = mywid.MyEdit(edit_text=comment, multiline=True,
                                     ring=app.ring)
-        self.contents.append((urwid.Text(u''), ('given', 8, False)))
+        self.contents.append((urwid.Text(''), ('given', 8, False)))
         self.contents.append((urwid.AttrMap(self.comment, 'draft-comment'),
                               ('weight', 1, False)))
         self.focus_position = 1
@@ -41,7 +41,7 @@ class UnifiedDiffComment(BaseDiffComment):
         super(UnifiedDiffComment, self).__init__([])
         self.context = context
         text = urwid.AttrMap(urwid.Text(comment), 'comment')
-        self.contents.append((urwid.Text(u''), ('given', 8, False)))
+        self.contents.append((urwid.Text(''), ('given', 8, False)))
         self.contents.append((text, ('weight', 1, False)))
 
 class UnifiedDiffLine(BaseDiffLine):
@@ -66,11 +66,11 @@ class UnifiedDiffLine(BaseDiffLine):
         if oldnew == gitrepo.OLD:
             action = old_action
             line = old_line
-            columns = [(LN_COL_WIDTH, old_ln_col), (LN_COL_WIDTH, urwid.Text(u''))]
+            columns = [(LN_COL_WIDTH, old_ln_col), (LN_COL_WIDTH, urwid.Text(''))]
         elif oldnew == gitrepo.NEW:
             action = new_action
             line = new_line
-            columns = [(LN_COL_WIDTH, urwid.Text(u'')), (LN_COL_WIDTH, new_ln_col)]
+            columns = [(LN_COL_WIDTH, urwid.Text('')), (LN_COL_WIDTH, new_ln_col)]
         if new_action == ' ':
             columns = [(LN_COL_WIDTH, old_ln_col), (LN_COL_WIDTH, new_ln_col)]
         line_col = mywid.SearchableText(line)
@@ -102,7 +102,7 @@ class UnifiedFileHeader(BaseFileHeader):
                     urwid.Text(('filename', old))])
         elif oldnew == gitrepo.NEW:
             col = urwid.Columns([
-                    (LN_COL_WIDTH, urwid.Text(u'')),
+                    (LN_COL_WIDTH, urwid.Text('')),
                     urwid.Text(('filename', new))])
         map = {None: 'focused-filename',
                'filename': 'focused-filename'}
@@ -114,7 +114,7 @@ class UnifiedFileReminder(BaseFileReminder):
         self.new_text = urwid.Text(('filename', ''))
         self.col = urwid.Columns([('pack', self.old_text),
                                   ('pack', self.new_text),
-                                  urwid.Text(u'')], dividechars=2)
+                                  urwid.Text('')], dividechars=2)
         super(UnifiedFileReminder, self).__init__(self.col)
 
     def set(self, old, new):

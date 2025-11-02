@@ -22,7 +22,7 @@ from hubtty.view.diff import BaseFileHeader, BaseFileReminder, BaseDiffView
 LN_COL_WIDTH = 5
 
 class SideDiffCommentEdit(BaseDiffCommentEdit):
-    def __init__(self, app, context, old_key=None, new_key=None, old=u'', new=u''):
+    def __init__(self, app, context, old_key=None, new_key=None, old='', new=''):
         super(SideDiffCommentEdit, self).__init__([])
         self.app = app
         self.context = context
@@ -31,17 +31,17 @@ class SideDiffCommentEdit(BaseDiffCommentEdit):
         self.new_key = new_key
         self.old = mywid.MyEdit(edit_text=old, multiline=True, ring=app.ring)
         self.new = mywid.MyEdit(edit_text=new, multiline=True, ring=app.ring)
-        self.contents.append((urwid.Text(u''), ('given', LN_COL_WIDTH, False)))
+        self.contents.append((urwid.Text(''), ('given', LN_COL_WIDTH, False)))
         if context.old_file_key and (context.old_ln is not None or context.header):
             self.contents.append((urwid.AttrMap(self.old, 'draft-comment'), ('weight', 1, False)))
         else:
-            self.contents.append((urwid.Text(u''), ('weight', 1, False)))
-        self.contents.append((urwid.Text(u''), ('given', LN_COL_WIDTH, False)))
+            self.contents.append((urwid.Text(''), ('weight', 1, False)))
+        self.contents.append((urwid.Text(''), ('given', LN_COL_WIDTH, False)))
         if context.new_file_key and (context.new_ln is not None or context.header):
             self.contents.append((urwid.AttrMap(self.new, 'draft-comment'), ('weight', 1, False)))
             new_editable = True
         else:
-            self.contents.append((urwid.Text(u''), ('weight', 1, False)))
+            self.contents.append((urwid.Text(''), ('weight', 1, False)))
             new_editable = False
         if new_editable:
             self.focus_position = 3
@@ -76,9 +76,9 @@ class SideDiffComment(BaseDiffComment):
             oldt = urwid.AttrMap(oldt, 'comment')
         if new:
             newt = urwid.AttrMap(newt, 'comment')
-        self.contents.append((urwid.Text(u''), ('given', LN_COL_WIDTH, False)))
+        self.contents.append((urwid.Text(''), ('given', LN_COL_WIDTH, False)))
         self.contents.append((oldt, ('weight', 1, False)))
-        self.contents.append((urwid.Text(u''), ('given', LN_COL_WIDTH, False)))
+        self.contents.append((urwid.Text(''), ('given', LN_COL_WIDTH, False)))
         self.contents.append((newt, ('weight', 1, False)))
 
 class SideDiffLine(BaseDiffLine):
@@ -154,7 +154,7 @@ class SideDiffView(BaseDiffView):
             new_list = comment_lists.pop(key, [])
             while old_list or new_list:
                 old_comment_key = new_comment_key = None
-                old_comment = new_comment = u''
+                old_comment = new_comment = ''
                 if old_list:
                     (old_comment_key, old_comment) = old_list.pop(0)
                 if new_list:
@@ -167,7 +167,7 @@ class SideDiffView(BaseDiffView):
             new_list = comment_lists.pop(key, [])
             while old_list or new_list:
                 old_comment_key = new_comment_key = None
-                old_comment = new_comment = u''
+                old_comment = new_comment = ''
                 if old_list:
                     (old_comment_key, old_comment) = old_list.pop(0)
                 if new_list:
@@ -194,7 +194,7 @@ class SideDiffView(BaseDiffView):
         new_list = comment_lists.pop(key, [])
         while old_list or new_list:
             old_comment_key = new_comment_key = None
-            old_comment = new_comment = u''
+            old_comment = new_comment = ''
             if old_list:
                 (old_comment_key, old_comment) = old_list.pop(0)
             if new_list:
@@ -207,7 +207,7 @@ class SideDiffView(BaseDiffView):
         new_list = comment_lists.pop(key, [])
         while old_list or new_list:
             old_comment_key = new_comment_key = None
-            old_comment = new_comment = u''
+            old_comment = new_comment = ''
             if old_list:
                 (old_comment_key, old_comment) = old_list.pop(0)
             if new_list:

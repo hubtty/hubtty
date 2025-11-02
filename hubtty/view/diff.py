@@ -159,11 +159,11 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                         self.old_file_keys[f.old_path] = f.key
                     else:
                         self.old_file_keys[f.path] = f.key
-            self.title = u'Diff of %s from %s to %s' % (
+            self.title = 'Diff of %s from %s to %s' % (
                 new_commit.pull_request.repository.name,
                 new_commit.parent[0:7],
                 new_commit.sha[0:7])
-            self.short_title = u'Diff of %s' % (new_commit.sha[0:7],)
+            self.short_title = 'Diff of %s' % (new_commit.sha[0:7],)
             self.pr_key = new_commit.pull_request.key
             self.repository_name = new_commit.pull_request.repository.name
             self.sha = new_commit.sha
@@ -191,7 +191,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                     message = comment.message
                 else:
                     message = [('comment-name', comment.author.name or comment.author.username),
-                               ('comment', u': '+comment.message)]
+                               ('comment', ': '+comment.message)]
                 comment_list.append((comment.key, message))
                 comment_lists[key] = comment_list
                 comment_filenames.add(path)
@@ -209,7 +209,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                     message = comment.message
                 else:
                     message = [('comment-name', comment.author.name or comment.author.username),
-                               ('comment', u': '+comment.message)]
+                               ('comment', ': '+comment.message)]
                 comment_list.append((comment.key, message))
                 comment_lists[key] = comment_list
                 comment_filenames.add(path)
