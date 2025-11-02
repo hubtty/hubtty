@@ -257,12 +257,13 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
             val = ''
             if category == 'Code-Review':
                 v = pr.getReviewState()
-            if v in ['APPROVED']:
-                val = ('positive-label', ' ✓')
-            elif v in ['CHANGES_REQUESTED']:
-                val = ('negative-label', ' ✗')
-            elif v in ['COMMENTED']:
-                val = ' •'
+            match v:
+                case 'APPROVED':
+                    val = ('positive-label', ' ✓')
+                case 'CHANGES_REQUESTED':
+                    val = ('negative-label', ' ✗')
+                case 'COMMENTED':
+                    val = ' •'
             self.category_columns.append((urwid.Text(val),
                                           self.columns.options('given', 2)))
         self.updateColumns()

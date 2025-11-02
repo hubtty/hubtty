@@ -768,21 +768,22 @@ class PullRequestView(urwid.WidgetWrap):
                     votes.addRow(row)
                 # Only set approval status if the review is for the current commit
                 if approval.sha == pr.commits[-1].sha:
-                    if approval.state in ['APPROVED', 'APPROVE']:
-                        text = '✓'
-                        if approval.state == 'APPROVE' and not pending_message:
-                            text = '(' + text + ')'
-                        approvals['Approved'].set_text(('positive-label', text))
-                    elif approval.state in ['CHANGES_REQUESTED', 'REQUEST_CHANGES']:
-                        text = '✗'
-                        if approval.state == 'REQUEST_CHANGES' and not pending_message:
-                            text = '(' + text + ')'
-                        approvals['Changes Requested'].set_text(('negative-label', text))
-                    else:
-                        text = '•'
-                        if approval.state == 'COMMENT' and not pending_message:
-                            text = '(' + text + ')'
-                        approvals['Comment'].set_text(text)
+                    match approval.state:
+                        case 'APPROVED' | 'APPROVE':
+                            text = '✓'
+                            if approval.state == 'APPROVE' and not pending_message:
+                                text = '(' + text + ')'
+                            approvals['Approved'].set_text(('positive-label', text))
+                        case 'CHANGES_REQUESTED' | 'REQUEST_CHANGES':
+                            text = '✗'
+                            if approval.state == 'REQUEST_CHANGES' and not pending_message:
+                                text = '(' + text + ')'
+                            approvals['Changes Requested'].set_text(('negative-label', text))
+                        case _:
+                            text = '•'
+                            if approval.state == 'COMMENT' and not pending_message:
+                                text = '(' + text + ')'
+                            approvals['Comment'].set_text(text)
             votes = urwid.Padding(votes, width='pack')
 
             # TODO: update the existing table rather than replacing it
