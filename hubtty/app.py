@@ -261,17 +261,10 @@ class App:
         logging.basicConfig(filename=self.config.log_file, filemode='w',
                             format='%(asctime)s %(message)s',
                             level=level)
-        # Python2.6 Logger.setLevel doesn't convert string name
-        # to integer code. Here, we set the requests logger level to
-        # be less verbose, since our logging output duplicates some
-        # requests logging content in places.
-        req_level_name = 'WARN'
+        # Set the requests logger level to be less verbose, since our
+        # logging output duplicates some requests logging content in places.
         req_logger = logging.getLogger('requests')
-        if sys.version_info < (2, 7):
-            level = logging.getLevelName(req_level_name)
-            req_logger.setLevel(level)
-        else:
-            req_logger.setLevel(req_level_name)
+        req_logger.setLevel('WARN')
         self.log = logging.getLogger('hubtty.App')
         self.log.debug("Starting")
 
