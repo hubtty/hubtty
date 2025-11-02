@@ -19,7 +19,6 @@ except:
     pass
 import re
 
-import six
 import urwid
 
 from hubtty import mywid
@@ -31,7 +30,7 @@ except AttributeError:
 
 class TextReplacement(object):
     def __init__(self, config):
-        if isinstance(config, six.string_types):
+        if isinstance(config, str):
             self.color = None
             self.text = config
         else:
@@ -99,7 +98,7 @@ class CommentLink(object):
     def run(self, app, chunks):
         ret = []
         for chunk in chunks:
-            if not isinstance(chunk, six.string_types):
+            if not isinstance(chunk, str):
                 # We don't currently support nested commentlinks; if
                 # we have something that isn't a string, just append
                 # it to the output.

@@ -22,7 +22,6 @@ import re
 
 import git
 import gitdb
-import six
 
 OLD = 0
 NEW = 1
@@ -85,11 +84,11 @@ class CommitContext(object):
             commit.authored_date, commit.author_tz_offset)
         commit_date = self.decorateGitTime(
             commit.committed_date, commit.committer_tz_offset)
-        if isinstance(author.email, six.text_type):
+        if isinstance(author.email, str):
             author_email = author.email
         else:
             author_email = author.email.decode('utf8')
-        if isinstance(committer.email, six.text_type):
+        if isinstance(committer.email, str):
             committer_email = committer.email
         else:
             committer_email = committer.email.decode('utf8')
@@ -190,7 +189,7 @@ class DiffFile(object):
         newlines = [(n, d, self.expand_tabs(l)) for (n, d, l)
                         in self.current_chunk.newlines]
         self.current_chunk.lines = list(
-                six.moves.zip(oldlines, newlines))
+                zip(oldlines, newlines))
         if not self.chunks:
             self.current_chunk.first = True
         else:
@@ -210,7 +209,7 @@ class DiffFile(object):
             return "»" + " " * cnt
 
         try:
-            if isinstance(l, six.string_types):
+            if isinstance(l, str):
                 return re.sub(r'\t', replace, l)
             elif isinstance(l, list):
                 return [self.expand_tabs(e) for e in l]
@@ -456,7 +455,7 @@ class Repo(object):
             oldchunk = []
             newchunk = []
             prev_key = ''
-            if isinstance(diff_context.diff, six.string_types):
+            if isinstance(diff_context.diff, str):
                 diff_text = diff_context.diff
             else:
                 diff_text = diff_context.diff.decode('utf-8')
@@ -540,7 +539,7 @@ class Repo(object):
                 f.old_lineno = 1
                 f.new_lineno = 1
                 for line in blob.data_stream.read().splitlines():
-                    if isinstance(line, six.string_types):
+                    if isinstance(line, str):
                         f.addContextLine(line)
                     else:
                         try:
@@ -563,7 +562,7 @@ class Repo(object):
         except KeyError:
             return None
         for line in blob.data_stream.read().splitlines():
-            if isinstance(line, six.string_types):
+            if isinstance(line, str):
                 f.addContextLine(line)
             else:
                 f.addContextLine(line.decode('utf8'))

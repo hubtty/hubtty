@@ -30,9 +30,8 @@ import threading
 import warnings
 import webbrowser
 
-import six
-from six.moves import queue
-from six.moves.urllib import parse as urlparse
+import queue
+from urllib import parse as urlparse
 import sqlalchemy.exc
 import urwid
 
@@ -415,7 +414,7 @@ class App(object):
                 s.close()
                 parts = buf.split()
                 self.command_queue.put((parts[0], parts[1:]))
-                os.write(self.command_pipe, six.b('command\n'))
+                os.write(self.command_pipe, b'command\n')
             except Exception:
                 self.log.exception("Exception in socket handler")
 
@@ -750,7 +749,7 @@ class App(object):
         if category == requestsexceptions.InsecureRequestWarning:
             return
         self.error_queue.put(('Warning', m))
-        os.write(self.error_pipe, six.b('error\n'))
+        os.write(self.error_pipe, b'error\n')
 
     def _commandPipeInput(self, data=None):
         (command, data) = self.command_queue.get()

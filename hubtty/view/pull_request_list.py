@@ -16,7 +16,6 @@
 import datetime
 import logging
 
-import six
 import urwid
 
 from hubtty import keymap
@@ -473,7 +472,7 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
                     self.enabled_columns.discard(colinfo.name)
         if currently_enabled_columns != self.enabled_columns:
             self.header.updateColumns()
-            for key, value in six.iteritems(self.pr_rows):
+            for key, value in self.pr_rows.items():
                 value.updateColumns()
 
     def getQueryString(self):
@@ -482,7 +481,7 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
         return self.query
 
     def clearPullRequestList(self):
-        for key, value in six.iteritems(self.pr_rows):
+        for key, value in self.pr_rows.items():
             self.listbox.body.remove(value)
         self.pr_rows = {}
 

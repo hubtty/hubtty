@@ -30,8 +30,7 @@ except:
     pass
 import requests
 import requests.utils
-import six
-from six.moves import queue
+import queue
 
 import hubtty.version
 from hubtty import gitrepo
@@ -1339,7 +1338,7 @@ class Sync(object):
                 self.submitTask(UploadReviewsTask(HIGH_PRIORITY))
             self.offline = True
             self.app.status.update(offline=True, refresh=False)
-            os.write(pipe, six.b('refresh\n'))
+            os.write(pipe, b'refresh\n')
             time.sleep(30)
             return task
         except RestrictedError as e:
@@ -1356,7 +1355,7 @@ class Sync(object):
         self.app.status.update(offline=False, refresh=False)
         for r in task.results:
             self.result_queue.put(r)
-        os.write(pipe, six.b('refresh\n'))
+        os.write(pipe, b'refresh\n')
         return None
 
     def url(self, path):

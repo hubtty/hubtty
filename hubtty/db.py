@@ -21,7 +21,6 @@ import threading
 import alembic
 import alembic.config
 import alembic.migration
-import six
 import sqlalchemy
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, Text, UniqueConstraint
 from sqlalchemy.schema import ForeignKey
@@ -918,7 +917,7 @@ class DatabaseSession(object):
             return None
 
     def getCommitsByParent(self, parent):
-        if isinstance(parent, six.string_types):
+        if isinstance(parent, str):
             parent = (parent,)
         try:
             return self.session().query(Commit).filter(Commit.parent.in_(parent)).all()
