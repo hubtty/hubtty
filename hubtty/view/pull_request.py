@@ -683,9 +683,9 @@ class PullRequestView(urwid.WidgetWrap):
                 or
                 (isinstance(event, sync.PullRequestUpdatedEvent) and
                  self.pr_key in event.related_pr_keys)):
-            self.log.debug("Ignoring refresh pull request due to event {}".format(event))
+            self.log.debug(f"Ignoring refresh pull request due to event {event}")
             return False
-        self.log.debug("Refreshing pull request due to event {}".format(event))
+        self.log.debug(f"Refreshing pull request due to event {event}")
         return True
 
     def refresh(self):
@@ -1212,13 +1212,13 @@ class PullRequestView(urwid.WidgetWrap):
 
     def searchAuthor(self, widget):
         if self.author_login:
-            self.app.doSearch("state:open author:{}".format(self.author_login))
+            self.app.doSearch(f"state:open author:{self.author_login}")
 
     def searchRepository(self, widget):
-        self.app.doSearch("state:open repo:{}".format(self.repository_name))
+        self.app.doSearch(f"state:open repo:{self.repository_name}")
 
     def searchLabel(self, name):
-        self.app.doSearch("state:open repo:{} label:{}".format(self.repository_name, name))
+        self.app.doSearch(f"state:open repo:{self.repository_name} label:{name}")
 
     def reviewKey(self, reviewkey):
         approval = reviewkey.get('approval', 'COMMENT')

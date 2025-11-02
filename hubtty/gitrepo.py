@@ -91,11 +91,11 @@ class CommitContext:
             committer_email = committer.email
         else:
             committer_email = committer.email.decode('utf8')
-        return ["Parent: %s\n" % parentsha,
-                "Author: {} <{}>\n".format(author.name, author_email),
-                "AuthorDate: %s\n" % author_date,
-                "Commit: {} <{}>\n".format(committer.name, committer_email),
-                "CommitDate: %s\n" % commit_date,
+        return [f"Parent: {parentsha}\n",
+                f"Author: {author.name} <{author_email}>\n",
+                f"AuthorDate: {author_date}\n",
+                f"Commit: {committer.name} <{committer_email}>\n",
+                f"CommitDate: {commit_date}\n",
                 "\n"] + commit.message.splitlines(True)
 
     def __init__(self, old, new):

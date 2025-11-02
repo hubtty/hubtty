@@ -148,9 +148,9 @@ class SideDiffView(BaseDiffView):
             lines.append(SideDiffLine(self.app, context, old, new,
                                       callback=self.onSelect))
             # see if there are any comments for this line
-            key = 'old-{}-{}'.format(old[0], diff.oldname)
+            key = f'old-{old[0]}-{diff.oldname}'
             old_list = comment_lists.pop(key, [])
-            key = 'new-{}-{}'.format(new[0], diff.newname)
+            key = f'new-{new[0]}-{diff.newname}'
             new_list = comment_lists.pop(key, [])
             while old_list or new_list:
                 old_comment_key = new_comment_key = None
@@ -161,9 +161,9 @@ class SideDiffView(BaseDiffView):
                     (new_comment_key, new_comment) = new_list.pop(0)
                 lines.append(SideDiffComment(context, old_comment, new_comment))
             # see if there are any draft comments for this line
-            key = 'olddraft-{}-{}'.format(old[0], diff.oldname)
+            key = f'olddraft-{old[0]}-{diff.oldname}'
             old_list = comment_lists.pop(key, [])
-            key = 'newdraft-{}-{}'.format(new[0], diff.newname)
+            key = f'newdraft-{new[0]}-{diff.newname}'
             new_list = comment_lists.pop(key, [])
             while old_list or new_list:
                 old_comment_key = new_comment_key = None
@@ -188,9 +188,9 @@ class SideDiffView(BaseDiffView):
                                     callback=self.onSelect))
 
         # see if there are any comments for this file
-        key = 'old-None-{}'.format(diff.oldname)
+        key = f'old-None-{diff.oldname}'
         old_list = comment_lists.pop(key, [])
-        key = 'new-None-{}'.format(diff.newname)
+        key = f'new-None-{diff.newname}'
         new_list = comment_lists.pop(key, [])
         while old_list or new_list:
             old_comment_key = new_comment_key = None
@@ -201,9 +201,9 @@ class SideDiffView(BaseDiffView):
                 (new_comment_key, new_comment) = new_list.pop(0)
             lines.append(SideDiffComment(context, old_comment, new_comment))
         # see if there are any draft comments for this file
-        key = 'olddraft-None-{}'.format(diff.oldname)
+        key = f'olddraft-None-{diff.oldname}'
         old_list = comment_lists.pop(key, [])
-        key = 'newdraft-None-{}'.format(diff.newname)
+        key = f'newdraft-None-{diff.newname}'
         new_list = comment_lists.pop(key, [])
         while old_list or new_list:
             old_comment_key = new_comment_key = None

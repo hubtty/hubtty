@@ -117,7 +117,7 @@ class StatusHeader(urwid.WidgetWrap):
         if self._held != self.held:
             self._held = self.held
             if self._held:
-                self.held_widget.set_text(('error', 'Held: {} ({})'.format(self._held, self.held_key)))
+                self.held_widget.set_text(('error', f'Held: {self._held} ({self.held_key})'))
             else:
                 self.held_widget.set_text('')
         if self._error != self.error:
@@ -152,7 +152,7 @@ class BreadCrumbBar(urwid.WidgetWrap):
         title = getattr(screen, 'short_title', None)
         if not title:
             title = getattr(screen, 'title', str(screen))
-        text = "{} {}".format(BreadCrumbBar.BREADCRUMB_SYMBOL, title)
+        text = f"{BreadCrumbBar.BREADCRUMB_SYMBOL} {title}"
         if len(text) > 23:
             text = "%s..." % text[:20]
         return urwid.Text(text, wrap='clip')
@@ -396,14 +396,14 @@ class App:
         while True:
             try:
                 s, addr = self.socket.accept()
-                self.log.debug("Accepted socket connection {}".format(s))
+                self.log.debug(f"Accepted socket connection {s}")
                 buf = b''
                 while True:
                     buf += s.recv(1)
                     if buf[-1] == 10:
                         break
                 buf = buf.decode('utf8').strip()
-                self.log.debug("Received {} from socket".format(buf))
+                self.log.debug(f"Received {buf} from socket")
                 s.close()
                 parts = buf.split()
                 self.command_queue.put((parts[0], parts[1:]))
@@ -417,7 +417,7 @@ class App:
             self.status.update(message='')
 
     def changeScreen(self, widget, push=True):
-        self.log.debug("Changing screen to {}".format(widget))
+        self.log.debug(f"Changing screen to {widget}")
         self.status.update(error=False, title=widget.title)
         if push:
             self.screens.append(self.frame.body)
@@ -436,7 +436,7 @@ class App:
             widget = self.screens.pop()
             if (not target_widget) or (widget is target_widget):
                 break
-        self.log.debug("Popping screen to {}".format(widget))
+        self.log.debug(f"Popping screen to {widget}")
         if hasattr(widget, 'title'):
             self.status.update(title=widget.title)
         self.clearInputBuffer()
@@ -497,7 +497,7 @@ class App:
                                 min_width=min_width, min_height=min_height)
         if hasattr(widget, 'title'):
             overlay.title = widget.title
-        self.log.debug("Overlaying {} on screen {}".format(widget, self.frame.body))
+        self.log.debug(f"Overlaying {widget} on screen {self.frame.body}")
         self.screens.append(self.frame.body)
         self.frame.body = overlay
 
@@ -704,7 +704,7 @@ class App:
                     if cmd in commands:
                         completions.append(key)
             completions = ' '.join(completions)
-            msg = '{}: {}'.format(msg, completions)
+            msg = f'{msg}: {completions}'
             self.status.update(message=msg)
             return
         self.clearInputBuffer()
@@ -748,12 +748,12 @@ class App:
         (command, data) = self.command_queue.get()
         if command == 'open':
             url = data[0]
-            self.log.debug("Opening URL {}".format(url))
+            self.log.debug(f"Opening URL {url}")
             result = self.parseInternalURL(url)
             if result is not None:
                 self.openInternalURL(result)
         else:
-            self.log.error("Unable to parse command {} with data {}".format(command, data))
+            self.log.error(f"Unable to parse command {command} with data {data}")
 
     def toggleHeldPullRequest(self, pr_key):
         with self.db.getSession() as session:
@@ -863,7 +863,7 @@ class OpenPullRequestAction(argparse.Action):
                            namespace.keymap, namespace.path)
         url = values[0]
         if not url.startswith(cf.url):
-            print('Supplied URL must start with {}'.format(cf.url))
+            print(f'Supplied URL must start with {cf.url}')
             sys.exit(1)
 
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)

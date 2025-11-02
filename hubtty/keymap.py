@@ -216,7 +216,7 @@ class Key:
         return self.keys[key]
 
     def __repr__(self):
-        return '{} {} {}'.format(self.__class__.__name__, self.key, self.keys.keys())
+        return f'{self.__class__.__name__} {self.key} {self.keys.keys()}'
 
 class KeyMap:
     def __init__(self, config):

@@ -195,7 +195,7 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
             style = 'reviewed-pr'
         else:
             style = 'unreviewed-pr'
-        title = '{}{}'.format(self.prefix, pr.title)
+        title = f'{self.prefix}{pr.title}'
         flag = ' '
         if pr.starred:
             flag = '*'
@@ -393,9 +393,9 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
                 or
                 (isinstance(event, sync.PullRequestUpdatedEvent) and
                  event.pr_key in self.pr_rows.keys())):
-            self.log.debug("Ignoring refresh pull request list due to event {}".format(event))
+            self.log.debug(f"Ignoring refresh pull request list due to event {event}")
             return False
-        self.log.debug("Refreshing pull request list due to event {}".format(event))
+        self.log.debug(f"Refreshing pull request list due to event {event}")
         return True
 
     def refresh(self):
@@ -477,7 +477,7 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
 
     def getQueryString(self):
         if self.repository_key is not None:
-            return "repo:{} {}".format(self.query_desc, self.app.config.repository_pr_list_query)
+            return f"repo:{self.query_desc} {self.app.config.repository_pr_list_query}"
         return self.query
 
     def clearPullRequestList(self):

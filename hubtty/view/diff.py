@@ -163,7 +163,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 new_commit.pull_request.repository.name,
                 new_commit.parent[0:7],
                 new_commit.sha[0:7])
-            self.short_title = 'Diff of {}'.format(new_commit.sha[0:7])
+            self.short_title = f'Diff of {new_commit.sha[0:7]}'
             self.pr_key = new_commit.pull_request.key
             self.repository_name = new_commit.pull_request.repository.name
             self.sha = new_commit.sha
@@ -233,7 +233,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             if diff:
                 diffs.append(diff)
             else:
-                self.log.debug("Unable to find file {} in commit {}".format(filename, self.sha))
+                self.log.debug(f"Unable to find file {filename} in commit {self.sha}")
         for i, diff in enumerate(diffs):
             if i > 0:
                 lines.append(urwid.Text(''))
@@ -309,7 +309,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
 
     def expandChunk(self, diff, chunk, comment_lists={}, from_start=None, from_end=None,
                     expand_all=None):
-        self.log.debug("Expand chunk {} {} {}".format(chunk, from_start, from_end))
+        self.log.debug(f"Expand chunk {chunk} {from_start} {from_end}")
         add_lines = []
         if from_start is not None:
             index = self.listbox.body.index(chunk.button)

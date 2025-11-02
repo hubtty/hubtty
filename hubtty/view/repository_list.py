@@ -261,9 +261,9 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
                 or
                 (isinstance(event, sync.PullRequestUpdatedEvent) and
                  (event.state_changed or event.review_flag_changed))):
-            self.log.debug("Ignoring refresh repository list due to event {}".format(event))
+            self.log.debug(f"Ignoring refresh repository list due to event {event}")
             return False
-        self.log.debug("Refreshing repository list due to event {}".format(event))
+        self.log.debug(f"Refreshing repository list due to event {event}")
         return True
 
     def advance(self):
@@ -362,7 +362,7 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
         repository_key, repository_name = data
         self.app.changeScreen(view_pr_list.PullRequestListView(
                 self.app,
-                "_repository_key:{} {}".format(repository_key, self.app.config.repository_pr_list_query),
+                f"_repository_key:{repository_key} {self.app.config.repository_pr_list_query}",
                 repository_name, repository_key=repository_key, unreviewed=True))
 
     def onSelectTopic(self, button, data):
@@ -483,9 +483,9 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
                         repository = session.getRepository(row.repository_key)
                         if move and row.topic_key:
                             old_topic = session.getTopic(row.topic_key)
-                            self.log.debug("Remove {} from {}".format(repository, old_topic))
+                            self.log.debug(f"Remove {repository} from {old_topic}")
                             old_topic.removeRepository(repository)
-                        self.log.debug("Add {} to {}".format(repository, new_topic))
+                        self.log.debug(f"Add {repository} to {new_topic}")
                         new_topic.addRepository(repository)
         self.app.backScreen()
         if error:
@@ -506,7 +506,7 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
             for row in rows:
                 repository = session.getRepository(row.repository_key)
                 topic = session.getTopic(row.topic_key)
-                self.log.debug("Remove {} from {}".format(repository, topic))
+                self.log.debug(f"Remove {repository} from {topic}")
                 topic.removeRepository(repository)
         self.refresh()
 

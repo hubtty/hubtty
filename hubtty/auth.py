@@ -35,7 +35,7 @@ def requestOneTimeCode(url):
 
 def printUserCode(code, url):
     print("Hubtty needs to access your github account.")
-    print("Copy the code {} and paste it at {}".format(code, url))
+    print(f"Copy the code {code} and paste it at {url}")
 
 
 def poll(url, one_time_code):
