@@ -205,14 +205,14 @@ pull_request_label_table = Table(
     )
 
 
-class Account(object):
+class Account:
     def __init__(self, id, name=None, username=None, email=None):
         self.id = id
         self.name = name
         self.username = username
         self.email = email
 
-class Repository(object):
+class Repository:
     def __init__(self, name, subscribed=False, description='', can_push=False):
         self.name = name
         self.subscribed = subscribed
@@ -246,18 +246,18 @@ class Repository(object):
         session.flush()
         return l
 
-class Branch(object):
+class Branch:
     def __init__(self, repository, name):
         self.repository_key = repository.key
         self.name = name
 
-class RepositoryTopic(object):
+class RepositoryTopic:
     def __init__(self, repository, topic, sequence):
         self.repository_key = repository.key
         self.topic_key = topic.key
         self.sequence = sequence
 
-class Topic(object):
+class Topic:
     def __init__(self, name, sequence):
         self.name = name
         self.sequence = sequence
@@ -280,7 +280,7 @@ class Topic(object):
         self.repositories.remove(repository)
         session.flush()
 
-class Label(object):
+class Label:
     def __init__(self, repository, id, name, color, description=None):
         self.repository_key = repository.key
         self.id = id
@@ -288,12 +288,12 @@ class Label(object):
         self.color = color
         self.description = description
 
-class PullRequestLabel(object):
+class PullRequestLabel:
     def __init__(self, pull_request, label):
         self.pr_key = pull_request.key
         self.label_key = label.key
 
-class PullRequest(object):
+class PullRequest:
     def __init__(self, repository, id, author, number, branch, pr_id,
                  title, body, created, updated, state, additions, deletions,
                  html_url, merged, mergeable, draft=False, hidden=False,
@@ -422,7 +422,7 @@ class PullRequest(object):
                 author_name = self.author.email
         return author_name
 
-class Commit(object):
+class Commit:
     def __init__(self, pull_request, message, sha, parent):
         self.pr_key = pull_request.key
         self.message = message
@@ -469,7 +469,7 @@ class Commit(object):
         return None
 
 
-class Message(object):
+class Message:
     def __init__(self, pull_request, commit_id, id, author, created, message, draft=False, pending=False):
         self.pr_key = pull_request.key
         self.commit_key = commit_id
@@ -501,7 +501,7 @@ class Message(object):
         session.flush()
         return c
 
-class Comment(object):
+class Comment:
     def __init__(self, message_obj, file_id, id, author, in_reply_to, created,
                  updated, parent, commit_id, original_commit_id, line,
                  original_line, message, draft=False, url=None):
@@ -521,7 +521,7 @@ class Comment(object):
         self.draft = draft
         self.url = url
 
-class Approval(object):
+class Approval:
     def __init__(self, pull_request, reviewer, state, sha, draft=False):
         self.pr_key = pull_request.key
         self.account_key = reviewer.key
@@ -541,7 +541,7 @@ class Approval(object):
                 reviewer_name = self.reviewer.email
         return reviewer_name
 
-class PendingMerge(object):
+class PendingMerge:
     def __init__(self, pull_request, sha, merge_method, commit_title=None,
             commit_message=None):
         self.pr_key = pull_request.key
@@ -550,7 +550,7 @@ class PendingMerge(object):
         self.sha = sha
         self.merge_method = merge_method
 
-class File(object):
+class File:
     def __init__(self, commit, path, status, old_path=None,
                  inserted=None, deleted=None):
         self.commit_key = commit.key
@@ -586,11 +586,11 @@ class File(object):
         else:
             return '%s => %s' % (self.old_path, self.path)
 
-class Server(object):
+class Server:
     def __init__(self):
         pass
 
-class Check(object):
+class Check:
     def __init__(self, commit, name, state, created, updated):
         self.commit_key = commit.key
         self.name = name
@@ -718,7 +718,7 @@ def add_sqlite_match(dbapi_connection, connection_record):
     dbapi_connection.create_function("matches", 2, match)
 
 
-class Database(object):
+class Database:
     def __init__(self, app, dburi, search):
         self.log = logging.getLogger('hubtty.db')
         self.own_account_key = None
@@ -760,7 +760,7 @@ class Database(object):
             alembic.command.stamp(config, "a2af1e2e44ee")
         alembic.command.upgrade(config, 'head')
 
-class DatabaseSession(object):
+class DatabaseSession:
     def __init__(self, database):
         self.database = database
         self.session = database.session

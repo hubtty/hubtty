@@ -20,7 +20,7 @@ import urwid
 from hubtty import mywid
 
 
-class TextReplacement(object):
+class TextReplacement:
     def __init__(self, config):
         if isinstance(config, str):
             self.color = None
@@ -34,7 +34,7 @@ class TextReplacement(object):
             return (self.color.format(**data), self.text.format(**data))
         return (None, self.text.format(**data))
 
-class LinkReplacement(object):
+class LinkReplacement:
     def __init__(self, config):
         self.url = config['url']
         self.text = config['text']
@@ -51,7 +51,7 @@ class LinkReplacement(object):
             return app.openInternalURL(result)
         return app.openURL(url)
 
-class SearchReplacement(object):
+class SearchReplacement:
     def __init__(self, config):
         self.query = config['query']
         self.text = config['text']
@@ -62,7 +62,7 @@ class SearchReplacement(object):
             lambda link:app.doSearch(self.query.format(**data)))
         return link
 
-class CommentLink(object):
+class CommentLink:
     def __init__(self, config):
         self.match = re.compile(config['match'], re.M)
         self.test_result = config.get('test-result', None)

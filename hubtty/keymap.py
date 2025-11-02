@@ -204,7 +204,7 @@ def formatKey(key):
         key = subre.sub(repl, key)
     return key
 
-class Key(object):
+class Key:
     def __init__(self, key):
         self.key = key
         self.keys = {}
@@ -218,7 +218,7 @@ class Key(object):
     def __repr__(self):
         return '%s %s %s' % (self.__class__.__name__, self.key, self.keys.keys())
 
-class KeyMap(object):
+class KeyMap:
     def __init__(self, config):
         # key -> [commands]
         self.keytree = Key(None)

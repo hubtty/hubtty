@@ -46,12 +46,12 @@ class GitTimeZone(datetime.tzinfo):
         return None
 
 
-class CommitBlob(object):
+class CommitBlob:
     def __init__(self):
         self.path = '/COMMIT_MSG'
 
 
-class CommitContext(object):
+class CommitContext:
     """A git.diff.Diff for commit messages."""
 
     def decorateGitTime(self, seconds, tz):
@@ -120,7 +120,7 @@ class CommitContext(object):
             fromfile="/a/COMMIT_MSG", tofile="/b/COMMIT_MSG"))
 
 
-class DiffChunk(object):
+class DiffChunk:
     def __init__(self):
         self.oldlines = []
         self.newlines = []
@@ -167,7 +167,7 @@ class DiffContextChunk(DiffChunk):
 class DiffChangedChunk(DiffChunk):
     context = False
 
-class DiffFile(object):
+class DiffFile:
     log = logging.getLogger('hubtty.gitrepo')
 
     def __init__(self):
@@ -269,7 +269,7 @@ class GitCloneError(Exception):
         super(GitCloneError, self).__init__(msg)
         self.msg = msg
 
-class Repo(object):
+class Repo:
     def __init__(self, url, path):
         self.log = logging.getLogger('hubtty.gitrepo')
         self.url = url

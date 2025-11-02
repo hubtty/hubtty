@@ -226,7 +226,7 @@ class BackgroundBrowser(webbrowser.GenericBrowser):
         except OSError:
             return False
 
-class RepositoryCache(object):
+class RepositoryCache:
     def __init__(self):
         self.repositories = {}
 
@@ -242,7 +242,7 @@ class RepositoryCache(object):
         if repository.key in self.repositories:
             del self.repositories[repository.key]
 
-class App(object):
+class App:
     simple_pr_search = re.compile(r'([a-zA-Z_]+/)+\d+')
 
     def __init__(self, server=None, palette='default',

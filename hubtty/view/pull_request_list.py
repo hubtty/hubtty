@@ -26,7 +26,7 @@ from hubtty.view import mouse_scroll_decorator
 import hubtty.view
 
 
-class ColumnInfo(object):
+class ColumnInfo:
     def __init__(self, name, packing, value):
         self.name = name
         self.packing = packing
@@ -49,7 +49,7 @@ COLUMNS = [
 ]
 
 
-class PullRequestListColumns(object):
+class PullRequestListColumns:
     def updateColumns(self):
         del self.columns.contents[:]
         cols = self.columns.contents

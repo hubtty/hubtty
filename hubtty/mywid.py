@@ -91,7 +91,7 @@ class Table(urwid.WidgetWrap):
         for i, widget in enumerate(cells):
             self._w.contents[i][0].contents.append((widget, ('pack', None)))
 
-class KillRing(object):
+class KillRing:
     def __init__(self):
         self.ring = []
 
@@ -138,7 +138,7 @@ class MyEdit(urwid.Edit):
             self.ring.kill(text)
         return super(MyEdit, self).keypress(size, key)
 
-class LineBoxTitlePropertyMixin(object):
+class LineBoxTitlePropertyMixin:
 
     @property
     def title(self):
@@ -300,7 +300,7 @@ class SearchableText(urwid.Text):
         self._invalidate()
         return found
 
-class Searchable(object):
+class Searchable:
     def searchInit(self):
         self.search = None
         self.results = []

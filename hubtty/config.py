@@ -32,7 +32,7 @@ import hubtty.keymap
 CONFIG_PATH = os.path.join(BaseDirectory.save_config_path('hubtty'), 'hubtty.yaml')
 SECURE_CONFIG_PATH = os.path.join(BaseDirectory.save_config_path('hubtty'), 'hubtty_auth.yaml')
 
-class ConfigSchema(object):
+class ConfigSchema:
     server = {v.Required('name'): str,
               'api-url': str,
               'url': str,
@@ -130,7 +130,7 @@ class ConfigSchema(object):
                            })
         return schema
 
-class Config(object):
+class Config:
     def __init__(self, server=None, palette='default', keymap='default',
                  path=None):
         self.path = self.verifyConfigFile(path)

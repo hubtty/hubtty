@@ -46,7 +46,7 @@ class RestrictedError(Exception):
 class RateLimitError(Exception):
     pass
 
-class MultiQueue(object):
+class MultiQueue:
     def __init__(self, priorities):
         self.queues = collections.OrderedDict()
         for key in priorities:
@@ -111,7 +111,7 @@ class MultiQueue(object):
             self.condition.release()
 
 
-class UpdateEvent(object):
+class UpdateEvent:
     def updateRelatedPullRequests(self, session, pr):
         related_pr_keys = set()
         related_pr_keys.add(pr.key)
@@ -157,7 +157,7 @@ class PullRequestUpdatedEvent(UpdateEvent):
         self.state_changed = False
         self.held_changed = False
 
-class Task(object):
+class Task:
     def __init__(self, priority=NORMAL_PRIORITY):
         self.log = logging.getLogger('hubtty.sync')
         self.priority = priority
@@ -1261,7 +1261,7 @@ class VacuumDatabaseTask(Task):
         with app.db.getSession() as session:
             session.vacuum()
 
-class Sync(object):
+class Sync:
     def __init__(self, app, disable_background_sync):
         self.user_agent = 'Hubtty/%s %s' % (hubtty.version.version_info.release_string(),
                                             requests.utils.default_user_agent())

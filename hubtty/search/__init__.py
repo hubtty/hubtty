@@ -24,7 +24,7 @@ class SearchSyntaxError(Exception):
         self.message = message
 
 
-class SearchCompiler(object):
+class SearchCompiler:
     def __init__(self, get_account_id):
         self.get_account_id = get_account_id
         self.lexer = tokenizer.SearchTokenizer()

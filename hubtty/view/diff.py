@@ -24,7 +24,7 @@ from hubtty import sync
 from hubtty.view import mouse_scroll_decorator
 
 
-class LineContext(object):
+class LineContext:
     def __init__(self, old_file_key, new_file_key,
                  old_fn, new_fn, old_ln, new_ln,
                  header=False):
