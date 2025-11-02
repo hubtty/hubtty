@@ -396,14 +396,14 @@ class App:
         while True:
             try:
                 s, addr = self.socket.accept()
-                self.log.debug(f"Accepted socket connection {s}")
+                self.log.debug("Accepted socket connection %s", s)
                 buf = b''
                 while True:
                     buf += s.recv(1)
                     if buf[-1] == 10:
                         break
                 buf = buf.decode('utf8').strip()
-                self.log.debug(f"Received {buf} from socket")
+                self.log.debug("Received %s from socket", buf)
                 s.close()
                 parts = buf.split()
                 self.command_queue.put((parts[0], parts[1:]))
@@ -417,7 +417,7 @@ class App:
             self.status.update(message='')
 
     def changeScreen(self, widget, push=True):
-        self.log.debug(f"Changing screen to {widget}")
+        self.log.debug("Changing screen to %s", widget)
         self.status.update(error=False, title=widget.title)
         if push:
             self.screens.append(self.frame.body)
@@ -436,7 +436,7 @@ class App:
             widget = self.screens.pop()
             if (not target_widget) or (widget is target_widget):
                 break
-        self.log.debug(f"Popping screen to {widget}")
+        self.log.debug("Popping screen to %s", widget)
         if hasattr(widget, 'title'):
             self.status.update(title=widget.title)
         self.clearInputBuffer()
@@ -497,7 +497,7 @@ class App:
                                 min_width=min_width, min_height=min_height)
         if hasattr(widget, 'title'):
             overlay.title = widget.title
-        self.log.debug(f"Overlaying {widget} on screen {self.frame.body}")
+        self.log.debug("Overlaying %s on screen %s", widget, self.frame.body)
         self.screens.append(self.frame.body)
         self.frame.body = overlay
 
@@ -570,7 +570,7 @@ class App:
             raise Exception('Pull request is not in local database.')
 
     def doSearch(self, query):
-        self.log.debug("Search query: %s" % query)
+        self.log.debug("Search query: %s", query)
         try:
             self._syncOnePullRequestFromQuery(query)
         except Exception as e:
@@ -710,7 +710,7 @@ class App:
         self.clearInputBuffer()
 
     def openURL(self, url):
-        self.log.debug("Open URL %s" % url)
+        self.log.debug("Open URL %s", url)
         webbrowser.open_new_tab(url)
         self.loop.screen.clear()
 
@@ -748,12 +748,12 @@ class App:
         (command, data) = self.command_queue.get()
         if command == 'open':
             url = data[0]
-            self.log.debug(f"Opening URL {url}")
+            self.log.debug("Opening URL %s", url)
             result = self.parseInternalURL(url)
             if result is not None:
                 self.openInternalURL(result)
         else:
-            self.log.error(f"Unable to parse command {command} with data {data}")
+            self.log.error("Unable to parse command %s with data %s", command, data)
 
     def toggleHeldPullRequest(self, pr_key):
         with self.db.getSession() as session:

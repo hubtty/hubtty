@@ -90,7 +90,7 @@ class Renderer:
                     lambda link:self.app.openURL(url))
                 text.append(link)
             else:
-                self.log.warning("unknown element type: %s" % element['type'])
+                self.log.warning("unknown element type: %s", element['type'])
                 if 'children' in element:
                     text.extend(self.toUrwidMarkup(element['children']))
         return text

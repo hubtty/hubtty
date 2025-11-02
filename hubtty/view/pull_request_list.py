@@ -393,9 +393,9 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
                 or
                 (isinstance(event, sync.PullRequestUpdatedEvent) and
                  event.pr_key in self.pr_rows.keys())):
-            self.log.debug(f"Ignoring refresh pull request list due to event {event}")
+            self.log.debug("Ignoring refresh pull request list due to event %s", event)
             return False
-        self.log.debug(f"Refreshing pull request list due to event {event}")
+        self.log.debug("Refreshing pull request list due to event %s", event)
         return True
 
     def refresh(self):

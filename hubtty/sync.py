@@ -497,7 +497,7 @@ class SyncOutdatedPullRequestsTask(Task):
     def run(self, sync):
         with sync.app.db.getSession() as session:
             for pr in session.getOutdated():
-                self.log.debug(f"Sync outdated pull request {pr.pr_id}")
+                self.log.debug("Sync outdated pull request %s", pr.pr_id)
                 sync.submitTask(SyncPullRequestTask(pr.pr_id, priority=self.priority))
 
 class SyncPullRequestTask(Task):
@@ -595,13 +595,13 @@ class SyncPullRequestTask(Task):
             self.log.info("Synced pull request %s in %0.5f seconds.", self.pr_id, total_time)
         except Exception:
             try:
-                self.log.error(f"Marking pull request {self.pr_id} outdated")
+                self.log.error("Marking pull request %s outdated", self.pr_id)
                 with sync.app.db.getSession() as session:
                     pr = session.getPullRequestByPullRequestID(self.pr_id)
                     if pr:
                         pr.outdated = True
             except Exception:
-                self.log.exception(f"Error while marking pull request {self.pr_id} as outdated")
+                self.log.exception("Error while marking pull request %s as outdated", self.pr_id)
             raise
 
     def _syncPullRequest(self, sync):
@@ -648,7 +648,7 @@ class SyncPullRequestTask(Task):
             if not pr:
                 repository = session.getRepositoryByName(repository_name)
                 if not repository:
-                    self.log.debug(f"Repository {repository_name} unknown while syncing pull request")
+                    self.log.debug("Repository %s unknown while syncing pull request", repository_name)
                     remote_repository = sync.get(f'repos/{repository_name}')
                     if remote_repository:
                         repository = session.createRepository(
@@ -1086,12 +1086,12 @@ class UploadReviewTask(Task):
         with app.db.getSession() as session:
             message = session.getMessage(self.message_key)
             if message is None:
-                self.log.debug("Message %s has already been uploaded" % (
-                    self.message_key))
+                self.log.debug("Message %s has already been uploaded",
+                    self.message_key)
                 return
             pr = message.commit.pull_request
         if not pr.held:
-            self.log.debug(f"Syncing {pr.pr_id} to find out if it should be held")
+            self.log.debug("Syncing %s to find out if it should be held", pr.pr_id)
             t = SyncPullRequestTask(pr.pr_id)
             t.run(sync)
             self.results += t.results
@@ -1224,11 +1224,11 @@ class PrunePullRequestTask(Task):
             if not pr:
                 return
             repo = gitrepo.get_repo(pr.repository.name, app.config)
-            self.log.info("Pruning {} pull request {} state:{} updated:{}".format(
-                pr.repository.name, pr.number, pr.state, pr.updated))
+            self.log.info("Pruning %s pull request %s state:%s updated:%s",
+                pr.repository.name, pr.number, pr.state, pr.updated)
             pr_ref = f"pull/{pr.number}/head"
-            self.log.info("Deleting {} ref {}".format(
-                pr.repository.name, pr_ref))
+            self.log.info("Deleting %s ref %s",
+                pr.repository.name, pr_ref)
             try:
                 repo.deleteRef(pr_ref)
             except OSError as e:
@@ -1309,7 +1309,7 @@ class Sync:
     def _run(self, pipe, task=None):
         if not task:
             task = self.queue.get()
-        self.log.debug(f'Run: {task}')
+        self.log.debug('Run: %s', task)
         try:
             task.run(self)
             task.complete(True)
@@ -1318,7 +1318,7 @@ class Sync:
                 requests.exceptions.ChunkedEncodingError,
                 requests.exceptions.ReadTimeout
         ) as e:
-            self.log.warning(f"Offline due to: {e}")
+            self.log.warning("Offline due to: %s", e)
             if not self.offline:
                 self.submitTask(UploadReviewsTask(HIGH_PRIORITY))
             self.offline = True
@@ -1329,12 +1329,12 @@ class Sync:
         except RestrictedError as e:
             task.complete(False)
             self.queue.complete(task)
-            self.log.warning(f"Failed to run task {task}: {e}")
+            self.log.warning("Failed to run task %s: %s", task, e)
             self.app.status.update(error=True, refresh=False)
         except Exception:
             task.complete(False)
             self.queue.complete(task)
-            self.log.exception(f'Exception running task {task}')
+            self.log.exception('Exception running task %s', task)
             self.app.status.update(error=True, refresh=False)
         self.offline = False
         self.app.status.update(offline=False, refresh=False)
@@ -1380,7 +1380,7 @@ class Sync:
             response_callback = self.checkResponse
 
         while not done:
-            self.log.debug(f'GET: {url}')
+            self.log.debug('GET: %s', url)
 
             r = self.session.get(url,
                                  timeout=TIMEOUT,
@@ -1407,7 +1407,7 @@ class Sync:
                 else:
                     ret = result
                 if len(result):
-                    self.log.debug(f'200 OK, Received: {result}')
+                    self.log.debug('200 OK, Received: %s', result)
                 else:
                     self.log.debug('200 OK, No body.')
             if 'next' in r.links.keys():
@@ -1427,13 +1427,13 @@ class Sync:
         if not response_callback:
             response_callback = self.checkResponse
 
-        self.log.debug(f'POST: {url}')
-        self.log.debug(f'data: {data}')
+        self.log.debug('POST: %s', url)
+        self.log.debug('data: %s', data)
         r = self.session.post(url, data=json.dumps(data).encode('utf8'),
                               timeout=TIMEOUT,
                               headers = {**default_headers, **headers})
         response_callback(r)
-        self.log.debug(f'Received: {r.text}')
+        self.log.debug('Received: %s', r.text)
         ret = None
         if r.text and len(r.text)>0:
             try:
@@ -1454,13 +1454,13 @@ class Sync:
         if not response_callback:
             response_callback = self.checkResponse
 
-        self.log.debug(f'PUT: {url}')
-        self.log.debug(f'data: {data}')
+        self.log.debug('PUT: %s', url)
+        self.log.debug('data: %s', data)
         r = self.session.put(url, data=json.dumps(data).encode('utf8'),
                              timeout=TIMEOUT,
                              headers = {**default_headers, **headers})
         response_callback(r)
-        self.log.debug(f'Received: {r.text}')
+        self.log.debug('Received: %s', r.text)
 
     def patch(self, path, data, headers={}, response_callback=None):
         url = self.url(path)
@@ -1472,13 +1472,13 @@ class Sync:
         if not response_callback:
             response_callback = self.checkResponse
 
-        self.log.debug(f'PATCH: {url}')
-        self.log.debug(f'data: {data}')
+        self.log.debug('PATCH: %s', url)
+        self.log.debug('data: %s', data)
         r = self.session.patch(url, data=json.dumps(data).encode('utf8'),
                              timeout=TIMEOUT,
                              headers = {**default_headers, **headers})
         response_callback(r)
-        self.log.debug(f'Received: {r.text}')
+        self.log.debug('Received: %s', r.text)
 
     def delete(self, path, data, headers={}, response_callback=None):
         url = self.url(path)
@@ -1490,13 +1490,13 @@ class Sync:
         if not response_callback:
             response_callback = self.checkResponse
 
-        self.log.debug(f'DELETE: {url}')
-        self.log.debug(f'data: {data}')
+        self.log.debug('DELETE: %s', url)
+        self.log.debug('data: %s', data)
         r = self.session.delete(url, data=json.dumps(data).encode('utf8'),
                                 timeout=TIMEOUT,
                                 headers = {**default_headers, **headers})
         response_callback(r)
-        self.log.debug(f'Received: {r.text}')
+        self.log.debug('Received: %s', r.text)
 
     def syncSubscribedRepositories(self):
         task = SyncSubscribedRepositoriesTask(LOW_PRIORITY)
@@ -1521,5 +1521,5 @@ class Sync:
 
     def query(self, query):
         q = 'search/issues?per_page=100&q=%s' % query
-        self.log.debug(f'Query: {q}')
+        self.log.debug('Query: %s', q)
         return self.get(q)

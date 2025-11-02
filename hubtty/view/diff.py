@@ -233,7 +233,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             if diff:
                 diffs.append(diff)
             else:
-                self.log.debug(f"Unable to find file {filename} in commit {self.sha}")
+                self.log.debug("Unable to find file %s in commit %s", filename, self.sha)
         for i, diff in enumerate(diffs):
             if i > 0:
                 lines.append(urwid.Text(''))
@@ -272,7 +272,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         while comment_lists:
             comment_lists_keys = list(comment_lists.keys())
             if len(comment_lists_keys) == lastlen:
-                self.log.error("Unable to display all comments: %s" % comment_lists)
+                self.log.error("Unable to display all comments: %s", comment_lists)
                 return
             comment_lists_keys = list(comment_lists.keys())
             lastlen = len(comment_lists_keys)
@@ -285,7 +285,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 oldnew = gitrepo.NEW
             file_diffs = self.file_diffs[oldnew]
             if path not in file_diffs:
-                self.log.error("Unable to display comment: %s" % key)
+                self.log.error("Unable to display comment: %s", key)
                 del comment_lists[key]
                 continue
             diff = self.file_diffs[oldnew][path]
@@ -309,7 +309,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
 
     def expandChunk(self, diff, chunk, comment_lists={}, from_start=None, from_end=None,
                     expand_all=None):
-        self.log.debug(f"Expand chunk {chunk} {from_start} {from_end}")
+        self.log.debug("Expand chunk %s %s %s", chunk, from_start, from_end)
         add_lines = []
         if from_start is not None:
             index = self.listbox.body.index(chunk.button)

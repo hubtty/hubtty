@@ -683,9 +683,9 @@ class PullRequestView(urwid.WidgetWrap):
                 or
                 (isinstance(event, sync.PullRequestUpdatedEvent) and
                  self.pr_key in event.related_pr_keys)):
-            self.log.debug(f"Ignoring refresh pull request due to event {event}")
+            self.log.debug("Ignoring refresh pull request due to event %s", event)
             return False
-        self.log.debug(f"Refreshing pull request due to event {event}")
+        self.log.debug("Refreshing pull request due to event %s", event)
         return True
 
     def refresh(self):

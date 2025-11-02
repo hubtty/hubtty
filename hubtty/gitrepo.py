@@ -304,7 +304,7 @@ class Repo:
             # Use force to delete even unmerged refs
             repo.delete_head(ref, force=True)
         except git.exc.GitCommandError as e:
-            self.log.error("Failed to delete ref: " + e.stderr)
+            self.log.error("Failed to delete ref: %s", e.stderr)
 
     def checkout(self, ref):
         repo = git.Repo(self.path)

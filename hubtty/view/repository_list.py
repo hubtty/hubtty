@@ -261,9 +261,9 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
                 or
                 (isinstance(event, sync.PullRequestUpdatedEvent) and
                  (event.state_changed or event.review_flag_changed))):
-            self.log.debug(f"Ignoring refresh repository list due to event {event}")
+            self.log.debug("Ignoring refresh repository list due to event %s", event)
             return False
-        self.log.debug(f"Refreshing repository list due to event {event}")
+        self.log.debug("Refreshing repository list due to event %s", event)
         return True
 
     def advance(self):
@@ -483,9 +483,9 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
                         repository = session.getRepository(row.repository_key)
                         if move and row.topic_key:
                             old_topic = session.getTopic(row.topic_key)
-                            self.log.debug(f"Remove {repository} from {old_topic}")
+                            self.log.debug("Remove %s from %s", repository, old_topic)
                             old_topic.removeRepository(repository)
-                        self.log.debug(f"Add {repository} to {new_topic}")
+                        self.log.debug("Add %s to %s", repository, new_topic)
                         new_topic.addRepository(repository)
         self.app.backScreen()
         if error:
@@ -506,7 +506,7 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
             for row in rows:
                 repository = session.getRepository(row.repository_key)
                 topic = session.getTopic(row.topic_key)
-                self.log.debug(f"Remove {repository} from {topic}")
+                self.log.debug("Remove %s from %s", repository, topic)
                 topic.removeRepository(repository)
         self.refresh()
 

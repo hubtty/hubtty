@@ -744,7 +744,7 @@ class Database:
         conn = self.engine.connect()
         context = alembic.migration.MigrationContext.configure(conn)
         current_rev = context.get_current_revision()
-        self.log.debug('Current migration revision: %s' % current_rev)
+        self.log.debug('Current migration revision: %s', current_rev)
 
         has_table = self.engine.dialect.has_table(conn, "repository")
 
@@ -777,7 +777,7 @@ class DatabaseSession:
         self.session().close()
         self.session = None
         end = time.time()
-        self.database.log.debug(f"Database lock held {end-self.start} seconds")
+        self.database.log.debug("Database lock held %s seconds", end-self.start)
         self.database.lock.release()
 
     def abort(self):
@@ -873,7 +873,7 @@ class DatabaseSession:
             return None
 
     def getPullRequests(self, query, unreviewed=False, sort_by='number'):
-        self.database.log.debug(f"Search query: {query} sort: {sort_by}")
+        self.database.log.debug("Search query: %s sort: %s", query, sort_by)
         q = self.session().query(PullRequest).filter(self.search.parse(query))
         if not isinstance(sort_by, (list, tuple)):
             sort_by = [sort_by]
@@ -889,7 +889,7 @@ class DatabaseSession:
             elif s == 'repository':
                 q = q.filter(repository_table.c.key == pull_request_table.c.repository_key)
                 q = q.order_by(repository_table.c.name)
-        self.database.log.debug("Search SQL: %s" % q)
+        self.database.log.debug("Search SQL: %s", q)
         try:
             validPullRequests = []
             for c in q.all():
