@@ -863,15 +863,7 @@ class SyncPullRequestTask(Task):
             pr.outdated = False
         for url, refs in fetches.items():
             self.log.debug("Fetching from %s with refs %s", url, refs)
-            try:
-                repo.fetch(url, refs)
-            except Exception:
-                # Backwards compat with GitPython before the multi-ref fetch
-                # patch.
-                # (https://github.com/gitpython-developers/GitPython/pull/170)
-                for ref in refs:
-                    self.log.debug("git fetch %s %s" % (url, ref))
-                    repo.fetch(url, ref)
+            repo.fetch(url, refs)
 
 class CheckReposTask(Task):
     # on startup, check all repositories
