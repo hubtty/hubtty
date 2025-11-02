@@ -193,8 +193,8 @@ URWID_COMMANDS = frozenset((
 FORMAT_SUBS = (
     (re.compile('ctrl '), 'CTRL-'),
     (re.compile('meta '), 'META-'),
-    (re.compile('f(\d+)'), 'F\\1'),
-    (re.compile('([a-z][a-z]+)'), lambda x: x.group(1).upper()),
+    (re.compile(r'f(\d+)'), 'F\\1'),
+    (re.compile(r'([a-z][a-z]+)'), lambda x: x.group(1).upper()),
     )
 
 def formatKey(key):

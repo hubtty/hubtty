@@ -622,7 +622,7 @@ class App(object):
                 return self.openInternalURL(result)
         self.doSearch(query)
 
-    trailing_filename_re = re.compile('.*(,[a-z]+)')
+    trailing_filename_re = re.compile(r'.*(,[a-z]+)')
     def parseInternalURL(self, url):
         if not url.startswith(self.config.url):
             return None

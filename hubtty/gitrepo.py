@@ -330,7 +330,7 @@ class Repo(object):
             ret.append(x.split('\t'))
         return ret
 
-    trailing_ws_re = re.compile('\s+$')
+    trailing_ws_re = re.compile(r'\s+$')
     def _emph_trail_ws(self, style, line):
         result = (style, line)
         re_result = self.trailing_ws_re.search(line)
@@ -417,7 +417,7 @@ class Repo(object):
         #self.log.debug(repr(output_new))
         return output_old, output_new
 
-    header_re = re.compile('@@ -(\d+)(,\d+)? \+(\d+)(,\d+)? @@')
+    header_re = re.compile(r'@@ -(\d+)(,\d+)? \+(\d+)(,\d+)? @@')
     def diff(self, old, new, context=10000, show_old_commit=False):
         """Create a diff from old to new.
 
