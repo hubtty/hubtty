@@ -14,5 +14,5 @@
 
 class DisplayError(Exception):
     def __init__(self, message):
-        super(DisplayError, self).__init__(message)
+        super().__init__(message)
         self.message = message

@@ -43,7 +43,7 @@ class TextButton(urwid.Button):
         return True
 
     def __init__(self, text, on_press=None, user_data=None):
-        super(TextButton, self).__init__('', on_press=on_press, user_data=user_data)
+        super().__init__('', on_press=on_press, user_data=user_data)
         self.text = urwid.Text(text)
         self._w = urwid.AttrMap(self.text, None, focus_map='focused')
 
@@ -84,14 +84,14 @@ class Table(urwid.WidgetWrap):
             cols = [('pack', TableColumn([('pack', w)])) for w in headers]
         else:
             cols = [('pack', TableColumn([])) for x in range(columns)]
-        super(Table, self).__init__(
+        super().__init__(
             urwid.Columns(cols))
 
     def addRow(self, cells=[]):
         for i, widget in enumerate(cells):
             self._w.contents[i][0].contents.append((widget, ('pack', None)))
 
-class KillRing(object):
+class KillRing:
     def __init__(self):
         self.ring = []
 
@@ -112,7 +112,7 @@ class MyEdit(urwid.Edit):
         if not self.ring:
             self.ring = KillRing()
         self.last_yank = None
-        super(MyEdit, self).__init__(*args, **kw)
+        super().__init__(*args, **kw)
 
     def keypress(self, size, key):
         if self._command_map[key] == keymap.YANK:
@@ -136,9 +136,9 @@ class MyEdit(urwid.Edit):
             text = self.edit_text[self.edit_pos:]
             self.edit_text = self.edit_text[:self.edit_pos]
             self.ring.kill(text)
-        return super(MyEdit, self).keypress(size, key)
+        return super().keypress(size, key)
 
-class LineBoxTitlePropertyMixin(object):
+class LineBoxTitlePropertyMixin:
 
     @property
     def title(self):
@@ -151,7 +151,7 @@ class LineBoxTitlePropertyMixin(object):
 class SystemMessage(urwid.WidgetWrap, LineBoxTitlePropertyMixin):
     def __init__(self, message):
         w = urwid.Filler(urwid.Text(message, align='center'))
-        super(SystemMessage, self).__init__(urwid.LineBox(w, u'System Message'))
+        super().__init__(urwid.LineBox(w, 'System Message'))
 
 @mouse_scroll_decorator.ScrollByWheel
 class ButtonDialog(urwid.WidgetWrap, LineBoxTitlePropertyMixin):
@@ -171,7 +171,7 @@ class ButtonDialog(urwid.WidgetWrap, LineBoxTitlePropertyMixin):
         rows.append(urwid.Divider())
         rows.append(button_columns)
         listbox = urwid.ListBox(rows)
-        super(ButtonDialog, self).__init__(urwid.LineBox(listbox, title))
+        super().__init__(urwid.LineBox(listbox, title))
 
 class LineEditDialog(ButtonDialog):
     signals = ['save', 'cancel']
@@ -184,7 +184,7 @@ class LineEditDialog(ButtonDialog):
                              lambda button:self._emit('save'))
         urwid.connect_signal(cancel_button, 'click',
                              lambda button:self._emit('cancel'))
-        super(LineEditDialog, self).__init__(title, message, entry_prompt,
+        super().__init__(title, message, entry_prompt,
                                              entry_text,
                                              buttons=[save_button,
                                                       cancel_button],
@@ -192,7 +192,7 @@ class LineEditDialog(ButtonDialog):
 
     def keypress(self, size, key):
         if not self.app.input_buffer:
-            key = super(LineEditDialog, self).keypress(size, key)
+            key = super().keypress(size, key)
         keys = self.app.input_buffer + [key]
         commands = self.app.config.keymap.getCommands(keys)
         if keymap.ACTIVATE in commands:
@@ -220,7 +220,7 @@ class TextEditDialog(urwid.WidgetWrap, LineBoxTitlePropertyMixin):
         rows.append(button_columns)
         pile = urwid.Pile(rows)
         fill = urwid.Filler(pile, valign='top')
-        super(TextEditDialog, self).__init__(urwid.LineBox(fill, title))
+        super().__init__(urwid.LineBox(fill, title))
 
 class MessageDialog(ButtonDialog):
     signals = ['close']
@@ -228,7 +228,7 @@ class MessageDialog(ButtonDialog):
         ok_button = FixedButton('OK')
         urwid.connect_signal(ok_button, 'click',
                              lambda button:self._emit('close'))
-        super(MessageDialog, self).__init__(title, message, buttons=[ok_button])
+        super().__init__(title, message, buttons=[ok_button])
 
 class YesNoDialog(ButtonDialog):
     signals = ['yes', 'no']
@@ -239,10 +239,10 @@ class YesNoDialog(ButtonDialog):
                              lambda button:self._emit('yes'))
         urwid.connect_signal(no_button, 'click',
                              lambda button:self._emit('no'))
-        super(YesNoDialog, self).__init__(title, message, buttons=[yes_button,
+        super().__init__(title, message, buttons=[yes_button,
                                                                    no_button])
     def keypress(self, size, key):
-        r = super(YesNoDialog, self).keypress(size, key)
+        r = super().keypress(size, key)
         if r in ('Y', 'y'):
             self._emit('yes')
             return None
@@ -254,7 +254,7 @@ class YesNoDialog(ButtonDialog):
 class SearchableText(urwid.Text):
     def set_text(self, markup):
         self._markup = markup
-        super(SearchableText, self).set_text(markup)
+        super().set_text(markup)
 
     def search(self, search, attribute):
         if not search:
@@ -300,7 +300,7 @@ class SearchableText(urwid.Text):
         self._invalidate()
         return found
 
-class Searchable(object):
+class Searchable:
     def searchInit(self):
         self.search = None
         self.results = []
@@ -371,7 +371,7 @@ class HyperText(urwid.Text):
         self.selectable_items = []
         self.focused_index = None
         self.last_focused_index = 0
-        super(HyperText, self).__init__(markup, align, wrap, layout)
+        super().__init__(markup, align, wrap, layout)
 
     def focusFirstItem(self):
         if len(self.selectable_items) == 0:
@@ -500,7 +500,7 @@ class HyperText(urwid.Text):
     def set_text(self, markup):
         self._markup = markup
         self.selectable_items = []
-        super(HyperText, self).set_text(self.processLinks(markup))
+        super().set_text(self.processLinks(markup))
 
     def move_cursor_to_coords(self, size, col, row):
         if self.focused_index is None:
@@ -513,7 +513,7 @@ class HyperText(urwid.Text):
     def render(self, size, focus=False):
         if (not focus) and (self.focused_index is not None):
             self.focusItem(None)
-        return super(HyperText, self).render(size, focus)
+        return super().render(size, focus)
 
 class Link(urwid.Widget):
     signals = ['selected']

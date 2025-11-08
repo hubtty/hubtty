@@ -13,25 +13,16 @@
 # under the License.
 
 import collections
-try:
-    import ordereddict
-except:
-    pass
 import re
 
-import six
 import urwid
 
 from hubtty import mywid
 
-try:
-    OrderedDict = collections.OrderedDict
-except AttributeError:
-    OrderedDict = ordereddict.OrderedDict
 
-class TextReplacement(object):
+class TextReplacement:
     def __init__(self, config):
-        if isinstance(config, six.string_types):
+        if isinstance(config, str):
             self.color = None
             self.text = config
         else:
@@ -43,7 +34,7 @@ class TextReplacement(object):
             return (self.color.format(**data), self.text.format(**data))
         return (None, self.text.format(**data))
 
-class LinkReplacement(object):
+class LinkReplacement:
     def __init__(self, config):
         self.url = config['url']
         self.text = config['text']
@@ -60,7 +51,7 @@ class LinkReplacement(object):
             return app.openInternalURL(result)
         return app.openURL(url)
 
-class SearchReplacement(object):
+class SearchReplacement:
     def __init__(self, config):
         self.query = config['query']
         self.text = config['text']
@@ -71,7 +62,7 @@ class SearchReplacement(object):
             lambda link:app.doSearch(self.query.format(**data)))
         return link
 
-class CommentLink(object):
+class CommentLink:
     def __init__(self, config):
         self.match = re.compile(config['match'], re.M)
         self.test_result = config.get('test-result', None)
@@ -87,7 +78,7 @@ class CommentLink(object):
     def getTestResults(self, app, text):
         if self.test_result is None:
             return {}
-        ret = OrderedDict()
+        ret = collections.OrderedDict()
         for line in text.split('\n'):
             m = self.match.search(line)
             if m:
@@ -99,7 +90,7 @@ class CommentLink(object):
     def run(self, app, chunks):
         ret = []
         for chunk in chunks:
-            if not isinstance(chunk, six.string_types):
+            if not isinstance(chunk, str):
                 # We don't currently support nested commentlinks; if
                 # we have something that isn't a string, just append
                 # it to the output.

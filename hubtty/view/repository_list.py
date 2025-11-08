@@ -49,7 +49,7 @@ class TopicSelectDialog(urwid.WidgetWrap):
         rows.append(button_columns)
         pile = urwid.Pile(rows)
         fill = urwid.Filler(pile, valign='top')
-        super(TopicSelectDialog, self).__init__(urwid.LineBox(fill, title))
+        super().__init__(urwid.LineBox(fill, title))
 
     def getSelected(self):
         for b in self.topic_buttons:
@@ -78,7 +78,7 @@ class RepositoryRow(urwid.Button):
         self.name.set_text(name)
 
     def __init__(self, app, repository, topic, callback=None):
-        super(RepositoryRow, self).__init__('', on_press=callback,
+        super().__init__('', on_press=callback,
                                          user_data=(repository.key, repository.name))
         self.app = app
         self.mark = False
@@ -94,8 +94,8 @@ class RepositoryRow(urwid.Button):
         self.name = mywid.SearchableText('')
         self._setName(repository.name, self.indent)
         self.name.set_wrap_mode('clip')
-        self.unreviewed_prs = urwid.Text(u'', align=urwid.RIGHT)
-        self.open_prs = urwid.Text(u'', align=urwid.RIGHT)
+        self.unreviewed_prs = urwid.Text('', align=urwid.RIGHT)
+        self.open_prs = urwid.Text('', align=urwid.RIGHT)
         col = urwid.Columns([
                 self.name,
                 ('fixed', 11, self.unreviewed_prs),
@@ -152,7 +152,7 @@ class TopicRow(urwid.Button):
         self.name.set_text(name)
 
     def __init__(self, topic, callback=None):
-        super(TopicRow, self).__init__('', on_press=callback,
+        super().__init__('', on_press=callback,
                                        user_data=(topic.key, topic.name))
         self.mark = False
         self._style = None
@@ -160,8 +160,8 @@ class TopicRow(urwid.Button):
         self.name = urwid.Text('')
         self._setName(topic.name)
         self.name.set_wrap_mode('clip')
-        self.unreviewed_prs = urwid.Text(u'', align=urwid.RIGHT)
-        self.open_prs = urwid.Text(u'', align=urwid.RIGHT)
+        self.unreviewed_prs = urwid.Text('', align=urwid.RIGHT)
+        self.open_prs = urwid.Text('', align=urwid.RIGHT)
         col = urwid.Columns([
                 self.name,
                 ('fixed', 11, self.unreviewed_prs),
@@ -195,10 +195,10 @@ class TopicRow(urwid.Button):
 
 class RepositoryListHeader(urwid.WidgetWrap):
     def __init__(self):
-        cols = [urwid.Text(u' Repository'),
-                (11, urwid.Text(u'Unreviewed')),
-                (5, urwid.Text(u'Open'))]
-        super(RepositoryListHeader, self).__init__(urwid.Columns(cols))
+        cols = [urwid.Text(' Repository'),
+                (11, urwid.Text('Unreviewed')),
+                (5, urwid.Text('Open'))]
+        super().__init__(urwid.Columns(cols))
 
 @mouse_scroll_decorator.ScrollByWheel
 class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
@@ -236,7 +236,7 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
         return [(c[0], key(c[0]), c[1]) for c in commands]
 
     def __init__(self, app):
-        super(RepositoryListView, self).__init__(urwid.Pile([]))
+        super().__init__(urwid.Pile([]))
         self.log = logging.getLogger('hubtty.view.repository_list')
         self.searchInit()
         self.app = app
@@ -261,9 +261,9 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
                 or
                 (isinstance(event, sync.PullRequestUpdatedEvent) and
                  (event.state_changed or event.review_flag_changed))):
-            self.log.debug("Ignoring refresh repository list due to event %s" % (event,))
+            self.log.debug("Ignoring refresh repository list due to event %s", event)
             return False
-        self.log.debug("Refreshing repository list due to event %s" % (event,))
+        self.log.debug("Refreshing repository list due to event %s", event)
         return True
 
     def advance(self):
@@ -324,12 +324,12 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
 
     def refresh(self):
         if self.subscribed:
-            self.title = u'Subscribed repositories'
+            self.title = 'Subscribed repositories'
             self.short_title = self.title[:]
             if self.unreviewed:
-                self.title += u' with unreviewed pull requests'
+                self.title += ' with unreviewed pull requests'
         else:
-            self.title = u'All repositories'
+            self.title = 'All repositories'
             self.short_title = self.title[:]
         self.app.status.update(title=self.title)
         with self.app.db.getSession() as session:
@@ -362,12 +362,12 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
         repository_key, repository_name = data
         self.app.changeScreen(view_pr_list.PullRequestListView(
                 self.app,
-                "_repository_key:%s %s" % (repository_key, self.app.config.repository_pr_list_query),
+                f"_repository_key:{repository_key} {self.app.config.repository_pr_list_query}",
                 repository_name, repository_key=repository_key, unreviewed=True))
 
     def onSelectTopic(self, button, data):
         topic_key = data[0]
-        self.open_topics ^= set([topic_key])
+        self.open_topics ^= {topic_key}
         self.refresh()
 
     def toggleMark(self):
@@ -483,9 +483,9 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
                         repository = session.getRepository(row.repository_key)
                         if move and row.topic_key:
                             old_topic = session.getTopic(row.topic_key)
-                            self.log.debug("Remove %s from %s" % (repository, old_topic))
+                            self.log.debug("Remove %s from %s", repository, old_topic)
                             old_topic.removeRepository(repository)
-                        self.log.debug("Add %s to %s" % (repository, new_topic))
+                        self.log.debug("Add %s to %s", repository, new_topic)
                         new_topic.addRepository(repository)
         self.app.backScreen()
         if error:
@@ -506,7 +506,7 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
             for row in rows:
                 repository = session.getRepository(row.repository_key)
                 topic = session.getTopic(row.topic_key)
-                self.log.debug("Remove %s from %s" % (repository, topic))
+                self.log.debug("Remove %s from %s", repository, topic)
                 topic.removeRepository(repository)
         self.refresh()
 
@@ -534,7 +534,7 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
             return None
 
         if not self.app.input_buffer:
-            key = super(RepositoryListView, self).keypress(size, key)
+            key = super().keypress(size, key)
         keys = self.app.input_buffer + [key]
         commands = self.app.config.keymap.getCommands(keys)
         ret = self.handleCommands(commands)

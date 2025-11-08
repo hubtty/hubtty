@@ -16,7 +16,6 @@
 import datetime
 import logging
 
-import six
 import urwid
 
 from hubtty import keymap
@@ -27,7 +26,7 @@ from hubtty.view import mouse_scroll_decorator
 import hubtty.view
 
 
-class ColumnInfo(object):
+class ColumnInfo:
     def __init__(self, name, packing, value):
         self.name = name
         self.packing = packing
@@ -50,7 +49,7 @@ COLUMNS = [
 ]
 
 
-class PullRequestListColumns(object):
+class PullRequestListColumns:
     def updateColumns(self):
         del self.columns.contents[:]
         cols = self.columns.contents
@@ -97,18 +96,18 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
 
     def __init__(self, app, pr, prefix, categories,
                  enabled_columns, callback=None):
-        super(PullRequestRow, self).__init__('', on_press=callback, user_data=pr.key)
+        super().__init__('', on_press=callback, user_data=pr.key)
         self.app = app
         self.pr_key = pr.key
         self.prefix = prefix
         self.enabled_columns = enabled_columns
-        self.title = mywid.SearchableText(u'', wrap='clip')
-        self.number = mywid.SearchableText(u'')
-        self.updated = mywid.SearchableText(u'')
-        self.size = mywid.SearchableText(u'', align='right')
-        self.repository = mywid.SearchableText(u'', wrap='clip')
-        self.author = mywid.SearchableText(u'', wrap='clip')
-        self.branch = mywid.SearchableText(u'', wrap='clip')
+        self.title = mywid.SearchableText('', wrap='clip')
+        self.number = mywid.SearchableText('')
+        self.updated = mywid.SearchableText('')
+        self.size = mywid.SearchableText('', align='right')
+        self.repository = mywid.SearchableText('', wrap='clip')
+        self.author = mywid.SearchableText('', wrap='clip')
+        self.branch = mywid.SearchableText('', wrap='clip')
         self.mark = False
         self.columns = urwid.Columns([], dividechars=1)
         self.row_style = urwid.AttrMap(self.columns, '')
@@ -143,8 +142,8 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
         # appropriately.  This is so that the reverse-video which
         # operates on the line when focused works as expected.
 
-        lower_box = u'\u2584'
-        upper_box = u'\u2580'
+        lower_box = '\u2584'
+        upper_box = '\u2580'
         ret = []
         # The graph is logarithmic -- one cell for each order of
         # magnitude.
@@ -169,14 +168,14 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
         # You can see the character table at the wikipedia[1] or somewhere.
         # [1] https://en.wikipedia.org/wiki/Block_Elements#Character_table
         conf_thresholds = self.app.config.size_column['thresholds']
-        thresholds = [(conf_thresholds[7], u'\u2588'),
-                      (conf_thresholds[6], u'\u2589'),
-                      (conf_thresholds[5], u'\u258a'),
-                      (conf_thresholds[4], u'\u258b'),
-                      (conf_thresholds[3], u'\u258c'),
-                      (conf_thresholds[2], u'\u258d'),
-                      (conf_thresholds[1], u'\u258e'),
-                      (conf_thresholds[0], u'\u258f')]
+        thresholds = [(conf_thresholds[7], '\u2588'),
+                      (conf_thresholds[6], '\u2589'),
+                      (conf_thresholds[5], '\u258a'),
+                      (conf_thresholds[4], '\u258b'),
+                      (conf_thresholds[3], '\u258c'),
+                      (conf_thresholds[2], '\u258d'),
+                      (conf_thresholds[1], '\u258e'),
+                      (conf_thresholds[0], '\u258f')]
         ret = []
         # The graph is logarithmic -- one cell for each order of
         # magnitude.
@@ -196,7 +195,7 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
             style = 'reviewed-pr'
         else:
             style = 'unreviewed-pr'
-        title = '%s%s' % (self.prefix, pr.title)
+        title = f'{self.prefix}{pr.title}'
         flag = ' '
         if pr.starred:
             flag = '*'
@@ -258,12 +257,13 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
             val = ''
             if category == 'Code-Review':
                 v = pr.getReviewState()
-            if v in ['APPROVED']:
-                val = ('positive-label', ' ✓')
-            elif v in ['CHANGES_REQUESTED']:
-                val = ('negative-label', ' ✗')
-            elif v in ['COMMENTED']:
-                val = ' •'
+            match v:
+                case 'APPROVED':
+                    val = ('positive-label', ' ✓')
+                case 'CHANGES_REQUESTED':
+                    val = ('negative-label', ' ✗')
+                case 'COMMENTED':
+                    val = ' •'
             self.category_columns.append((urwid.Text(val),
                                           self.columns.options('given', 2)))
         self.updateColumns()
@@ -271,16 +271,16 @@ class PullRequestRow(urwid.Button, PullRequestListColumns):
 class PullRequestListHeader(urwid.WidgetWrap, PullRequestListColumns):
     def __init__(self, enabled_columns):
         self.enabled_columns = enabled_columns
-        self.title = urwid.Text(u'Title', wrap='clip')
-        self.number = urwid.Text(u'Number')
-        self.updated = urwid.Text(u'Updated')
-        self.size = urwid.Text(u'Size')
-        self.repository = urwid.Text(u'Repository', wrap='clip')
-        self.author = urwid.Text(u'Author', wrap='clip')
-        self.branch = urwid.Text(u'Branch', wrap='clip')
+        self.title = urwid.Text('Title', wrap='clip')
+        self.number = urwid.Text('Number')
+        self.updated = urwid.Text('Updated')
+        self.size = urwid.Text('Size')
+        self.repository = urwid.Text('Repository', wrap='clip')
+        self.author = urwid.Text('Author', wrap='clip')
+        self.branch = urwid.Text('Branch', wrap='clip')
         self.columns = urwid.Columns([], dividechars=1)
         self.category_columns = []
-        super(PullRequestListHeader, self).__init__(self.columns)
+        super().__init__(self.columns)
 
     def update(self, categories):
         self.category_columns = []
@@ -292,9 +292,9 @@ class PullRequestListHeader(urwid.WidgetWrap, PullRequestListColumns):
 
 @mouse_scroll_decorator.ScrollByWheel
 class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
-    required_columns = set(['Number', 'Title', 'Updated'])
+    required_columns = {'Number', 'Title', 'Updated'}
     # FIXME(masayukig): Disable 'Size' column when configured
-    optional_columns = set(['Branch', 'Size'])
+    optional_columns = {'Branch', 'Size'}
 
     def getCommands(self):
         if self.repository_key:
@@ -343,7 +343,7 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
 
     def __init__(self, app, query, query_desc=None, repository_key=None,
                  unreviewed=False, sort_by=None, reverse=None):
-        super(PullRequestListView, self).__init__(urwid.Pile([]))
+        super().__init__(urwid.Pile([]))
         self.log = logging.getLogger('hubtty.view.pull_request_list')
         self.searchInit()
         self.app = app
@@ -394,9 +394,9 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
                 or
                 (isinstance(event, sync.PullRequestUpdatedEvent) and
                  event.pr_key in self.pr_rows.keys())):
-            self.log.debug("Ignoring refresh pull request list due to event %s" % (event,))
+            self.log.debug("Ignoring refresh pull request list due to event %s", event)
             return False
-        self.log.debug("Refreshing pull request list due to event %s" % (event,))
+        self.log.debug("Refreshing pull request list due to event %s", event)
         return True
 
     def refresh(self):
@@ -405,10 +405,10 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
             pr_list = session.getPullRequests(self.query, self.unreviewed,
                                               sort_by=self.sort_by)
             if self.unreviewed:
-                self.title = (u'Unreviewed %d pull requests in %s' %
+                self.title = ('Unreviewed %d pull requests in %s' %
                     (len(pr_list), self.query_desc))
             else:
-                self.title = (u'All %d pull requests in %s' %
+                self.title = ('All %d pull requests in %s' %
                     (len(pr_list), self.query_desc))
             self.short_title = self.query_desc
             if '/' in self.short_title and ' ' not in self.short_title:
@@ -473,16 +473,16 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
                     self.enabled_columns.discard(colinfo.name)
         if currently_enabled_columns != self.enabled_columns:
             self.header.updateColumns()
-            for key, value in six.iteritems(self.pr_rows):
+            for key, value in self.pr_rows.items():
                 value.updateColumns()
 
     def getQueryString(self):
         if self.repository_key is not None:
-            return "repo:%s %s" % (self.query_desc, self.app.config.repository_pr_list_query)
+            return f"repo:{self.query_desc} {self.app.config.repository_pr_list_query}"
         return self.query
 
     def clearPullRequestList(self):
-        for key, value in six.iteritems(self.pr_rows):
+        for key, value in self.pr_rows.items():
             self.listbox.body.remove(value)
         self.pr_rows = {}
 
@@ -550,7 +550,7 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
             return None
 
         if not self.app.input_buffer:
-            key = super(PullRequestListView, self).keypress(size, key)
+            key = super().keypress(size, key)
         keys = self.app.input_buffer + [key]
         commands = self.app.config.keymap.getCommands(keys)
         ret = self.handleCommands(commands)
@@ -743,16 +743,16 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
         self.app.backScreen()
 
     def closePullRequest(self):
-        dialog = mywid.TextEditDialog(u'Close pull request', u'Message:',
-                                      u'Close pull request', u'')
+        dialog = mywid.TextEditDialog('Close pull request', 'Message:',
+                                      'Close pull request', '')
         urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
         urwid.connect_signal(dialog, 'save', lambda button:
                                  self.doCloseReopenPullRequest(dialog, 'closed'))
         self.app.popup(dialog)
 
     def reopenPullRequest(self):
-        dialog = mywid.TextEditDialog(u'Reopen pull request', u'Message:',
-                                      u'Reopen pull request', u'')
+        dialog = mywid.TextEditDialog('Reopen pull request', 'Message:',
+                                      'Reopen pull request', '')
         urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
         urwid.connect_signal(dialog, 'save', lambda button:
                              self.doCloseReopenPullRequest(dialog, 'open'))

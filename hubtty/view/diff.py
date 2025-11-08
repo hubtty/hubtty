@@ -24,7 +24,7 @@ from hubtty import sync
 from hubtty.view import mouse_scroll_decorator
 
 
-class LineContext(object):
+class LineContext:
     def __init__(self, old_file_key, new_file_key,
                  old_fn, new_fn, old_ln, new_ln,
                  header=False):
@@ -76,7 +76,7 @@ class DiffContextButton(urwid.WidgetWrap):
         buttons = urwid.Columns([urwid.Text('')] + buttons + [urwid.Text('')],
                                 dividechars=4)
         buttons = urwid.AttrMap(buttons, 'context-button')
-        super(DiffContextButton, self).__init__(buttons)
+        super().__init__(buttons)
         self.view = view
         self.diff = diff
         self.chunk = chunk
@@ -124,7 +124,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         return ret
 
     def __init__(self, app, new_commit_key):
-        super(BaseDiffView, self).__init__(urwid.Pile([]))
+        super().__init__(urwid.Pile([]))
         self.log = logging.getLogger('hubtty.view.diff')
         self.app = app
         self.old_commit_key = None  # Base
@@ -159,11 +159,11 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                         self.old_file_keys[f.old_path] = f.key
                     else:
                         self.old_file_keys[f.path] = f.key
-            self.title = u'Diff of %s from %s to %s' % (
+            self.title = 'Diff of {} from {} to {}'.format(
                 new_commit.pull_request.repository.name,
                 new_commit.parent[0:7],
                 new_commit.sha[0:7])
-            self.short_title = u'Diff of %s' % (new_commit.sha[0:7],)
+            self.short_title = f'Diff of {new_commit.sha[0:7]}'
             self.pr_key = new_commit.pull_request.key
             self.repository_name = new_commit.pull_request.repository.name
             self.sha = new_commit.sha
@@ -191,7 +191,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                     message = comment.message
                 else:
                     message = [('comment-name', comment.author.name or comment.author.username),
-                               ('comment', u': '+comment.message)]
+                               ('comment', ': '+comment.message)]
                 comment_list.append((comment.key, message))
                 comment_lists[key] = comment_list
                 comment_filenames.add(path)
@@ -209,7 +209,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                     message = comment.message
                 else:
                     message = [('comment-name', comment.author.name or comment.author.username),
-                               ('comment', u': '+comment.message)]
+                               ('comment', ': '+comment.message)]
                 comment_list.append((comment.key, message))
                 comment_lists[key] = comment_list
                 comment_filenames.add(path)
@@ -233,7 +233,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             if diff:
                 diffs.append(diff)
             else:
-                self.log.debug("Unable to find file %s in commit %s" % (filename, self.sha))
+                self.log.debug("Unable to find file %s in commit %s", filename, self.sha)
         for i, diff in enumerate(diffs):
             if i > 0:
                 lines.append(urwid.Text(''))
@@ -272,7 +272,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         while comment_lists:
             comment_lists_keys = list(comment_lists.keys())
             if len(comment_lists_keys) == lastlen:
-                self.log.error("Unable to display all comments: %s" % comment_lists)
+                self.log.error("Unable to display all comments: %s", comment_lists)
                 return
             comment_lists_keys = list(comment_lists.keys())
             lastlen = len(comment_lists_keys)
@@ -285,7 +285,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 oldnew = gitrepo.NEW
             file_diffs = self.file_diffs[oldnew]
             if path not in file_diffs:
-                self.log.error("Unable to display comment: %s" % key)
+                self.log.error("Unable to display comment: %s", key)
                 del comment_lists[key]
                 continue
             diff = self.file_diffs[oldnew][path]
@@ -309,7 +309,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
 
     def expandChunk(self, diff, chunk, comment_lists={}, from_start=None, from_end=None,
                     expand_all=None):
-        self.log.debug("Expand chunk %s %s %s" % (chunk, from_start, from_end))
+        self.log.debug("Expand chunk %s %s %s", chunk, from_start, from_end)
         add_lines = []
         if from_start is not None:
             index = self.listbox.body.index(chunk.button)
@@ -396,7 +396,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
 
         old_focus = self.listbox.focus
         if not self.app.input_buffer:
-            key = super(BaseDiffView, self).keypress(size, key)
+            key = super().keypress(size, key)
         new_focus = self.listbox.focus
         keys = self.app.input_buffer + [key]
         commands = self.app.config.keymap.getCommands(keys)
@@ -427,7 +427,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
 
     def mouse_event(self, size, event, button, x, y, focus):
         old_focus = self.listbox.focus
-        r = super(BaseDiffView, self).mouse_event(size, event, button, x, y, focus)
+        r = super().mouse_event(size, event, button, x, y, focus)
         new_focus = self.listbox.focus
         if old_focus != new_focus and isinstance(old_focus, BaseDiffCommentEdit):
             self.cleanupEdit(old_focus)

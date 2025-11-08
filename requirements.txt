@@ -5,11 +5,9 @@ SQLAlchemy>=1.4.0
 GitPython>=0.3.7
 python-dateutil
 requests>=2.5.3,<3.0.0
-ordereddict
 alembic>=0.6.4
 PyYAML>=3.1.0
 voluptuous>=0.7
 ply>=3.4
-six
 pyxdg
 mistune>=2.0,<3.0.0

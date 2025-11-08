@@ -156,7 +156,7 @@ LIGHT_PALETTE = {
     'md-thematicbreak': ['dark gray', ''],
     }
 
-class Palette(object):
+class Palette:
     def __init__(self, config):
         self.palette = {}
         self.palette.update(DEFAULT_PALETTE)

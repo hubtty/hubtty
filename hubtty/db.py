@@ -21,7 +21,6 @@ import threading
 import alembic
 import alembic.config
 import alembic.migration
-import six
 import sqlalchemy
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, Text, UniqueConstraint
 from sqlalchemy.schema import ForeignKey
@@ -206,14 +205,14 @@ pull_request_label_table = Table(
     )
 
 
-class Account(object):
+class Account:
     def __init__(self, id, name=None, username=None, email=None):
         self.id = id
         self.name = name
         self.username = username
         self.email = email
 
-class Repository(object):
+class Repository:
     def __init__(self, name, subscribed=False, description='', can_push=False):
         self.name = name
         self.subscribed = subscribed
@@ -247,18 +246,18 @@ class Repository(object):
         session.flush()
         return l
 
-class Branch(object):
+class Branch:
     def __init__(self, repository, name):
         self.repository_key = repository.key
         self.name = name
 
-class RepositoryTopic(object):
+class RepositoryTopic:
     def __init__(self, repository, topic, sequence):
         self.repository_key = repository.key
         self.topic_key = topic.key
         self.sequence = sequence
 
-class Topic(object):
+class Topic:
     def __init__(self, name, sequence):
         self.name = name
         self.sequence = sequence
@@ -281,7 +280,7 @@ class Topic(object):
         self.repositories.remove(repository)
         session.flush()
 
-class Label(object):
+class Label:
     def __init__(self, repository, id, name, color, description=None):
         self.repository_key = repository.key
         self.id = id
@@ -289,12 +288,12 @@ class Label(object):
         self.color = color
         self.description = description
 
-class PullRequestLabel(object):
+class PullRequestLabel:
     def __init__(self, pull_request, label):
         self.pr_key = pull_request.key
         self.label_key = label.key
 
-class PullRequest(object):
+class PullRequest:
     def __init__(self, repository, id, author, number, branch, pr_id,
                  title, body, created, updated, state, additions, deletions,
                  html_url, merged, mergeable, draft=False, hidden=False,
@@ -423,7 +422,7 @@ class PullRequest(object):
                 author_name = self.author.email
         return author_name
 
-class Commit(object):
+class Commit:
     def __init__(self, pull_request, message, sha, parent):
         self.pr_key = pull_request.key
         self.message = message
@@ -470,7 +469,7 @@ class Commit(object):
         return None
 
 
-class Message(object):
+class Message:
     def __init__(self, pull_request, commit_id, id, author, created, message, draft=False, pending=False):
         self.pr_key = pull_request.key
         self.commit_key = commit_id
@@ -502,7 +501,7 @@ class Message(object):
         session.flush()
         return c
 
-class Comment(object):
+class Comment:
     def __init__(self, message_obj, file_id, id, author, in_reply_to, created,
                  updated, parent, commit_id, original_commit_id, line,
                  original_line, message, draft=False, url=None):
@@ -522,7 +521,7 @@ class Comment(object):
         self.draft = draft
         self.url = url
 
-class Approval(object):
+class Approval:
     def __init__(self, pull_request, reviewer, state, sha, draft=False):
         self.pr_key = pull_request.key
         self.account_key = reviewer.key
@@ -542,7 +541,7 @@ class Approval(object):
                 reviewer_name = self.reviewer.email
         return reviewer_name
 
-class PendingMerge(object):
+class PendingMerge:
     def __init__(self, pull_request, sha, merge_method, commit_title=None,
             commit_message=None):
         self.pr_key = pull_request.key
@@ -551,7 +550,7 @@ class PendingMerge(object):
         self.sha = sha
         self.merge_method = merge_method
 
-class File(object):
+class File:
     def __init__(self, commit, path, status, old_path=None,
                  inserted=None, deleted=None):
         self.commit_key = commit.key
@@ -579,19 +578,17 @@ class File(object):
             else:
                 break
         post = ''.join(post)
-        mid = '{%s => %s}' % (self.old_path[start:0-end+1], self.path[start:0-end+1])
         if pre and post:
-            mid = '{%s => %s}' % (self.old_path[start:0-end+1],
-                                  self.path[start:0-end+1])
+            mid = f'{{{self.old_path[start:0-end+1]} => {self.path[start:0-end+1]}}}'
             return pre + mid + post
         else:
-            return '%s => %s' % (self.old_path, self.path)
+            return f'{self.old_path} => {self.path}'
 
-class Server(object):
+class Server:
     def __init__(self):
         pass
 
-class Check(object):
+class Check:
     def __init__(self, commit, name, state, created, updated):
         self.commit_key = commit.key
         self.name = name
@@ -719,7 +716,7 @@ def add_sqlite_match(dbapi_connection, connection_record):
     dbapi_connection.create_function("matches", 2, match)
 
 
-class Database(object):
+class Database:
     def __init__(self, app, dburi, search):
         self.log = logging.getLogger('hubtty.db')
         self.own_account_key = None
@@ -747,7 +744,7 @@ class Database(object):
         conn = self.engine.connect()
         context = alembic.migration.MigrationContext.configure(conn)
         current_rev = context.get_current_revision()
-        self.log.debug('Current migration revision: %s' % current_rev)
+        self.log.debug('Current migration revision: %s', current_rev)
 
         has_table = self.engine.dialect.has_table(conn, "repository")
 
@@ -761,7 +758,7 @@ class Database(object):
             alembic.command.stamp(config, "a2af1e2e44ee")
         alembic.command.upgrade(config, 'head')
 
-class DatabaseSession(object):
+class DatabaseSession:
     def __init__(self, database):
         self.database = database
         self.session = database.session
@@ -780,7 +777,7 @@ class DatabaseSession(object):
         self.session().close()
         self.session = None
         end = time.time()
-        self.database.log.debug("Database lock held %s seconds" % (end-self.start,))
+        self.database.log.debug("Database lock held %s seconds", end-self.start)
         self.database.lock.release()
 
     def abort(self):
@@ -876,7 +873,7 @@ class DatabaseSession(object):
             return None
 
     def getPullRequests(self, query, unreviewed=False, sort_by='number'):
-        self.database.log.debug("Search query: %s sort: %s" % (query, sort_by))
+        self.database.log.debug("Search query: %s sort: %s", query, sort_by)
         q = self.session().query(PullRequest).filter(self.search.parse(query))
         if not isinstance(sort_by, (list, tuple)):
             sort_by = [sort_by]
@@ -892,7 +889,7 @@ class DatabaseSession(object):
             elif s == 'repository':
                 q = q.filter(repository_table.c.key == pull_request_table.c.repository_key)
                 q = q.order_by(repository_table.c.name)
-        self.database.log.debug("Search SQL: %s" % q)
+        self.database.log.debug("Search SQL: %s", q)
         try:
             validPullRequests = []
             for c in q.all():
@@ -918,7 +915,7 @@ class DatabaseSession(object):
             return None
 
     def getCommitsByParent(self, parent):
-        if isinstance(parent, six.string_types):
+        if isinstance(parent, str):
             parent = (parent,)
         try:
             return self.session().query(Commit).filter(Commit.parent.in_(parent)).all()

@@ -466,7 +466,7 @@ def SearchParser():
 
     def p_error(p):
         if p:
-            raise hubtty.search.SearchSyntaxError('Syntax error at "%s" in search string "%s" (col %s)' % (
+            raise hubtty.search.SearchSyntaxError('Syntax error at "{}" in search string "{}" (col {})'.format(
                     p.lexer.lexdata[p.lexpos:], p.lexer.lexdata, p.lexpos))
         else:
             raise hubtty.search.SearchSyntaxError('Syntax error: EOF in search string')

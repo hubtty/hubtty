@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 OpenStack Foundation
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -22,7 +21,6 @@ import re
 
 import git
 import gitdb
-import six
 
 OLD = 0
 NEW = 1
@@ -47,12 +45,12 @@ class GitTimeZone(datetime.tzinfo):
         return None
 
 
-class CommitBlob(object):
+class CommitBlob:
     def __init__(self):
         self.path = '/COMMIT_MSG'
 
 
-class CommitContext(object):
+class CommitContext:
     """A git.diff.Diff for commit messages."""
 
     def decorateGitTime(self, seconds, tz):
@@ -85,20 +83,20 @@ class CommitContext(object):
             commit.authored_date, commit.author_tz_offset)
         commit_date = self.decorateGitTime(
             commit.committed_date, commit.committer_tz_offset)
-        if isinstance(author.email, six.text_type):
+        if isinstance(author.email, str):
             author_email = author.email
         else:
             author_email = author.email.decode('utf8')
-        if isinstance(committer.email, six.text_type):
+        if isinstance(committer.email, str):
             committer_email = committer.email
         else:
             committer_email = committer.email.decode('utf8')
-        return [u"Parent: %s\n" % parentsha,
-                u"Author: %s <%s>\n" % (author.name, author_email),
-                u"AuthorDate: %s\n" % author_date,
-                u"Commit: %s <%s>\n" % (committer.name, committer_email),
-                u"CommitDate: %s\n" % commit_date,
-                u"\n"] + commit.message.splitlines(True)
+        return [f"Parent: {parentsha}\n",
+                f"Author: {author.name} <{author_email}>\n",
+                f"AuthorDate: {author_date}\n",
+                f"Commit: {committer.name} <{committer_email}>\n",
+                f"CommitDate: {commit_date}\n",
+                "\n"] + commit.message.splitlines(True)
 
     def __init__(self, old, new):
         """Create a CommitContext.
@@ -121,7 +119,7 @@ class CommitContext(object):
             fromfile="/a/COMMIT_MSG", tofile="/b/COMMIT_MSG"))
 
 
-class DiffChunk(object):
+class DiffChunk:
     def __init__(self):
         self.oldlines = []
         self.newlines = []
@@ -131,7 +129,7 @@ class DiffChunk(object):
         self.calcRange()
 
     def __repr__(self):
-        return '<%s old lines %s-%s / new lines %s-%s>' % (
+        return '<{} old lines {}-{} / new lines {}-{}>'.format(
             self.__class__.__name__,
             self.range[OLD][START], self.range[OLD][END],
             self.range[NEW][START], self.range[NEW][END])
@@ -168,7 +166,7 @@ class DiffContextChunk(DiffChunk):
 class DiffChangedChunk(DiffChunk):
     context = False
 
-class DiffFile(object):
+class DiffFile:
     log = logging.getLogger('hubtty.gitrepo')
 
     def __init__(self):
@@ -190,7 +188,7 @@ class DiffFile(object):
         newlines = [(n, d, self.expand_tabs(l)) for (n, d, l)
                         in self.current_chunk.newlines]
         self.current_chunk.lines = list(
-                six.moves.zip(oldlines, newlines))
+                zip(oldlines, newlines))
         if not self.chunks:
             self.current_chunk.first = True
         else:
@@ -210,7 +208,7 @@ class DiffFile(object):
             return "»" + " " * cnt
 
         try:
-            if isinstance(l, six.string_types):
+            if isinstance(l, str):
                 return re.sub(r'\t', replace, l)
             elif isinstance(l, list):
                 return [self.expand_tabs(e) for e in l]
@@ -262,15 +260,15 @@ class DiffFile(object):
 
 class GitCheckoutError(Exception):
     def __init__(self, msg):
-        super(GitCheckoutError, self).__init__(msg)
+        super().__init__(msg)
         self.msg = msg
 
 class GitCloneError(Exception):
     def __init__(self, msg):
-        super(GitCloneError, self).__init__(msg)
+        super().__init__(msg)
         self.msg = msg
 
-class Repo(object):
+class Repo:
     def __init__(self, url, path):
         self.log = logging.getLogger('hubtty.gitrepo')
         self.url = url
@@ -306,7 +304,7 @@ class Repo(object):
             # Use force to delete even unmerged refs
             repo.delete_head(ref, force=True)
         except git.exc.GitCommandError as e:
-            self.log.error("Failed to delete ref: " + e.stderr)
+            self.log.error("Failed to delete ref: %s", e.stderr)
 
     def checkout(self, ref):
         repo = git.Repo(self.path)
@@ -331,7 +329,7 @@ class Repo(object):
             ret.append(x.split('\t'))
         return ret
 
-    trailing_ws_re = re.compile('\s+$')
+    trailing_ws_re = re.compile(r'\s+$')
     def _emph_trail_ws(self, style, line):
         result = (style, line)
         re_result = self.trailing_ws_re.search(line)
@@ -418,7 +416,7 @@ class Repo(object):
         #self.log.debug(repr(output_new))
         return output_old, output_new
 
-    header_re = re.compile('@@ -(\d+)(,\d+)? \+(\d+)(,\d+)? @@')
+    header_re = re.compile(r'@@ -(\d+)(,\d+)? \+(\d+)(,\d+)? @@')
     def diff(self, old, new, context=10000, show_old_commit=False):
         """Create a diff from old to new.
 
@@ -456,7 +454,7 @@ class Repo(object):
             oldchunk = []
             newchunk = []
             prev_key = ''
-            if isinstance(diff_context.diff, six.string_types):
+            if isinstance(diff_context.diff, str):
                 diff_text = diff_context.diff
             else:
                 diff_text = diff_context.diff.decode('utf-8')
@@ -540,7 +538,7 @@ class Repo(object):
                 f.old_lineno = 1
                 f.new_lineno = 1
                 for line in blob.data_stream.read().splitlines():
-                    if isinstance(line, six.string_types):
+                    if isinstance(line, str):
                         f.addContextLine(line)
                     else:
                         try:
@@ -563,7 +561,7 @@ class Repo(object):
         except KeyError:
             return None
         for line in blob.data_stream.read().splitlines():
-            if isinstance(line, six.string_types):
+            if isinstance(line, str):
                 f.addContextLine(line)
             else:
                 f.addContextLine(line.decode('utf8'))

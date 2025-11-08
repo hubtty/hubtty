@@ -29,13 +29,13 @@ def requestOneTimeCode(url):
     r = requests.post(url, headers=header, json=data)
 
     if 'error' in r.json():
-        sys.exit("Failed to request device code %s: %s" % (r.json()['error'], r.json()['error_description']))
+        sys.exit("Failed to request device code {}: {}".format(r.json()['error'], r.json()['error_description']))
     return r.json()
 
 
 def printUserCode(code, url):
     print("Hubtty needs to access your github account.")
-    print("Copy the code %s and paste it at %s" % (code, url))
+    print(f"Copy the code {code} and paste it at {url}")
 
 
 def poll(url, one_time_code):
@@ -61,7 +61,7 @@ def poll(url, one_time_code):
                 interval += 5
                 pass
             else:
-                sys.exit("Failed to get auth token %s: %s" % (r.json()['error'], r.json()['error_description']))
+                sys.exit("Failed to get auth token {}: {}".format(r.json()['error'], r.json()['error_description']))
         else:
             break
 

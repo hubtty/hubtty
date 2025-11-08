@@ -193,8 +193,8 @@ URWID_COMMANDS = frozenset((
 FORMAT_SUBS = (
     (re.compile('ctrl '), 'CTRL-'),
     (re.compile('meta '), 'META-'),
-    (re.compile('f(\d+)'), 'F\\1'),
-    (re.compile('([a-z][a-z]+)'), lambda x: x.group(1).upper()),
+    (re.compile(r'f(\d+)'), 'F\\1'),
+    (re.compile(r'([a-z][a-z]+)'), lambda x: x.group(1).upper()),
     )
 
 def formatKey(key):
@@ -204,7 +204,7 @@ def formatKey(key):
         key = subre.sub(repl, key)
     return key
 
-class Key(object):
+class Key:
     def __init__(self, key):
         self.key = key
         self.keys = {}
@@ -216,9 +216,9 @@ class Key(object):
         return self.keys[key]
 
     def __repr__(self):
-        return '%s %s %s' % (self.__class__.__name__, self.key, self.keys.keys())
+        return f'{self.__class__.__name__} {self.key} {self.keys.keys()}'
 
-class KeyMap(object):
+class KeyMap:
     def __init__(self, config):
         # key -> [commands]
         self.keytree = Key(None)

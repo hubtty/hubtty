@@ -1,4 +1,3 @@
-# coding=utf8
 #
 # Copyright 2014 Jan Kundrát <jkt@kde.org>
 #

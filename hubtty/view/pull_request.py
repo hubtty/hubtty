@@ -16,10 +16,6 @@
 import collections
 import datetime
 import logging
-try:
-    import ordereddict
-except:
-    pass
 import os
 import textwrap
 
@@ -34,11 +30,6 @@ from hubtty.view import side_diff as view_side_diff
 from hubtty.view import unified_diff as view_unified_diff
 from hubtty.view import mouse_scroll_decorator
 import hubtty.view
-
-try:
-    OrderedDict = collections.OrderedDict
-except AttributeError:
-    OrderedDict = ordereddict.OrderedDict
 
 class EditLabelsDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
     signals = ['save', 'cancel']
@@ -57,7 +48,7 @@ class EditLabelsDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         rows = []
         self.labels_checkboxes = []
 
-        rows.append(urwid.Text(u"Labels:"))
+        rows.append(urwid.Text("Labels:"))
         truecolors = (os.environ.get('COLORTERM') == 'truecolor')
         for label in pr.repository.labels:
             b = mywid.FixedCheckBox(label.name, state=(label in pr.labels))
@@ -70,7 +61,7 @@ class EditLabelsDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         rows.append(button_columns)
         pile = urwid.Pile(rows)
         fill = urwid.Filler(pile, valign='top')
-        super(EditLabelsDialog, self).__init__(urwid.LineBox(fill,
+        super().__init__(urwid.LineBox(fill,
                                                              'Set pull request labels'))
 
 class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
@@ -78,9 +69,9 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
     def __init__(self, app, commit_key, message=''):
         self.commit_key = commit_key
         self.app = app
-        save_button = mywid.FixedButton(u'Save')
-        merge_button = mywid.FixedButton(u'Save and Merge')
-        cancel_button = mywid.FixedButton(u'Cancel')
+        save_button = mywid.FixedButton('Save')
+        merge_button = mywid.FixedButton('Save and Merge')
+        cancel_button = mywid.FixedButton('Cancel')
         urwid.connect_signal(save_button, 'click',
             lambda button:self._emit('save'))
         urwid.connect_signal(merge_button, 'click',
@@ -136,14 +127,14 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                     message = message + "\n" + m.message
                 else:
                     message = m.message
-        self.message = mywid.MyEdit(u"Message: \n", edit_text=message,
+        self.message = mywid.MyEdit("Message: \n", edit_text=message,
                                     multiline=True, ring=app.ring)
         rows.append(self.message)
         rows.append(urwid.Divider())
         rows.append(buttons)
         pile = urwid.Pile(rows)
         fill = urwid.Filler(pile, valign='top')
-        super(ReviewDialog, self).__init__(urwid.LineBox(fill, 'Review'))
+        super().__init__(urwid.LineBox(fill, 'Review'))
 
     def getValues(self):
         approval = ''
@@ -155,7 +146,7 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
 
     def keypress(self, size, key):
         if not self.app.input_buffer:
-            key = super(ReviewDialog, self).keypress(size, key)
+            key = super().keypress(size, key)
         keys = self.app.input_buffer + [key]
         commands = self.app.config.keymap.getCommands(keys)
         if keymap.PREV_SCREEN in commands:
@@ -167,8 +158,8 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
     signals = ['merge', 'cancel']
     def __init__(self, app, pr, title='', message=''):
         self.app = app
-        merge_button = mywid.FixedButton(u'Merge')
-        cancel_button = mywid.FixedButton(u'Cancel')
+        merge_button = mywid.FixedButton('Merge')
+        cancel_button = mywid.FixedButton('Cancel')
         urwid.connect_signal(merge_button, 'click',
             lambda button:self._emit('merge'))
         urwid.connect_signal(cancel_button, 'click',
@@ -193,17 +184,17 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             b._value = method
             rows.append(b)
         rows.append(urwid.Divider())
-        self.commit_title = mywid.MyEdit(u"Commit title (Optional): \n", edit_text=title,
+        self.commit_title = mywid.MyEdit("Commit title (Optional): \n", edit_text=title,
                                     multiline=False, ring=app.ring)
         rows.append(self.commit_title)
-        self.commit_message = mywid.MyEdit(u"Commit message (Optional): \n", edit_text=message,
+        self.commit_message = mywid.MyEdit("Commit message (Optional): \n", edit_text=message,
                                     multiline=True, ring=app.ring)
         rows.append(self.commit_message)
         rows.append(urwid.Divider())
         rows.append(buttons)
         pile = urwid.Pile(rows)
         fill = urwid.Filler(pile, valign='top')
-        super(MergeDialog, self).__init__(urwid.LineBox(fill, 'Merge pull request'))
+        super().__init__(urwid.LineBox(fill, 'Merge pull request'))
 
     def getValues(self):
         strategy = ''
@@ -220,7 +211,7 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
 
     def keypress(self, size, key):
         if not self.app.input_buffer:
-            key = super(MergeDialog, self).keypress(size, key)
+            key = super().keypress(size, key)
         keys = self.app.input_buffer + [key]
         commands = self.app.config.keymap.getCommands(keys)
         if keymap.PREV_SCREEN in commands:
@@ -232,8 +223,8 @@ class EditPullRequestDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
     signals = ['save', 'cancel']
     def __init__(self, app, pr):
         self.app = app
-        save_button = mywid.FixedButton(u'Save')
-        cancel_button = mywid.FixedButton(u'Cancel')
+        save_button = mywid.FixedButton('Save')
+        cancel_button = mywid.FixedButton('Cancel')
         urwid.connect_signal(save_button, 'click',
             lambda button:self._emit('save'))
         urwid.connect_signal(cancel_button, 'click',
@@ -246,22 +237,22 @@ class EditPullRequestDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
 
         self.pr_title = mywid.MyEdit(edit_text=pr.title, multiline=False,
                 ring=app.ring)
-        rows.append(urwid.Text(u"Title:"))
+        rows.append(urwid.Text("Title:"))
         rows.append(self.pr_title)
         rows.append(urwid.Divider())
         self.pr_description = mywid.MyEdit(edit_text=pr.body,
                 multiline=True, ring=app.ring)
-        rows.append(urwid.Text(u"Description:"))
+        rows.append(urwid.Text("Description:"))
         rows.append(self.pr_description)
         rows.append(urwid.Divider())
         rows.append(button_columns)
         pile = urwid.Pile(rows)
         fill = urwid.Filler(pile, valign='top')
-        super(EditPullRequestDialog, self).__init__(urwid.LineBox(fill, 'Edit Pull Request'))
+        super().__init__(urwid.LineBox(fill, 'Edit Pull Request'))
 
 class ReviewButton(mywid.FixedButton):
     def __init__(self, commit_row):
-        super(ReviewButton, self).__init__(('commit-button', u'Review'))
+        super().__init__(('commit-button', 'Review'))
         self.commit_row = commit_row
         self.pr_view = commit_row.pr_view
         urwid.connect_signal(self, 'click',
@@ -298,14 +289,14 @@ class CommitRow(urwid.WidgetWrap):
                           }
 
     def __init__(self, app, pr_view, repo, commit, expanded=False):
-        super(CommitRow, self).__init__(urwid.Pile([]))
+        super().__init__(urwid.Pile([]))
         self.app = app
         self.pr_view = pr_view
         self.commit_key = commit.key
         self.repository_name = commit.pull_request.repository.name
         self.commit_sha = commit.sha
         self.can_merge = commit.pull_request.canMerge()
-        self.title = mywid.TextButton(u'', on_press = self.expandContract)
+        self.title = mywid.TextButton('', on_press = self.expandContract)
         table = mywid.Table(columns=3)
         total_added = 0
         total_removed = 0
@@ -353,11 +344,11 @@ class CommitRow(urwid.WidgetWrap):
         num_drafts = sum([len(f.draft_comments) for f in commit.files])
         if num_drafts:
             if not commit.pull_request.hasPendingMessage():
-                line.append(('commit-drafts', ' (%s draft%s)' % (
+                line.append(('commit-drafts', ' ({} draft{})'.format(
                             num_drafts, num_drafts>1 and 's' or '')))
         num_comments = sum([len(f.current_comments) for f in commit.files]) - num_drafts
         if num_comments:
-            line.append(('commit-comments', ' (%s inline comment%s)' % (
+            line.append(('commit-comments', ' ({} inline comment{})'.format(
                         num_comments, num_comments>1 and 's' or '')))
         self.title.text.set_text(line)
 
@@ -379,11 +370,11 @@ class CommitRow(urwid.WidgetWrap):
         self.app.localCherryPickCommit(self.repository_name, self.commit_sha)
 
 class PullRequestButton(urwid.Button):
-    button_left = urwid.Text(u' ')
-    button_right = urwid.Text(u' ')
+    button_left = urwid.Text(' ')
+    button_right = urwid.Text(' ')
 
     def __init__(self, pr_view, pr_key, text):
-        super(PullRequestButton, self).__init__('')
+        super().__init__('')
         self.set_label(text)
         self.pr_view = pr_view
         self.pr_key = pr_key
@@ -391,7 +382,7 @@ class PullRequestButton(urwid.Button):
             lambda button: self.openPullRequest())
 
     def set_label(self, text):
-        super(PullRequestButton, self).set_label(text)
+        super().set_label(text)
 
     def openPullRequest(self):
         try:
@@ -401,7 +392,7 @@ class PullRequestButton(urwid.Button):
 
 class PullRequestMessageBox(mywid.HyperText):
     def __init__(self, pr_view, pr, message):
-        super(PullRequestMessageBox, self).__init__(u'')
+        super().__init__('')
         self.pr_view = pr_view
         self.app = pr_view.app
         self.md = markdown.Renderer(self.app)
@@ -458,7 +449,7 @@ class PullRequestMessageBox(mywid.HyperText):
             name_style = 'pr-message-name'
             header_style = 'pr-message-header'
             if message.author.email:
-                reviewer_string = "%s <%s>" % (
+                reviewer_string = "{} <{}>".format(
                     message.author_name,
                     message.author.email)
             else:
@@ -499,9 +490,9 @@ class PullRequestMessageBox(mywid.HyperText):
             v.sort()
 
         if inline_comments:
-            comment_text.append(u'\n')
+            comment_text.append('\n')
         for key, value in inline_comments.items():
-            comment_text.append(('filename-inline-comment', u'%s' % key))
+            comment_text.append(('filename-inline-comment', '%s' % key))
             for sha, line, comment in value:
                 location_str = ''
                 if sha:
@@ -511,7 +502,7 @@ class PullRequestMessageBox(mywid.HyperText):
                     location_str += str(line)
                 if location_str:
                     location_str += ": "
-                comment_text.append(u'\n  %s' % (location_str))
+                comment_text.append('\n  %s' % (location_str))
                 # Let's pass the rendered comment through commentlinks, but not
                 # location_str
                 rendered_comment = self.md.render(comment)
@@ -525,14 +516,14 @@ class PullRequestMessageBox(mywid.HyperText):
 class PrDescriptionBox(mywid.HyperText):
     def __init__(self, app, message):
         self.app = app
-        super(PrDescriptionBox, self).__init__(message)
+        super().__init__(message)
 
     def set_text(self, text):
         if len(text) == 0:
             text = [text]
         for commentlink in self.app.config.commentlinks:
             text = commentlink.run(self.app, text)
-        super(PrDescriptionBox, self).set_text(text)
+        super().set_text(text)
 
 @mouse_scroll_decorator.ScrollByWheel
 class PullRequestView(urwid.WidgetWrap):
@@ -593,7 +584,7 @@ class PullRequestView(urwid.WidgetWrap):
         return ret
 
     def __init__(self, app, pr_key):
-        super(PullRequestView, self).__init__(urwid.Pile([]))
+        super().__init__(urwid.Pile([]))
         self.log = logging.getLogger('hubtty.view.pull_request')
         self.app = app
         self.pr_key = pr_key
@@ -603,14 +594,14 @@ class PullRequestView(urwid.WidgetWrap):
         self.last_commit_key = None
         self.hide_comments = True
         self.marked_seen = False
-        self.author_label = mywid.TextButton(u'', on_press=self.searchAuthor)
-        self.repository_label = mywid.TextButton(u'', on_press=self.searchRepository)
-        self.branch_label = urwid.Text(u'', wrap='clip')
-        self.labels_label = mywid.HyperText(u'')
-        self.created_label = urwid.Text(u'', wrap='clip')
-        self.updated_label = urwid.Text(u'', wrap='clip')
-        self.status_label = urwid.Text(u'', wrap='clip')
-        self.permalink_label = mywid.TextButton(u'', on_press=self.openPermalink)
+        self.author_label = mywid.TextButton('', on_press=self.searchAuthor)
+        self.repository_label = mywid.TextButton('', on_press=self.searchRepository)
+        self.branch_label = urwid.Text('', wrap='clip')
+        self.labels_label = mywid.HyperText('')
+        self.created_label = urwid.Text('', wrap='clip')
+        self.updated_label = urwid.Text('', wrap='clip')
+        self.status_label = urwid.Text('', wrap='clip')
+        self.permalink_label = mywid.TextButton('', on_press=self.openPermalink)
         self.md = markdown.Renderer(self.app)
         pr_info = []
         pr_info_map={'pr-data': 'focused-pr-data'}
@@ -632,14 +623,14 @@ class PullRequestView(urwid.WidgetWrap):
             row = urwid.Columns([(12, urwid.Text(('pr-header', l), wrap='clip')), v])
             pr_info.append(row)
         pr_info = urwid.Pile(pr_info)
-        self.pr_description = PrDescriptionBox(app, u'')
+        self.pr_description = PrDescriptionBox(app, '')
         votes = mywid.Table([])
         self.depends_on = urwid.Pile([])
         self.depends_on_rows = {}
         self.needed_by = urwid.Pile([])
         self.needed_by_rows = {}
         self.related_prs = urwid.Pile([self.depends_on, self.needed_by])
-        self.results = mywid.HyperText(u'') # because it scrolls better than a table
+        self.results = mywid.HyperText('') # because it scrolls better than a table
         self.grid = urwid.GridFlow([pr_info, self.pr_description, votes, self.results],
                                      cell_width=80, h_sep=2, v_sep=1, align='left')
         self.listbox = urwid.ListBox(urwid.SimpleFocusListWalker([]))
@@ -692,9 +683,9 @@ class PullRequestView(urwid.WidgetWrap):
                 or
                 (isinstance(event, sync.PullRequestUpdatedEvent) and
                  self.pr_key in event.related_pr_keys)):
-            self.log.debug("Ignoring refresh pull request due to event %s" % (event,))
+            self.log.debug("Ignoring refresh pull request due to event %s", event)
             return False
-        self.log.debug("Refreshing pull request due to event %s" % (event,))
+        self.log.debug("Refreshing pull request due to event %s", event)
         return True
 
     def refresh(self):
@@ -714,7 +705,7 @@ class PullRequestView(urwid.WidgetWrap):
                 starred = '* '
             if pr.held:
                 held = ' (held)'
-            self.title = '%sPull request %s%s%s%s' % (starred, pr.number, reviewed,
+            self.title = '{}Pull request {}{}{}{}'.format(starred, pr.number, reviewed,
                                                 hidden, held)
             self.app.status.update(title=self.title)
             self.repository_key = pr.repository.key
@@ -726,7 +717,7 @@ class PullRequestView(urwid.WidgetWrap):
                 self.author_login = None
 
             if pr.author.email:
-                author_string = '%s <%s>' % (pr.author_name,
+                author_string = '{} <{}>'.format(pr.author_name,
                                              pr.author.email)
             else:
                 author_string = pr.author_name
@@ -743,7 +734,7 @@ class PullRequestView(urwid.WidgetWrap):
                     link, 'selected',
                     lambda link, x=x: self.searchLabel(x.name))
                 label_buttons.append(link)
-            self.labels_label.set_text(('pr-data', label_buttons or u''))
+            self.labels_label.set_text(('pr-data', label_buttons or ''))
             self.created_label.set_text(('pr-data', str(self.app.time(pr.created))))
             self.updated_label.set_text(('pr-data', str(self.app.time(pr.updated))))
             stat = pr.draft and ('state-draft', 'Draft') or pr.state
@@ -770,28 +761,29 @@ class PullRequestView(urwid.WidgetWrap):
                         style = 'reviewer-name'
                     row.append(urwid.Text((style, approval.reviewer_name)))
                     for i, state in enumerate(review_states):
-                        w = urwid.Text(u'', align=urwid.CENTER)
+                        w = urwid.Text('', align=urwid.CENTER)
                         approvals[state] = w
                         row.append(w)
                     approvals_for_account[approval.reviewer.id] = approvals
                     votes.addRow(row)
                 # Only set approval status if the review is for the current commit
                 if approval.sha == pr.commits[-1].sha:
-                    if approval.state in ['APPROVED', 'APPROVE']:
-                        text = '✓'
-                        if approval.state == 'APPROVE' and not pending_message:
-                            text = '(' + text + ')'
-                        approvals['Approved'].set_text(('positive-label', text))
-                    elif approval.state in ['CHANGES_REQUESTED', 'REQUEST_CHANGES']:
-                        text = '✗'
-                        if approval.state == 'REQUEST_CHANGES' and not pending_message:
-                            text = '(' + text + ')'
-                        approvals['Changes Requested'].set_text(('negative-label', text))
-                    else:
-                        text = '•'
-                        if approval.state == 'COMMENT' and not pending_message:
-                            text = '(' + text + ')'
-                        approvals['Comment'].set_text(text)
+                    match approval.state:
+                        case 'APPROVED' | 'APPROVE':
+                            text = '✓'
+                            if approval.state == 'APPROVE' and not pending_message:
+                                text = '(' + text + ')'
+                            approvals['Approved'].set_text(('positive-label', text))
+                        case 'CHANGES_REQUESTED' | 'REQUEST_CHANGES':
+                            text = '✗'
+                            if approval.state == 'REQUEST_CHANGES' and not pending_message:
+                                text = '(' + text + ')'
+                            approvals['Changes Requested'].set_text(('negative-label', text))
+                        case _:
+                            text = '•'
+                            if approval.state == 'COMMENT' and not pending_message:
+                                text = '(' + text + ')'
+                            approvals['Comment'].set_text(text)
             votes = urwid.Padding(votes, width='pack')
 
             # TODO: update the existing table rather than replacing it
@@ -831,7 +823,7 @@ class PullRequestView(urwid.WidgetWrap):
                         results = commentlink.getTestResults(self.app, message.message)
                         if results:
                             result_system = result_systems.get(message.author.name,
-                                                               OrderedDict())
+                                                               collections.OrderedDict())
                             result_systems[message.author.name] = result_system
                             result_system.update(results)
                 skip = False
@@ -982,7 +974,7 @@ class PullRequestView(urwid.WidgetWrap):
 
     def keypress(self, size, key):
         if not self.app.input_buffer:
-            key = super(PullRequestView, self).keypress(size, key)
+            key = super().keypress(size, key)
         keys = self.app.input_buffer + [key]
         commands = self.app.config.keymap.getCommands(keys)
         if keymap.TOGGLE_REVIEWED in commands:
@@ -1077,8 +1069,8 @@ class PullRequestView(urwid.WidgetWrap):
         self.app.changeScreen(screen)
 
     def closePullRequest(self):
-        dialog = mywid.TextEditDialog(u'Close pull request', u'Message:',
-                                      u'Close pull request',
+        dialog = mywid.TextEditDialog('Close pull request', 'Message:',
+                                      'Close pull request',
                                       self.pending_edit_message)
         urwid.connect_signal(dialog, 'cancel', lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'save', lambda button:
@@ -1086,8 +1078,8 @@ class PullRequestView(urwid.WidgetWrap):
         self.app.popup(dialog)
 
     def reopenPullRequest(self):
-        dialog = mywid.TextEditDialog(u'Reopen pull request', u'Message:',
-                                      u'Reopen pull request',
+        dialog = mywid.TextEditDialog('Reopen pull request', 'Message:',
+                                      'Reopen pull request',
                                       self.pending_edit_message)
         urwid.connect_signal(dialog, 'cancel', lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'save', lambda button:
@@ -1133,8 +1125,8 @@ class PullRequestView(urwid.WidgetWrap):
         self.refresh()
 
     def rebasePullRequest(self):
-        dialog = mywid.YesNoDialog(u'Rebase pull request',
-                                   u'Perform a remote rebase of this pull request?')
+        dialog = mywid.YesNoDialog('Rebase pull request',
+                                   'Perform a remote rebase of this pull request?')
         urwid.connect_signal(dialog, 'no', self.app.backScreen)
         urwid.connect_signal(dialog, 'yes', self.doRebasePullRequest)
         self.app.popup(dialog)
@@ -1221,13 +1213,13 @@ class PullRequestView(urwid.WidgetWrap):
 
     def searchAuthor(self, widget):
         if self.author_login:
-            self.app.doSearch("state:open author:%s" % (self.author_login,))
+            self.app.doSearch(f"state:open author:{self.author_login}")
 
     def searchRepository(self, widget):
-        self.app.doSearch("state:open repo:%s" % (self.repository_name,))
+        self.app.doSearch(f"state:open repo:{self.repository_name}")
 
     def searchLabel(self, name):
-        self.app.doSearch("state:open repo:%s label:%s" % (self.repository_name, name,))
+        self.app.doSearch(f"state:open repo:{self.repository_name} label:{name}")
 
     def reviewKey(self, reviewkey):
         approval = reviewkey.get('approval', 'COMMENT')

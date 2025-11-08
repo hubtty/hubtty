@@ -13,7 +13,6 @@
 # under the License.
 
 import ply.lex as lex
-import six
 
 operators = {
     'age': 'OP_AGE', # Hubtty extension
@@ -89,14 +88,14 @@ def SearchTokenizer():
     def t_SSTRING(t):
         r"'([^\\']+|\\'|\\\\)*'"
         t.value = t.value[1:-1]
-        if not isinstance(t.value, six.text_type):
+        if not isinstance(t.value, str):
             t.value = t.value.decode('string-escape')
         return t
 
     def t_DSTRING(t):
         r'"([^\\"]+|\\"|\\\\)*"'
         t.value = t.value[1:-1]
-        if not isinstance(t.value, six.text_type):
+        if not isinstance(t.value, str):
             t.value = t.value.decode('string-escape')
         return t
 
@@ -132,7 +131,7 @@ def SearchTokenizer():
 
     def t_USTRING(t):
         r'([^\s\(\)!-][^\s\(\)!]*)'
-        t.value = six.b(t.value).decode("unicode_escape")
+        t.value = t.value.encode('utf-8').decode("unicode_escape")
         return t
 
     def t_newline(t):

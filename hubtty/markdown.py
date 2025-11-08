@@ -26,73 +26,71 @@ class Renderer:
     def toUrwidMarkup(self, ast):
         text = []
         for element in ast:
-            if element['type'] == 'text':
-                text.append(element['text'])
-            elif element['type'] == 'strong':
-                text.append(('md-strong', self.toUrwidMarkup(element['children'])))
-            elif element['type'] == 'emphasis':
-                text.append(('md-emphasis', self.toUrwidMarkup(element['children'])))
-            elif element['type'] == 'strikethrough':
-                text.append(('md-strikethrough', self.toUrwidMarkup(element['children'])))
-            elif element['type'] == 'heading':
-                text.append(('md-heading', ["#" * element['level'], " ", self.toUrwidMarkup(element['children']), "\n"]))
-            elif element['type'] == 'paragraph':
-                # Add newline before paragraphs if needed
-                if self.needsNewLine(text):
-                    text.append("\n")
-                text.extend(self.toUrwidMarkup(element['children']))
-                text.append("\n")
-            elif element['type'] == 'newline':
-                text.append("\n")
-            elif element['type'] == 'thematic_break':
-                text.append(('md-thematicbreak', "\n———————————————\n\n"))
-            elif element['type'] == 'block_quote':
-                text.append(('md-blockquote', ["| ", self.toUrwidMarkup(element['children'])]))
-            elif element['type'] == 'block_code':
-                info = element['info']
-                if info == None:
-                    info = ""
-                text.append(('md-blockcode', ["```%s\n" % info, element['text'], "```\n"]))
-            elif element['type'] == 'image':
-                # image - do nothing
-                pass
-            elif element['type'] == 'block_html':
-                # HTML comments - do nothing
-                pass
-            elif element['type'] == 'codespan':
-                text.append(('md-codespan', element['text']))
-            elif element['type'] == 'list':
-                if element['ordered']:
-                    idx = 1
-                    for li in element['children']:
-                        text.append("  " * element['level'] + "%s. " % idx)
-                        text.extend(self.toUrwidMarkup([li]))
-                        idx += 1
-                else:
-                    for li in element['children']:
-                        text.append("  " * element['level'] + "- ")
-                        text.extend(self.toUrwidMarkup([li]))
-            elif element['type'] == 'list_item':
-                text.extend(self.toUrwidMarkup(element['children']))
-            elif element['type'] == 'block_text':
-                text.extend(self.toUrwidMarkup(element['children']))
-                text.append("\n")
-            elif element['type'] == 'link':
-                url = element['link']
-                link_text = ""
-                for child in element['children']:
-                    if child.get('text'):
-                        link_text += child['text']
-                    elif child.get('alt'):
-                        link_text += child['alt']
-                link = mywid.Link(link_text, 'link', 'focused-link')
-                urwid.connect_signal(link, 'selected',
-                    lambda link:self.app.openURL(url))
-                text.append(link)
-            else:
-                self.log.warning("unknown element type: %s" % element['type'])
-                if 'children' in element:
+            match element['type']:
+                case 'text':
+                    text.append(element['text'])
+                case 'strong':
+                    text.append(('md-strong', self.toUrwidMarkup(element['children'])))
+                case 'emphasis':
+                    text.append(('md-emphasis', self.toUrwidMarkup(element['children'])))
+                case 'strikethrough':
+                    text.append(('md-strikethrough', self.toUrwidMarkup(element['children'])))
+                case 'heading':
+                    text.append(('md-heading', ["#" * element['level'], " ", self.toUrwidMarkup(element['children']), "\n"]))
+                case 'paragraph':
+                    # Add newline before paragraphs if needed
+                    if self.needsNewLine(text):
+                        text.append("\n")
                     text.extend(self.toUrwidMarkup(element['children']))
+                    text.append("\n")
+                case 'newline':
+                    text.append("\n")
+                case 'thematic_break':
+                    text.append(('md-thematicbreak', "\n———————————————\n\n"))
+                case 'block_quote':
+                    text.append(('md-blockquote', ["| ", self.toUrwidMarkup(element['children'])]))
+                case 'block_code':
+                    info = element['info']
+                    if info == None:
+                        info = ""
+                    text.append(('md-blockcode', ["```%s\n" % info, element['text'], "```\n"]))
+                case 'image' | 'block_html':
+                    # image and HTML comments - do nothing
+                    pass
+                case 'codespan':
+                    text.append(('md-codespan', element['text']))
+                case 'list':
+                    if element['ordered']:
+                        idx = 1
+                        for li in element['children']:
+                            text.append("  " * element['level'] + "%s. " % idx)
+                            text.extend(self.toUrwidMarkup([li]))
+                            idx += 1
+                    else:
+                        for li in element['children']:
+                            text.append("  " * element['level'] + "- ")
+                            text.extend(self.toUrwidMarkup([li]))
+                case 'list_item':
+                    text.extend(self.toUrwidMarkup(element['children']))
+                case 'block_text':
+                    text.extend(self.toUrwidMarkup(element['children']))
+                    text.append("\n")
+                case 'link':
+                    url = element['link']
+                    link_text = ""
+                    for child in element['children']:
+                        if child.get('text'):
+                            link_text += child['text']
+                        elif child.get('alt'):
+                            link_text += child['alt']
+                    link = mywid.Link(link_text, 'link', 'focused-link')
+                    urwid.connect_signal(link, 'selected',
+                        lambda link:self.app.openURL(url))
+                    text.append(link)
+                case _:
+                    self.log.warning("unknown element type: %s", element['type'])
+                    if 'children' in element:
+                        text.extend(self.toUrwidMarkup(element['children']))
         return text
 
     def needsNewLine(self, text):

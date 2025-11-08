@@ -13,7 +13,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import six
 import uuid
 
 from alembic import op
@@ -43,7 +42,7 @@ def sqlite_alter_columns(table_name, column_defs):
         # immediately, instead, add it to a list of indexes to create
         # after the table rename.
         if col.index:
-            indexes.append(('ix_%s_%s' % (table_name, col.name),
+            indexes.append((f'ix_{table_name}_{col.name}',
                             table_name,
                             [col.name],
                             col.unique))
@@ -83,7 +82,7 @@ def sqlite_alter_columns(table_name, column_defs):
                         index.unique))
 
     # create temp table
-    tmp_table_name = "%s_%s" % (table_name, six.text_type(uuid.uuid4()))
+    tmp_table_name = f"{table_name}_{str(uuid.uuid4())}"
     op.create_table(tmp_table_name, *new_columns)
     meta.reflect(connection)
 
@@ -166,7 +165,7 @@ def sqlite_drop_columns(table_name, drop_columns):
                         index.unique))
 
     # create temp table
-    tmp_table_name = "%s_%s" % (table_name, six.text_type(uuid.uuid4()))
+    tmp_table_name = f"{table_name}_{str(uuid.uuid4())}"
     op.create_table(tmp_table_name, *new_columns)
     meta.reflect(connection)
 

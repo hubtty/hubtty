@@ -30,9 +30,8 @@ import threading
 import warnings
 import webbrowser
 
-import six
-from six.moves import queue
-from six.moves.urllib import parse as urlparse
+import queue
+from urllib import parse as urlparse
 import sqlalchemy.exc
 import urwid
 
@@ -66,15 +65,15 @@ Press the F1 key anywhere to get help.  Your terminal emulator may require you t
 
 class StatusHeader(urwid.WidgetWrap):
     def __init__(self, app):
-        super(StatusHeader, self).__init__(urwid.Columns([]))
+        super().__init__(urwid.Columns([]))
         self.app = app
-        self.title_widget = urwid.Text(u'Start')
+        self.title_widget = urwid.Text('Start')
         self.error_widget = urwid.Text('')
         self.offline_widget = urwid.Text('')
-        self.sync_widget = urwid.Text(u'Sync: 0')
-        self.held_widget = urwid.Text(u'')
+        self.sync_widget = urwid.Text('Sync: 0')
+        self.held_widget = urwid.Text('')
         self._w.contents.append((self.title_widget, ('pack', None, False)))
-        self._w.contents.append((urwid.Text(u''), ('weight', 1, False)))
+        self._w.contents.append((urwid.Text(''), ('weight', 1, False)))
         self._w.contents.append((self.held_widget, ('pack', None, False)))
         self._w.contents.append((self.error_widget, ('pack', None, False)))
         self._w.contents.append((self.offline_widget, ('pack', None, False)))
@@ -118,42 +117,42 @@ class StatusHeader(urwid.WidgetWrap):
         if self._held != self.held:
             self._held = self.held
             if self._held:
-                self.held_widget.set_text(('error', u'Held: %s (%s)' % (self._held, self.held_key)))
+                self.held_widget.set_text(('error', f'Held: {self._held} ({self.held_key})'))
             else:
-                self.held_widget.set_text(u'')
+                self.held_widget.set_text('')
         if self._error != self.error:
             self._error = self.error
             if self._error:
-                self.error_widget.set_text(('error', u' Error'))
+                self.error_widget.set_text(('error', ' Error'))
             else:
-                self.error_widget.set_text(u'')
+                self.error_widget.set_text('')
         if self._offline != self.offline:
             self._offline = self.offline
             if self._offline:
-                self.offline_widget.set_text(u' Offline')
+                self.offline_widget.set_text(' Offline')
             else:
-                self.offline_widget.set_text(u'')
+                self.offline_widget.set_text('')
         if self._sync != self.sync:
             self._sync = self.sync
-            self.sync_widget.set_text(u' Sync: %i' % self._sync)
+            self.sync_widget.set_text(' Sync: %i' % self._sync)
 
 
 class BreadCrumbBar(urwid.WidgetWrap):
-    BREADCRUMB_SYMBOL = u'\N{BLACK RIGHT-POINTING SMALL TRIANGLE}'
+    BREADCRUMB_SYMBOL = '\N{BLACK RIGHT-POINTING SMALL TRIANGLE}'
     BREADCRUMB_WIDTH = 25
 
     def __init__(self):
-        self.prefix_text = urwid.Text(u' \N{WATCH}  ')
+        self.prefix_text = urwid.Text(' \N{WATCH}  ')
         self.breadcrumbs = urwid.Columns([], dividechars=3)
         self.display_widget = urwid.Columns(
             [('pack', self.prefix_text), self.breadcrumbs])
-        super(BreadCrumbBar, self).__init__(self.display_widget)
+        super().__init__(self.display_widget)
 
     def _get_breadcrumb_text(self, screen):
         title = getattr(screen, 'short_title', None)
         if not title:
             title = getattr(screen, 'title', str(screen))
-        text = "%s %s" % (BreadCrumbBar.BREADCRUMB_SYMBOL, title)
+        text = f"{BreadCrumbBar.BREADCRUMB_SYMBOL} {title}"
         if len(text) > 23:
             text = "%s..." % text[:20]
         return urwid.Text(text, wrap='clip')
@@ -185,7 +184,7 @@ class SearchDialog(mywid.ButtonDialog):
                              lambda button:self._emit('search'))
         urwid.connect_signal(cancel_button, 'click',
                              lambda button:self._emit('cancel'))
-        super(SearchDialog, self).__init__("Search",
+        super().__init__("Search",
                                            "Enter a pull request or search string.",
                                            entry_prompt="Search: ",
                                            entry_text=default,
@@ -195,7 +194,7 @@ class SearchDialog(mywid.ButtonDialog):
 
     def keypress(self, size, key):
         if not self.app.input_buffer:
-            key = super(SearchDialog, self).keypress(size, key)
+            key = super().keypress(size, key)
         keys = self.app.input_buffer + [key]
         commands = self.app.config.keymap.getCommands(keys)
         if keymap.ACTIVATE in commands:
@@ -227,7 +226,7 @@ class BackgroundBrowser(webbrowser.GenericBrowser):
         except OSError:
             return False
 
-class RepositoryCache(object):
+class RepositoryCache:
     def __init__(self):
         self.repositories = {}
 
@@ -243,7 +242,7 @@ class RepositoryCache(object):
         if repository.key in self.repositories:
             del self.repositories[repository.key]
 
-class App(object):
+class App:
     simple_pr_search = re.compile(r'([a-zA-Z_]+/)+\d+')
 
     def __init__(self, server=None, palette='default',
@@ -262,24 +261,17 @@ class App(object):
         logging.basicConfig(filename=self.config.log_file, filemode='w',
                             format='%(asctime)s %(message)s',
                             level=level)
-        # Python2.6 Logger.setLevel doesn't convert string name
-        # to integer code. Here, we set the requests logger level to
-        # be less verbose, since our logging output duplicates some
-        # requests logging content in places.
-        req_level_name = 'WARN'
+        # Set the requests logger level to be less verbose, since our
+        # logging output duplicates some requests logging content in places.
         req_logger = logging.getLogger('requests')
-        if sys.version_info < (2, 7):
-            level = logging.getLevelName(req_level_name)
-            req_logger.setLevel(level)
-        else:
-            req_logger.setLevel(req_level_name)
+        req_logger.setLevel('WARN')
         self.log = logging.getLogger('hubtty.App')
         self.log.debug("Starting")
 
         self.lock_fd = open(self.config.lock_file, 'w')
         try:
             fcntl.lockf(self.lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except IOError:
+        except OSError:
             print("error: another instance of hubtty is running for: %s" % self.config.server['name'])
             sys.exit(1)
 
@@ -383,8 +375,8 @@ class App(object):
         raise urwid.ExitMainLoop()
 
     def quit(self):
-        dialog = mywid.YesNoDialog(u'Quit',
-                                   u'Are you sure you want to quit?')
+        dialog = mywid.YesNoDialog('Quit',
+                                   'Are you sure you want to quit?')
         urwid.connect_signal(dialog, 'no', self.backScreen)
         urwid.connect_signal(dialog, 'yes', self._quit)
 
@@ -404,18 +396,18 @@ class App(object):
         while True:
             try:
                 s, addr = self.socket.accept()
-                self.log.debug("Accepted socket connection %s" % (s,))
+                self.log.debug("Accepted socket connection %s", s)
                 buf = b''
                 while True:
                     buf += s.recv(1)
                     if buf[-1] == 10:
                         break
                 buf = buf.decode('utf8').strip()
-                self.log.debug("Received %s from socket" % (buf,))
+                self.log.debug("Received %s from socket", buf)
                 s.close()
                 parts = buf.split()
                 self.command_queue.put((parts[0], parts[1:]))
-                os.write(self.command_pipe, six.b('command\n'))
+                os.write(self.command_pipe, b'command\n')
             except Exception:
                 self.log.exception("Exception in socket handler")
 
@@ -425,7 +417,7 @@ class App(object):
             self.status.update(message='')
 
     def changeScreen(self, widget, push=True):
-        self.log.debug("Changing screen to %s" % (widget,))
+        self.log.debug("Changing screen to %s", widget)
         self.status.update(error=False, title=widget.title)
         if push:
             self.screens.append(self.frame.body)
@@ -444,7 +436,7 @@ class App(object):
             widget = self.screens.pop()
             if (not target_widget) or (widget is target_widget):
                 break
-        self.log.debug("Popping screen to %s" % (widget,))
+        self.log.debug("Popping screen to %s", widget)
         if hasattr(widget, 'title'):
             self.status.update(title=widget.title)
         self.clearInputBuffer()
@@ -505,7 +497,7 @@ class App(object):
                                 min_width=min_width, min_height=min_height)
         if hasattr(widget, 'title'):
             overlay.title = widget.title
-        self.log.debug("Overlaying %s on screen %s" % (widget, self.frame.body))
+        self.log.debug("Overlaying %s on screen %s", widget, self.frame.body)
         self.screens.append(self.frame.body)
         self.frame.body = overlay
 
@@ -533,7 +525,7 @@ class App(object):
             if text:
                 text += '\n'
             text += title+'\n'
-            text += '%s\n' % ('='*len(title),)
+            text += '{}\n'.format('='*len(title))
             for cmd, keys, cmdtext in items:
                 text += '{keys:{width}} {text}\n'.format(
                     keys=keys, width=keylen, text=cmdtext)
@@ -578,7 +570,7 @@ class App(object):
             raise Exception('Pull request is not in local database.')
 
     def doSearch(self, query):
-        self.log.debug("Search query: %s" % query)
+        self.log.debug("Search query: %s", query)
         try:
             self._syncOnePullRequestFromQuery(query)
         except Exception as e:
@@ -623,7 +615,7 @@ class App(object):
                 return self.openInternalURL(result)
         self.doSearch(query)
 
-    trailing_filename_re = re.compile('.*(,[a-z]+)')
+    trailing_filename_re = re.compile(r'.*(,[a-z]+)')
     def parseInternalURL(self, url):
         if not url.startswith(self.config.url):
             return None
@@ -712,13 +704,13 @@ class App(object):
                     if cmd in commands:
                         completions.append(key)
             completions = ' '.join(completions)
-            msg = '%s: %s' % (msg, completions)
+            msg = f'{msg}: {completions}'
             self.status.update(message=msg)
             return
         self.clearInputBuffer()
 
     def openURL(self, url):
-        self.log.debug("Open URL %s" % url)
+        self.log.debug("Open URL %s", url)
         webbrowser.open_new_tab(url)
         self.loop.screen.clear()
 
@@ -750,18 +742,18 @@ class App(object):
         if category == requestsexceptions.InsecureRequestWarning:
             return
         self.error_queue.put(('Warning', m))
-        os.write(self.error_pipe, six.b('error\n'))
+        os.write(self.error_pipe, b'error\n')
 
     def _commandPipeInput(self, data=None):
         (command, data) = self.command_queue.get()
         if command == 'open':
             url = data[0]
-            self.log.debug("Opening URL %s" % (url,))
+            self.log.debug("Opening URL %s", url)
             result = self.parseInternalURL(url)
             if result is not None:
                 self.openInternalURL(result)
         else:
-            self.log.error("Unable to parse command %s with data %s" % (command, data))
+            self.log.error("Unable to parse command %s with data %s", command, data)
 
     def toggleHeldPullRequest(self, pr_key):
         with self.db.getSession() as session:
@@ -871,7 +863,7 @@ class OpenPullRequestAction(argparse.Action):
                            namespace.keymap, namespace.path)
         url = values[0]
         if not url.startswith(cf.url):
-            print('Supplied URL must start with %s' % (cf.url,))
+            print(f'Supplied URL must start with {cf.url}')
             sys.exit(1)
 
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
