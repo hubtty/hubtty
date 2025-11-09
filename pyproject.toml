@@ -38,7 +38,7 @@ dependencies = [
     "voluptuous>=0.7",
     "ply>=3.4",
     "pyxdg",
-    "mistune>=2.0,<3.0.0",
+    "mistune>=3.0",
 ]
 
 [project.urls]
