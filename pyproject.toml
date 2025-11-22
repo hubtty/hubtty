@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=80", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hubtty"
+dynamic = ["version"]
+description = "Hubtty is a console-based interface to the Github Code Review system."
+readme = "README.rst"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [
+    {name = "The hubtty developers", email = "hubtty@mandre.org"}
+]
+keywords = ["github", "console", "urwid", "review"]
+classifiers = [
+    "Topic :: Utilities",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+    "urwid>=2.2.0",
+    "SQLAlchemy>=1.4.0",
+    "GitPython>=0.3.7",
+    "python-dateutil",
+    "requests>=2.5.3,<3.0.0",
+    "alembic>=0.6.4",
+    "PyYAML>=3.1.0",
+    "voluptuous>=0.7",
+    "ply>=3.4",
+    "pyxdg",
+    "mistune>=2.0,<3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "flake8",
+]
+
+[project.urls]
+Homepage = "https://hubtty.github.io"
+Repository = "https://github.com/hubtty/hubtty"
+Issues = "https://github.com/hubtty/hubtty/issues"
+
+[project.scripts]
+hubtty = "hubtty.app:main"
+
+[tool.setuptools.data-files]
+"share/hubtty/examples" = ["examples/*"]
+
+[tool.setuptools_scm]
+
+[tool.flake8]
+# The official style guide for Hubtty is this:
+#   Try to match the existing code style and don't worry about it too much.
+# Please don't submit changes to enable pep8 style checks or change the code
+# to match pep8 guidelines. Hubtty should be fun to work on.
+# Pyflakes on the other hand is a useful system that often catches real bugs.
+# Flake8 is used to invoke pyflakes because it supports the "NOQA" flag.
+ignore = ["W", "E"]
+show-source = true
+exclude = [".venv", ".tox", "dist", "doc", "build", "*.egg"]
