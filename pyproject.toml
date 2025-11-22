@@ -58,3 +58,14 @@ hubtty = "hubtty.app:main"
 "share/hubtty/examples" = ["examples/*"]
 
 [tool.setuptools_scm]
+
+[tool.flake8]
+# The official style guide for Hubtty is this:
+#   Try to match the existing code style and don't worry about it too much.
+# Please don't submit changes to enable pep8 style checks or change the code
+# to match pep8 guidelines. Hubtty should be fun to work on.
+# Pyflakes on the other hand is a useful system that often catches real bugs.
+# Flake8 is used to invoke pyflakes because it supports the "NOQA" flag.
+ignore = ["W", "E"]
+show-source = true
+exclude = [".venv", ".tox", "dist", "doc", "build", "*.egg"]
