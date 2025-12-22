@@ -28,7 +28,7 @@ class Renderer:
         for element in ast:
             match element['type']:
                 case 'text':
-                    text.append(element['text'])
+                    text.append(element.get('raw', ''))
                 case 'strong':
                     text.append(('md-strong', self.toUrwidMarkup(element['children'])))
                 case 'emphasis':
@@ -36,39 +36,44 @@ class Renderer:
                 case 'strikethrough':
                     text.append(('md-strikethrough', self.toUrwidMarkup(element['children'])))
                 case 'heading':
-                    text.append(('md-heading', ["#" * element['level'], " ", self.toUrwidMarkup(element['children']), "\n"]))
+                    level = element.get('attrs', {}).get('level', 1)
+                    text.append(('md-heading', ["#" * level, " ", self.toUrwidMarkup(element['children']), "\n"]))
                 case 'paragraph':
                     # Add newline before paragraphs if needed
                     if self.needsNewLine(text):
                         text.append("\n")
                     text.extend(self.toUrwidMarkup(element['children']))
                     text.append("\n")
-                case 'newline':
+                case 'newline' | 'blank_line' | 'softbreak' | 'linebeak':
                     text.append("\n")
                 case 'thematic_break':
                     text.append(('md-thematicbreak', "\n———————————————\n\n"))
                 case 'block_quote':
                     text.append(('md-blockquote', ["| ", self.toUrwidMarkup(element['children'])]))
                 case 'block_code':
-                    info = element['info']
-                    if info == None:
+                    info = element.get('attrs', {}).get('info', '')
+                    if info is None:
                         info = ""
-                    text.append(('md-blockcode', ["```%s\n" % info, element['text'], "```\n"]))
-                case 'image' | 'block_html':
-                    # image and HTML comments - do nothing
+                    raw_code = element.get('raw', '')
+                    text.append(('md-blockcode', ["```%s\n" % info, raw_code, "```\n"]))
+                case 'image' | 'block_html' | 'blank_line':
+                    # image, HTML comments, and blank lines - do nothing
                     pass
                 case 'codespan':
-                    text.append(('md-codespan', element['text']))
+                    text.append(('md-codespan', element.get('raw', '')))
                 case 'list':
-                    if element['ordered']:
+                    attrs = element.get('attrs', {})
+                    ordered = attrs.get('ordered', False)
+                    depth = attrs.get('depth', 0)
+                    if ordered:
                         idx = 1
                         for li in element['children']:
-                            text.append("  " * element['level'] + "%s. " % idx)
+                            text.append("  " * depth + "%s. " % idx)
                             text.extend(self.toUrwidMarkup([li]))
                             idx += 1
                     else:
                         for li in element['children']:
-                            text.append("  " * element['level'] + "- ")
+                            text.append("  " * depth + "- ")
                             text.extend(self.toUrwidMarkup([li]))
                 case 'list_item':
                     text.extend(self.toUrwidMarkup(element['children']))
@@ -76,11 +81,11 @@ class Renderer:
                     text.extend(self.toUrwidMarkup(element['children']))
                     text.append("\n")
                 case 'link':
-                    url = element['link']
+                    url = element.get('attrs', {}).get('url', '')
                     link_text = ""
                     for child in element['children']:
-                        if child.get('text'):
-                            link_text += child['text']
+                        if child.get('raw'):
+                            link_text += child['raw']
                         elif child.get('alt'):
                             link_text += child['alt']
                     link = mywid.Link(link_text, 'link', 'focused-link')
@@ -142,7 +147,7 @@ class Renderer:
         
 
     def render(self, text):
-        md = mistune.create_markdown(renderer=mistune.AstRenderer(), plugins=['strikethrough'])
+        md = mistune.create_markdown(renderer='ast', plugins=['strikethrough'])
         # Misture returns newline for empty text, we don't want that
         if not text:
             return []
