@@ -57,4 +57,5 @@ hubtty = "hubtty.app:main"
 [dependency-groups]
 dev = [
     "flake8>=7.3.0",
+    "pytest>=8.0.0",
 ]

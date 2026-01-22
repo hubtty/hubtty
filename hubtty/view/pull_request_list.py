@@ -645,10 +645,10 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
         if keymap.REFRESH in commands:
             if self.repository_key:
                 self.app.sync.submitTask(
-                    sync.SyncRepositoryTask(self.repository_key, sync.HIGH_PRIORITY))
+                    sync.SyncRepositoryTask(self.repository_key, priority=sync.HIGH_PRIORITY))
             else:
                 self.app.sync.submitTask(
-                    sync.SyncSubscribedRepositoriesTask(sync.HIGH_PRIORITY))
+                    sync.SyncSubscribedRepositoriesTask(priority=sync.HIGH_PRIORITY))
             self.app.status.update()
             return True
         if keymap.REVIEW in commands:
@@ -738,7 +738,7 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
         if upload:
             for message_key in message_keys:
                 self.app.sync.submitTask(
-                    sync.UploadReviewTask(message_key, sync.HIGH_PRIORITY))
+                    sync.UploadReviewTask(message_key, priority=sync.HIGH_PRIORITY))
         self.refresh()
         self.app.backScreen()
 
@@ -771,6 +771,6 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
                 pr.pending_edit = True
                 pr.pending_edit_message = dialog.entry.edit_text
                 self.app.sync.submitTask(
-                    sync.EditPullRequestTask(pr_key, sync.HIGH_PRIORITY))
+                    sync.EditPullRequestTask(pr_key, priority=sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()

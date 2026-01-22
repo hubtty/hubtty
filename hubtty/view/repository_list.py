@@ -579,7 +579,7 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
             return True
         if keymap.REFRESH in commands:
             self.app.sync.submitTask(
-                sync.SyncSubscribedRepositoriesTask(sync.HIGH_PRIORITY))
+                sync.SyncSubscribedRepositoriesTask(priority=sync.HIGH_PRIORITY))
             self.app.status.update()
             self.refresh()
             return True
