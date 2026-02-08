@@ -421,12 +421,24 @@ class TextualApp(App, BaseApp):
         """Periodically check for sync results and update UI."""
         import queue
 
+        needs_refresh = False
+        invalidate = False
         try:
             while True:
-                self.sync.result_queue.get(0)
-                # TODO: dispatch events to screens
+                event = self.sync.result_queue.get(0)
+                screen = self.screen
+                if hasattr(screen, "interested") and screen.interested(event):
+                    needs_refresh = True
+                if hasattr(event, "held_changed") and event.held_changed:
+                    invalidate = True
         except queue.Empty:
             pass
+        if needs_refresh:
+            screen = self.screen
+            if hasattr(screen, "refresh_data"):
+                screen.refresh_data()
+        if invalidate:
+            self.updateStatusQueries()
         # Update sync queue count
         self.hubtty_header.set_sync(self.sync.queue.qsize())
 
