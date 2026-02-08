@@ -20,10 +20,77 @@ import webbrowser
 
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, Static
-from textual.binding import Binding
 
 from hubtty.base_app import BaseApp
+from hubtty import keymap
 import hubtty.version
+
+
+# ---- Key translation between urwid and Textual ----
+
+# Mapping from urwid special key names to Textual key names.
+# Printable characters (single chars like 'v', 'S', '?') pass through as-is.
+_URWID_TO_TEXTUAL = {
+    "esc": "escape",
+    "enter": "enter",
+    "tab": "tab",
+    "shift tab": "shift+tab",
+    "up": "up",
+    "down": "down",
+    "left": "left",
+    "right": "right",
+    "page up": "pageup",
+    "page down": "pagedown",
+    "home": "home",
+    "end": "end",
+    "delete": "delete",
+    "backspace": "backspace",
+    "insert": "insert",
+    " ": "space",
+}
+
+# Mapping from Textual key names back to urwid key names.
+_TEXTUAL_TO_URWID = {v: k for k, v in _URWID_TO_TEXTUAL.items()}
+
+
+def urwid_key_to_textual(key):
+    """Convert an urwid key name to a Textual key name."""
+    # Direct lookup for special keys
+    if key in _URWID_TO_TEXTUAL:
+        return _URWID_TO_TEXTUAL[key]
+    # 'ctrl x' -> 'ctrl+x'
+    if key.startswith("ctrl "):
+        return "ctrl+" + key[5:]
+    # 'meta x' -> 'escape' (Textual doesn't have meta; terminals send ESC+key)
+    if key.startswith("meta "):
+        return None  # handled via escape sequence buffering
+    # 'f1' through 'f24' are the same in both
+    if key.startswith("f") and key[1:].isdigit():
+        return key
+    # Single printable characters pass through
+    return key
+
+
+def textual_key_to_urwid(event):
+    """Convert a Textual Key event to an urwid-style key name.
+
+    Returns the urwid key name string, or None if the key should be ignored.
+    """
+    key = event.key
+    # Direct lookup for special keys
+    if key in _TEXTUAL_TO_URWID:
+        return _TEXTUAL_TO_URWID[key]
+    # 'ctrl+x' -> 'ctrl x'
+    if key.startswith("ctrl+"):
+        return "ctrl " + key[5:]
+    # Function keys pass through
+    if key.startswith("f") and key[1:].isdigit():
+        return key
+    # Printable character: use the character value to preserve case
+    if event.character and len(event.character) == 1:
+        return event.character
+    # Named keys that match directly
+    return key
 
 
 class HubttyHeader(Static):
@@ -36,10 +103,14 @@ class HubttyHeader(Static):
         self._error = False
         self._sync = 0
         self._held = 0
+        self._message = None
         self._update_display()
 
     def _update_display(self):
-        parts = [self._title]
+        if self._message:
+            parts = [self._message]
+        else:
+            parts = [self._title]
         if self._held:
             parts.append(f"  Held: {self._held}")
         if self._error:
@@ -51,6 +122,10 @@ class HubttyHeader(Static):
 
     def set_title(self, title):
         self._title = title
+        self._update_display()
+
+    def set_message(self, message):
+        self._message = message
         self._update_display()
 
     def set_error(self, error):
@@ -86,15 +161,13 @@ class TextualApp(App, BaseApp):
     }
     """
 
-    BINDINGS = [
-        Binding("q", "quit", "Quit"),
-    ]
+    BINDINGS = []
 
     def __init__(
         self,
         server=None,
         palette="default",
-        keymap="default",
+        keymap_name="default",
         debug=False,
         verbose=False,
         disable_sync=False,
@@ -109,7 +182,7 @@ class TextualApp(App, BaseApp):
             self,
             server=server,
             palette=palette,
-            keymap=keymap,
+            keymap=keymap_name,
             debug=debug,
             verbose=verbose,
             disable_sync=disable_sync,
@@ -119,6 +192,7 @@ class TextualApp(App, BaseApp):
         )
 
         self._disable_sync = disable_sync
+        self.input_buffer = []
 
     @property
     def title(self):
@@ -126,7 +200,7 @@ class TextualApp(App, BaseApp):
 
     @title.setter
     def title(self, value):
-        # Textual App has a title property; we override it
+        # Textual App has a title reactive; we override to keep ours fixed
         pass
 
     def compose(self) -> ComposeResult:
@@ -161,6 +235,78 @@ class TextualApp(App, BaseApp):
             self.sync_thread = None
             self.sync.offline = True
             self.hubtty_header.set_offline(True)
+
+    # ---- Key handling ----
+
+    def on_key(self, event) -> None:
+        """Handle all key events through the hubtty keymap system."""
+        urwid_key = textual_key_to_urwid(event)
+        if urwid_key is None:
+            return
+
+        keys = self.input_buffer + [urwid_key]
+        commands = self.config.keymap.getCommands(keys)
+
+        if not commands:
+            # No match; clear buffer and ignore
+            self._clearInputBuffer()
+            return
+
+        if keymap.FURTHER_INPUT in commands:
+            # Multi-key sequence in progress; buffer and wait
+            self.input_buffer.append(urwid_key)
+            event.prevent_default()
+            event.stop()
+            # Show the buffered keys in the header
+            msg = "".join(self.input_buffer)
+            further = self.config.keymap.getFurtherCommands(keys)
+            completions = " ".join(fkey for fkey, cmds in further if cmds)
+            msg = f"{msg}: {completions}"
+            self.hubtty_header.set_message(msg)
+            return
+
+        # We have a complete command match
+        event.prevent_default()
+        event.stop()
+        self._clearInputBuffer()
+
+        for command in commands:
+            if command == keymap.FURTHER_INPUT:
+                continue
+            self._handle_command(command, urwid_key)
+
+    def _clearInputBuffer(self):
+        if self.input_buffer:
+            self.input_buffer = []
+            if hasattr(self, "hubtty_header"):
+                self.hubtty_header.set_message(None)
+
+    def _handle_command(self, command, key):
+        """Dispatch a hubtty command. Global commands are handled here;
+        screen-specific commands will be forwarded to the active screen."""
+        if command == keymap.QUIT:
+            self.exit()
+        elif command == keymap.PREV_SCREEN:
+            self.backScreen()
+        elif command == keymap.TOP_SCREEN:
+            # TODO: navigate to top screen
+            pass
+        elif command == keymap.HELP:
+            # TODO: show help
+            self.notify("Help not yet implemented", title="Help")
+        elif command == keymap.PR_SEARCH:
+            # TODO: show search dialog
+            self.notify("Search not yet implemented", title="Search")
+        elif command == keymap.LIST_HELD:
+            self.doSearch("is:held")
+        elif command == keymap.REFRESH:
+            # TODO: refresh current screen
+            pass
+        else:
+            # TODO: forward to active screen's command handler
+            self.logger.debug("Unhandled command: %s (key: %s)", command, key)
+
+    # ---- Sync polling ----
 
     def _poll_sync_results(self) -> None:
         """Periodically check for sync results and update UI."""
