@@ -611,6 +611,7 @@ class TextualApp(App, BaseApp):
         # Refresh the restored view so it picks up any changes
         if hasattr(view, "refresh_data"):
             view.refresh_data()
+        self.screen.focus_next()
 
     def registerPaletteEntry(self, label_id, label_color):
         """Register a label color. In Textual, handled via CSS."""
