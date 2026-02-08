@@ -233,6 +233,8 @@ class RepositoryListView(Widget):
     #search-bar {
         dock: bottom;
         height: 1;
+        border: none;
+        padding: 0;
         display: none;
     }
     #search-bar.visible {
