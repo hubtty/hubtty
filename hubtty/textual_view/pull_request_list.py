@@ -13,21 +13,20 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from textual.screen import Screen
+from textual.widget import Widget
 from textual.widgets import Static
 
 
-class PullRequestListScreen(Screen):
-    """Screen showing the list of pull requests for a repository.
+class PullRequestListView(Widget):
+    """Widget showing the list of pull requests for a repository.
 
     This is a stub placeholder that will be fully implemented later.
     """
 
-    BINDINGS = []
-
     DEFAULT_CSS = """
-    PullRequestListScreen {
+    PullRequestListView {
         layout: vertical;
+        height: 1fr;
     }
     #pr-list-placeholder {
         height: 1fr;

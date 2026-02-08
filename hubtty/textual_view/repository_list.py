@@ -18,7 +18,8 @@ import logging
 from rich.text import Text
 
 from textual.containers import Horizontal, Vertical
-from textual.screen import ModalScreen, Screen
+from textual.screen import ModalScreen
+from textual.widget import Widget
 from textual.widgets import (
     Button,
     DataTable,
@@ -30,7 +31,7 @@ from textual.widgets import (
 
 from hubtty import keymap
 from hubtty import sync
-from hubtty.textual_view.pull_request_list import PullRequestListScreen
+from hubtty.textual_view.pull_request_list import PullRequestListView
 
 
 # Style names matching the urwid palette entries
@@ -213,21 +214,20 @@ class TopicSelectDialog(ModalScreen):
         self.dismiss(None)
 
 
-# ---- Main screen ----
+# ---- Main view ----
 
 
-class RepositoryListScreen(Screen):
-    """Screen showing the list of repositories."""
+class RepositoryListView(Widget):
+    """Widget showing the list of repositories."""
 
     title = "Repository list"
 
-    BINDINGS = []
-
     DEFAULT_CSS = """
-    RepositoryListScreen {
+    RepositoryListView {
         layout: vertical;
+        height: 1fr;
     }
-    RepositoryListScreen DataTable {
+    RepositoryListView DataTable {
         height: 1fr;
     }
     #search-bar {
@@ -455,7 +455,7 @@ class RepositoryListScreen(Screen):
             repo_key,
             self.app.config.repository_pr_list_query,
         )
-        self.app.changeScreen(PullRequestListScreen(query, title=repo_name))
+        self.app.changeScreen(PullRequestListView(query, title=repo_name))
 
     def _toggle_topic(self, meta):
         """Toggle topic fold/collapse state."""

@@ -19,11 +19,11 @@ import warnings
 import webbrowser
 
 from textual.app import App, ComposeResult
+from textual.containers import Vertical
 from textual.widgets import Footer, Static
 
 from hubtty.base_app import BaseApp
 from hubtty import keymap
-from hubtty.textual_view.repository_list import RepositoryListScreen
 import hubtty.version
 
 
@@ -304,6 +304,9 @@ class TextualApp(App, BaseApp):
         color: $text;
         text-style: bold;
     }
+    #content {
+        height: 1fr;
+    }
     """
 
     BINDINGS = []
@@ -355,6 +358,7 @@ class TextualApp(App, BaseApp):
 
     def compose(self) -> ComposeResult:
         yield HubttyHeader()
+        yield Vertical(id="content")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -370,8 +374,13 @@ class TextualApp(App, BaseApp):
 
         self.startSocketListener()
 
-        # Push the initial repository list screen
-        self.push_screen(RepositoryListScreen())
+        # Mount the initial repository list view
+        from hubtty.textual_view.repository_list import RepositoryListView
+
+        self._view_stack = []
+        self._current_view = RepositoryListView()
+        content = self.query_one("#content")
+        content.mount(self._current_view)
 
         # Start sync thread
         if not self._disable_sync:
@@ -481,9 +490,14 @@ class TextualApp(App, BaseApp):
         elif command == keymap.PREV_SCREEN:
             self.backScreen()
         elif command == keymap.TOP_SCREEN:
-            # Pop all screens back to the initial repository list
-            while len(self.screen_stack) > 1:
-                self.pop_screen()
+            # Pop all views back to the initial repository list
+            while self._view_stack:
+                old_view = self._current_view
+                old_view.remove()
+                self._current_view = self._view_stack.pop()
+            self._current_view.display = True
+            if hasattr(self._current_view, "refresh_data"):
+                self._current_view.refresh_data()
         elif command == keymap.HELP:
             # TODO: show help
             self.notify("Help not yet implemented", title="Help")
@@ -493,10 +507,10 @@ class TextualApp(App, BaseApp):
         elif command == keymap.LIST_HELD:
             self.doSearch("is:held")
         else:
-            # Forward to the active screen's command handler
-            screen = self.screen
-            if hasattr(screen, "handleCommand"):
-                if screen.handleCommand(command):
+            # Forward to the active view's command handler
+            view = self._current_view
+            if view and hasattr(view, "handleCommand"):
+                if view.handleCommand(command):
                     return
             self.logger.debug("Unhandled command: %s (key: %s)", command, key)
 
@@ -511,17 +525,17 @@ class TextualApp(App, BaseApp):
         try:
             while True:
                 event = self.sync.result_queue.get(0)
-                screen = self.screen
-                if hasattr(screen, "interested") and screen.interested(event):
+                view = self._current_view
+                if view and hasattr(view, "interested") and view.interested(event):
                     needs_refresh = True
                 if hasattr(event, "held_changed") and event.held_changed:
                     invalidate = True
         except queue.Empty:
             pass
         if needs_refresh:
-            screen = self.screen
-            if hasattr(screen, "refresh_data"):
-                screen.refresh_data()
+            view = self._current_view
+            if view and hasattr(view, "refresh_data"):
+                view.refresh_data()
         if invalidate:
             self.updateStatusQueries()
         # Update sync queue count
@@ -543,22 +557,31 @@ class TextualApp(App, BaseApp):
         # TODO: implement when PR list screen is ready
         self.notify(f"Search: {query}", title="Search")
 
-    def changeScreen(self, screen, push=True):
-        """Navigate to a new screen."""
-        self.logger.debug("Changing screen to %s", screen)
+    def changeScreen(self, view, push=True):
+        """Navigate to a new view widget."""
+        self.logger.debug("Changing view to %s", view)
         self._clearInputBuffer()
         if push:
-            self.push_screen(screen)
-        else:
-            self.switch_screen(screen)
+            self._view_stack.append(self._current_view)
+        content = self.query_one("#content")
+        self._current_view.display = False
+        content.mount(view)
+        self._current_view = view
 
     def backScreen(self, target_widget=None):
-        """Navigate back to the previous screen."""
-        if len(self.screen_stack) <= 1:
+        """Navigate back to the previous view."""
+        if not self._view_stack:
             return
         self._clearInputBuffer()
-        self.logger.debug("Popping screen")
-        self.pop_screen()
+        self.logger.debug("Popping view")
+        old_view = self._current_view
+        old_view.remove()
+        view = self._view_stack.pop()
+        view.display = True
+        self._current_view = view
+        # Refresh the restored view so it picks up any changes
+        if hasattr(view, "refresh_data"):
+            view.refresh_data()
 
     def registerPaletteEntry(self, label_id, label_color):
         """Register a label color. In Textual, handled via CSS."""
