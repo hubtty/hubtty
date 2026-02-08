@@ -660,8 +660,12 @@ def main():
                         help='the server to use (as specified in config file)')
     args = parser.parse_args()
     if args.ui == 'textual':
-        print("Textual UI not yet implemented")
-        sys.exit(1)
+        from hubtty.textual_app import TextualApp
+        g = TextualApp(args.server, args.palette, args.keymap, args.debug,
+                       args.verbose, args.no_sync, args.debug_sync,
+                       args.fetch_missing_refs, args.path)
+        g.run()
+        return
     g = App(args.server, args.palette, args.keymap, args.debug, args.verbose,
             args.no_sync, args.debug_sync, args.fetch_missing_refs, args.path)
     g.run()
