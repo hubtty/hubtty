@@ -120,8 +120,8 @@ class BaseApp:
         # logging output duplicates some requests logging content in places.
         req_logger = logging.getLogger("requests")
         req_logger.setLevel("WARN")
-        self.log = logging.getLogger("hubtty.App")
-        self.log.debug("Starting")
+        self.logger = logging.getLogger("hubtty.App")
+        self.logger.debug("Starting")
 
         self.lock_fd = open(self.config.lock_file, "w")
         try:
@@ -300,26 +300,26 @@ class BaseApp:
         while True:
             try:
                 s, addr = self.socket.accept()
-                self.log.debug("Accepted socket connection %s", s)
+                self.logger.debug("Accepted socket connection %s", s)
                 buf = b""
                 while True:
                     buf += s.recv(1)
                     if buf[-1] == 10:
                         break
                 buf = buf.decode("utf8").strip()
-                self.log.debug("Received %s from socket", buf)
+                self.logger.debug("Received %s from socket", buf)
                 s.close()
                 parts = buf.split()
                 self.handleSocketCommand(parts[0], parts[1:])
             except Exception:
-                self.log.exception("Exception in socket handler")
+                self.logger.exception("Exception in socket handler")
 
     def _showWarning(self, message, category, filename, lineno, file=None, line=None):
         # Don't display repeat warnings
         if str(message) in self.logged_warnings:
             return
         m = warnings.formatwarning(message, category, filename, lineno, line)
-        self.log.warning(m)
+        self.logger.warning(m)
         self.logged_warnings.add(str(message))
         # Log this warning, but never display it to the user; it is
         # nearly un-actionable.

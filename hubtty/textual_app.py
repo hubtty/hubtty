@@ -208,7 +208,7 @@ class TextualApp(App, BaseApp):
 
     def openURL(self, url):
         """Open a URL in the browser."""
-        self.log.debug("Open URL %s", url)
+        self.logger.debug("Open URL %s", url)
         webbrowser.open_new_tab(url)
 
     def updateStatusQueries(self):
@@ -222,12 +222,12 @@ class TextualApp(App, BaseApp):
         """Handle a command from the Unix socket."""
         if command == "open":
             url = data[0]
-            self.log.debug("Opening URL %s", url)
+            self.logger.debug("Opening URL %s", url)
             result = self.parseInternalURL(url)
             if result is not None:
                 self.call_from_thread(self.openInternalURL, result)
         else:
-            self.log.error("Unable to parse command %s with data %s", command, data)
+            self.logger.error("Unable to parse command %s with data %s", command, data)
 
     def showWarning(self, message):
         """Show a warning notification."""

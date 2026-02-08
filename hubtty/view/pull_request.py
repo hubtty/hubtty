@@ -668,7 +668,7 @@ class PullRequestView(urwid.WidgetWrap):
         if missing_commits:
             if self.app.sync.offline:
                 raise hubtty.view.DisplayError("Git commits not present in local repository")
-            self.app.log.warning("Missing some commits for pull request %s %s",
+            self.app.logger.warning("Missing some commits for pull request %s %s",
                 pr_number, missing_commits)
             task = sync.SyncPullRequestTask(pr_id, force_fetch=True,
                                        priority=sync.HIGH_PRIORITY)
@@ -1223,7 +1223,7 @@ class PullRequestView(urwid.WidgetWrap):
 
     def reviewKey(self, reviewkey):
         approval = reviewkey.get('approval', 'COMMENT')
-        self.app.log.debug("Reviewkey %s with approval %s" %
+        self.app.logger.debug("Reviewkey %s with approval %s" %
                            (reviewkey['key'], approval))
         row = self.commit_rows[self.last_commit_key]
         message = reviewkey.get('message', '')

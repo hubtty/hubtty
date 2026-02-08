@@ -300,7 +300,7 @@ class App(BaseApp):
             self.status.update(message='')
 
     def changeScreen(self, widget, push=True):
-        self.log.debug("Changing screen to %s", widget)
+        self.logger.debug("Changing screen to %s", widget)
         self.status.update(error=False, title=widget.title)
         if push:
             self.screens.append(self.frame.body)
@@ -319,7 +319,7 @@ class App(BaseApp):
             widget = self.screens.pop()
             if (not target_widget) or (widget is target_widget):
                 break
-        self.log.debug("Popping screen to %s", widget)
+        self.logger.debug("Popping screen to %s", widget)
         if hasattr(widget, 'title'):
             self.status.update(title=widget.title)
         self.clearInputBuffer()
@@ -333,7 +333,7 @@ class App(BaseApp):
         return None
 
     def clearHistory(self):
-        self.log.debug("Clearing screen history")
+        self.logger.debug("Clearing screen history")
         while self.screens:
             widget = self.screens.pop()
             self.clearInputBuffer()
@@ -380,7 +380,7 @@ class App(BaseApp):
                                 min_width=min_width, min_height=min_height)
         if hasattr(widget, 'title'):
             overlay.title = widget.title
-        self.log.debug("Overlaying %s on screen %s", widget, self.frame.body)
+        self.logger.debug("Overlaying %s on screen %s", widget, self.frame.body)
         self.screens.append(self.frame.body)
         self.frame.body = overlay
 
@@ -430,7 +430,7 @@ class App(BaseApp):
         self.popup(dialog, min_width=76, min_height=total_lines+4)
 
     def doSearch(self, query):
-        self.log.debug("Search query: %s", query)
+        self.logger.debug("Search query: %s", query)
         try:
             self._syncOnePullRequestFromQuery(query)
         except Exception as e:
@@ -537,7 +537,7 @@ class App(BaseApp):
         self.clearInputBuffer()
 
     def openURL(self, url):
-        self.log.debug("Open URL %s", url)
+        self.logger.debug("Open URL %s", url)
         webbrowser.open_new_tab(url)
         self.loop.screen.clear()
 
@@ -549,12 +549,12 @@ class App(BaseApp):
         (command, data) = self.command_queue.get()
         if command == 'open':
             url = data[0]
-            self.log.debug("Opening URL %s", url)
+            self.logger.debug("Opening URL %s", url)
             result = self.parseInternalURL(url)
             if result is not None:
                 self.openInternalURL(result)
         else:
-            self.log.error("Unable to parse command %s with data %s", command, data)
+            self.logger.error("Unable to parse command %s with data %s", command, data)
 
     def localCheckoutCommit(self, repository_name, commit_sha):
         repo = gitrepo.get_repo(repository_name, self.config)
