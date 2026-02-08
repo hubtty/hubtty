@@ -1322,7 +1322,7 @@ class Sync:
             if not self.offline:
                 self.submitTask(UploadReviewsTask(HIGH_PRIORITY))
             self.offline = True
-            self.app.status.update(offline=True, refresh=False)
+            self.app.set_status(offline=True)
             os.write(pipe, b'refresh\n')
             time.sleep(30)
             return task
@@ -1330,14 +1330,14 @@ class Sync:
             task.complete(False)
             self.queue.complete(task)
             self.log.warning("Failed to run task %s: %s", task, e)
-            self.app.status.update(error=True, refresh=False)
+            self.app.set_status(error=True)
         except Exception:
             task.complete(False)
             self.queue.complete(task)
             self.log.exception('Exception running task %s', task)
-            self.app.status.update(error=True, refresh=False)
+            self.app.set_status(error=True)
         self.offline = False
-        self.app.status.update(offline=False, refresh=False)
+        self.app.set_status(offline=False)
         for r in task.results:
             self.result_queue.put(r)
         os.write(pipe, b'refresh\n')

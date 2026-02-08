@@ -15,15 +15,9 @@
 
 import argparse
 import colorsys
-import datetime
-import dateutil
-import fcntl
 import functools
-import logging
 import os
-import re
 import socket
-import subprocess
 import sys
 import textwrap
 import threading
@@ -31,24 +25,21 @@ import warnings
 import webbrowser
 
 import queue
-from urllib import parse as urlparse
 import sqlalchemy.exc
 import urwid
 
-from hubtty import db
 from hubtty import config
 from hubtty import gitrepo
 from hubtty import keymap
 from hubtty import mywid
 from hubtty import palette
-from hubtty import sync
-from hubtty import search
-from hubtty import requestsexceptions
+import hubtty.search
 from hubtty.view import pull_request_list as view_pr_list
 from hubtty.view import repository_list as view_repository_list
 from hubtty.view import pull_request as view_pr
 import hubtty.view
 import hubtty.version
+from hubtty.base_app import BaseApp
 
 WELCOME_TEXT = """\
 Welcome to Hubtty!
@@ -202,96 +193,24 @@ class SearchDialog(mywid.ButtonDialog):
             return None
         return key
 
-# From: cpython/file/2.7/Lib/webbrowser.py with modification to
-# redirect stdin/out/err.
-class BackgroundBrowser(webbrowser.GenericBrowser):
-    """Class for all browsers which are to be started in the
-       background."""
 
-    def open(self, url, new=0, autoraise=True):
-        cmdline = [self.name] + [arg.replace("%s", url)
-                                 for arg in self.args]
-        inout = open(os.devnull, "r+")
-        try:
-            if sys.platform[:3] == 'win':
-                p = subprocess.Popen(cmdline)
-            else:
-                setsid = getattr(os, 'setsid', None)
-                if not setsid:
-                    setsid = getattr(os, 'setpgrp', None)
-                p = subprocess.Popen(cmdline, close_fds=True,
-                                     stdin=inout, stdout=inout,
-                                     stderr=inout, preexec_fn=setsid)
-            return (p.poll() is None)
-        except OSError:
-            return False
-
-class RepositoryCache:
-    def __init__(self):
-        self.repositories = {}
-
-    def get(self, repository):
-        if repository.key not in self.repositories:
-            self.repositories[repository.key] = dict(
-                unreviewed_prs = len(repository.unreviewed_prs),
-                open_prs = len(repository.open_prs),
-            )
-        return self.repositories[repository.key]
-
-    def clear(self, repository):
-        if repository.key in self.repositories:
-            del self.repositories[repository.key]
-
-class App:
-    simple_pr_search = re.compile(r'([a-zA-Z_]+/)+\d+')
+class App(BaseApp):
 
     def __init__(self, server=None, palette='default',
                  keymap='default', debug=False, verbose=False,
                  disable_sync=False, disable_background_sync=False,
                  fetch_missing_refs=False,
                  path=None):
-        self.server = server
-        self.config = config.Config(server, palette, keymap, path)
-        if debug:
-            level = logging.DEBUG
-        elif verbose:
-            level = logging.INFO
-        else:
-            level = logging.WARNING
-        logging.basicConfig(filename=self.config.log_file, filemode='w',
-                            format='%(asctime)s %(message)s',
-                            level=level)
-        # Set the requests logger level to be less verbose, since our
-        # logging output duplicates some requests logging content in places.
-        req_logger = logging.getLogger('requests')
-        req_logger.setLevel('WARN')
-        self.log = logging.getLogger('hubtty.App')
-        self.log.debug("Starting")
+        super().__init__(server=server, palette=palette, keymap=keymap,
+                         debug=debug, verbose=verbose,
+                         disable_sync=disable_sync,
+                         disable_background_sync=disable_background_sync,
+                         fetch_missing_refs=fetch_missing_refs,
+                         path=path)
 
-        self.lock_fd = open(self.config.lock_file, 'w')
-        try:
-            fcntl.lockf(self.lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            print("error: another instance of hubtty is running for: %s" % self.config.server['name'])
-            sys.exit(1)
-
-        self.repository_cache = RepositoryCache()
         self.ring = mywid.KillRing()
         self.input_buffer = []
-        webbrowser.register('xdg-open', None, BackgroundBrowser("xdg-open"))
-
-        self.fetch_missing_refs = fetch_missing_refs
         self.config.keymap.updateCommandMap()
-        self.search = search.SearchCompiler(self.getOwnAccountId)
-        self.db = db.Database(self, self.config.dburi, self.search)
-
-        self.own_account_id = None
-        with self.db.getSession() as session:
-            account = session.getOwnAccount()
-            if account:
-                self.own_account_id = account.id
-
-        self.sync = sync.Sync(self, disable_background_sync)
 
         self.status = StatusHeader(self)
         self.header = urwid.AttrMap(self.status, 'header')
@@ -315,7 +234,6 @@ class App:
         self.sync_pipe = self.loop.watch_pipe(self.refresh)
         self.error_queue = queue.Queue()
         self.error_pipe = self.loop.watch_pipe(self._errorPipeInput)
-        self.logged_warnings = set()
         self.command_pipe = self.loop.watch_pipe(self._commandPipeInput)
         self.command_queue = queue.Queue()
 
@@ -359,12 +277,6 @@ class App:
         default_fg, default_bg = self.config.palette.getPaletteItem('pr-data')
         self.loop.screen.register_palette_entry(name, default_fg, default_bg, foreground_high=fg, background_high=color)
 
-    def getOwnAccountId(self):
-        return self.own_account_id
-
-    def isOwnAccount(self, account):
-        return account.id == self.own_account_id
-
     def run(self):
         try:
             self.loop.run()
@@ -381,35 +293,6 @@ class App:
         urwid.connect_signal(dialog, 'yes', self._quit)
 
         self.popup(dialog)
-
-    def startSocketListener(self):
-        if os.path.exists(self.config.socket_path):
-            os.unlink(self.config.socket_path)
-        self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.socket.bind(self.config.socket_path)
-        self.socket.listen(1)
-        self.socket_thread = threading.Thread(target=self._socketListener)
-        self.socket_thread.daemon = True
-        self.socket_thread.start()
-
-    def _socketListener(self):
-        while True:
-            try:
-                s, addr = self.socket.accept()
-                self.log.debug("Accepted socket connection %s", s)
-                buf = b''
-                while True:
-                    buf += s.recv(1)
-                    if buf[-1] == 10:
-                        break
-                buf = buf.decode('utf8').strip()
-                self.log.debug("Received %s from socket", buf)
-                s.close()
-                parts = buf.split()
-                self.command_queue.put((parts[0], parts[1:]))
-                os.write(self.command_pipe, b'command\n')
-            except Exception:
-                self.log.exception("Exception in socket handler")
 
     def clearInputBuffer(self):
         if self.input_buffer:
@@ -546,29 +429,6 @@ class App:
             lambda button: self.backScreen())
         self.popup(dialog, min_width=76, min_height=total_lines+4)
 
-    def _syncOnePullRequestFromQuery(self, query):
-        number = prid = restid = None
-        if query.startswith("pr:"):
-            number = query.split(':')[1].strip()
-            try:
-                number = int(number)
-            except ValueError:
-                number = None
-                prid = query.split(':')[1].strip()
-        if not (number or prid):
-            return
-        with self.db.getSession() as session:
-            if prid:
-                pull_requests = session.getPullRequestsByPullRequestID(prid)
-            pr_keys = [pr.key for pr in pull_requests if pr]
-            restids = [pr.pr_id for pr in pull_requests if pr]
-        if restids:
-            for restid in restids:
-                task = sync.SyncPullRequestTask(restid, sync.HIGH_PRIORITY)
-                self.sync.submitTask(task)
-        if not pr_keys:
-            raise Exception('Pull request is not in local database.')
-
     def doSearch(self, query):
         self.log.debug("Search query: %s", query)
         try:
@@ -614,39 +474,6 @@ class App:
             if result is not None:
                 return self.openInternalURL(result)
         self.doSearch(query)
-
-    trailing_filename_re = re.compile(r'.*(,[a-z]+)')
-    def parseInternalURL(self, url):
-        if not url.startswith(self.config.url):
-            return None
-        result = urlparse.urlparse(url)
-        pr = patchset = filename = None
-        path = [x for x in result.path.split('/') if x]
-        if path:
-            pr = path[0]
-        else:
-            path = [x for x in result.fragment.split('/') if x]
-            if path[0] == 'c':
-                path.pop(0)
-            while path:
-                if not pr:
-                    pr = path.pop(0)
-                    continue
-                if not patchset:
-                    patchset = path.pop(0)
-                    continue
-                if not filename:
-                    filename = '/'.join(path)
-                    m = self.trailing_filename_re.match(filename)
-                    if m:
-                        filename = filename[:0-len(m.group(1))]
-                    path = None
-        return (pr, patchset, filename)
-
-    def openInternalURL(self, result):
-        (pr, patchset, filename) = result
-        # TODO: support deep-linking to a filename
-        self.doSearch('pr:%s' % pr)
 
     def error(self, message, title='Error'):
         dialog = mywid.MessageDialog(title, message)
@@ -714,35 +541,9 @@ class App:
         webbrowser.open_new_tab(url)
         self.loop.screen.clear()
 
-    def time(self, dt):
-        utc = dt.replace(tzinfo=dateutil.tz.tzutc())
-        if self.config.utc:
-            return utc
-        local = utc.astimezone(dateutil.tz.tzlocal())
-        return local
-
     def _errorPipeInput(self, data=None):
         (title, message) = self.error_queue.get()
         self.error(message, title=title)
-
-    def _showWarning(self, message, category, filename, lineno,
-                     file=None, line=None):
-        # Don't display repeat warnings
-        if str(message) in self.logged_warnings:
-            return
-        m = warnings.formatwarning(message, category, filename, lineno, line)
-        self.log.warning(m)
-        self.logged_warnings.add(str(message))
-        # Log this warning, but never display it to the user; it is
-        # nearly un-actionable.
-        if category == requestsexceptions.InsecurePlatformWarning:
-            return
-        if category == requestsexceptions.SNIMissingWarning:
-            return
-        if category == requestsexceptions.InsecureRequestWarning:
-            return
-        self.error_queue.put(('Warning', m))
-        os.write(self.error_pipe, b'error\n')
 
     def _commandPipeInput(self, data=None):
         (command, data) = self.command_queue.get()
@@ -754,20 +555,6 @@ class App:
                 self.openInternalURL(result)
         else:
             self.log.error("Unable to parse command %s with data %s", command, data)
-
-    def toggleHeldPullRequest(self, pr_key):
-        with self.db.getSession() as session:
-            pr = session.getPullRequest(pr_key)
-            pr.held = not pr.held
-            ret = pr.held
-            if not pr.held:
-                for c in pr.commits:
-                    for m in pr.messages:
-                        if m.pending:
-                            self.sync.submitTask(
-                                sync.UploadReviewTask(m.key, sync.HIGH_PRIORITY))
-        self.updateStatusQueries()
-        return ret
 
     def localCheckoutCommit(self, repository_name, commit_sha):
         repo = gitrepo.get_repo(repository_name, self.config)
@@ -795,51 +582,16 @@ class App:
             lambda button: self.backScreen())
         self.popup(dialog, min_height=min_height)
 
-    def saveReviews(self, commit_keys, approval, message, upload, merge):
-        message_keys = []
-        with self.db.getSession() as session:
-            account = session.getOwnAccount()
-            for commit_key in commit_keys:
-                k = self._saveReview(session, account, commit_key,
-                                     approval, message, upload, merge)
-                if k:
-                    message_keys.append(k)
-        return message_keys
+    def set_status(self, **kwargs):
+        self.status.update(refresh=False, **kwargs)
 
-    def _saveReview(self, session, account, commit_key,
-                    approval, message, upload, merge):
-        message_key = None
-        commit = session.getCommit(commit_key)
-        pr = commit.pull_request
+    def showWarning(self, message):
+        self.error_queue.put(('Warning', message))
+        os.write(self.error_pipe, b'error\n')
 
-        existing_approval = session.getApproval(pr, account, commit.sha)
-        if existing_approval:
-            existing_approval.draft = True
-            existing_approval.state = approval
-        else:
-            pr.createApproval(account, approval, commit.sha, draft=True)
-
-        draft_message = commit.getDraftMessage()
-        if not draft_message:
-            if message or upload:
-                draft_message = pr.createMessage(commit.key, None, account,
-                                                 datetime.datetime.utcnow(),
-                                                 '', draft=True)
-        if draft_message:
-            draft_message.created = datetime.datetime.utcnow()
-            draft_message.message = message
-            draft_message.pending = upload
-            message_key = draft_message.key
-        if upload:
-            pr.reviewed = True
-            self.repository_cache.clear(pr.repository)
-        if merge:
-            sha = pr.commits[-1].sha
-            pending_merge = pr.createPendingMerge(sha,'merge')
-            self.sync.submitTask(
-                    sync.SendMergeTask(pending_merge.key, sync.HIGH_PRIORITY))
-        return message_key
-
+    def handleSocketCommand(self, command, data):
+        self.command_queue.put((command, data))
+        os.write(self.command_pipe, b'command\n')
 
 
 def version():
