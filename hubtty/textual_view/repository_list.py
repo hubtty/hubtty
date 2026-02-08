@@ -65,7 +65,7 @@ def _parse_row_key(row_key):
         ('repo', repository_key, topic_key_or_None) for repository rows
         ('topic', topic_key, None) for topic rows
     """
-    key_str = str(row_key)
+    key_str = row_key.value if hasattr(row_key, "value") else str(row_key)
     parts = key_str.split(":")
     if parts[0] == ROW_TYPE_TOPIC:
         return (ROW_TYPE_TOPIC, int(parts[1]), None)
@@ -425,7 +425,7 @@ class RepositoryListView(Widget):
             return None
         try:
             row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
-            return str(row_key)
+            return row_key.value
         except Exception:
             return None
 
@@ -438,7 +438,7 @@ class RepositoryListView(Widget):
 
     def on_data_table_row_selected(self, event):
         """Handle Enter/click on a row."""
-        row_key_str = str(event.row_key)
+        row_key_str = event.row_key.value
         meta = self._row_meta.get(row_key_str)
         if meta is None:
             return
@@ -765,7 +765,7 @@ class RepositoryListView(Widget):
     def _ordered_row_meta(self, table):
         """Yield (row_key_str, meta) in display order."""
         for row in table.ordered_rows:
-            key_str = str(row.key)
+            key_str = row.key.value
             meta = self._row_meta.get(key_str)
             if meta:
                 yield (key_str, meta)
