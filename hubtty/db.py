@@ -1077,7 +1077,13 @@ class DatabaseSession:
                 q = q.order_by(pull_request_table.c.branch)
             elif s == "author":
                 q = q.filter(account_table.c.key == pull_request_table.c.account_key)
-                q = q.order_by(account_table.c.name)
+                q = q.order_by(
+                    sqlalchemy.func.coalesce(
+                        account_table.c.name,
+                        account_table.c.username,
+                        account_table.c.email,
+                    )
+                )
             elif s == "repository":
                 q = q.filter(
                     repository_table.c.key == pull_request_table.c.repository_key
