@@ -20,7 +20,9 @@ from rich.text import Text
 from textual.screen import Screen
 from textual.widgets import DataTable
 
+from hubtty import keymap
 from hubtty import sync
+from hubtty.textual_view.pull_request_list import PullRequestListScreen
 
 
 # Style names matching the urwid palette entries
@@ -105,6 +107,8 @@ class RepositoryListScreen(Screen):
         table.add_column("Open", key="open")
         self.refresh_data()
 
+    # ---- Event interest and data refresh ----
+
     def interested(self, event):
         """Check if a sync event should trigger a refresh."""
         if isinstance(event, sync.RepositoryAddedEvent):
@@ -175,6 +179,8 @@ class RepositoryListScreen(Screen):
                 table.move_cursor(row=old_cursor_row, animate=False)
             else:
                 table.move_cursor(row=table.row_count - 1, animate=False)
+
+    # ---- Row building helpers ----
 
     def _get_repo_style(self, repository, cache):
         """Determine the display style for a repository based on state."""
@@ -249,8 +255,159 @@ class RepositoryListScreen(Screen):
         except Exception:
             pass
 
+    # ---- Row selection / activation ----
+
+    def _get_focused_row_key(self):
+        """Get the row key string of the currently focused row."""
+        table = self.query_one("#repo-list", DataTable)
+        if table.row_count == 0:
+            return None
+        try:
+            row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
+            return str(row_key)
+        except Exception:
+            return None
+
+    def _get_focused_meta(self):
+        """Get the metadata dict for the currently focused row."""
+        row_key = self._get_focused_row_key()
+        if row_key is None:
+            return None
+        return self._row_meta.get(row_key)
+
+    def on_data_table_row_selected(self, event):
+        """Handle Enter/click on a row."""
+        row_key_str = str(event.row_key)
+        meta = self._row_meta.get(row_key_str)
+        if meta is None:
+            return
+        if meta["type"] == ROW_TYPE_REPO:
+            self._open_repository(meta)
+        elif meta["type"] == ROW_TYPE_TOPIC:
+            self._toggle_topic(meta)
+
+    def _open_repository(self, meta):
+        """Navigate to the pull request list for a repository."""
+        repo_key = meta["db_key"]
+        repo_name = meta["name"]
+        query = "_repository_key:%s %s" % (
+            repo_key,
+            self.app.config.repository_pr_list_query,
+        )
+        self.app.changeScreen(PullRequestListScreen(query, title=repo_name))
+
+    def _toggle_topic(self, meta):
+        """Toggle topic fold/collapse state."""
+        topic_key = meta["db_key"]
+        self.open_topics ^= {topic_key}
+        self.refresh_data()
+
+    # ---- Mark operations ----
+
+    def _get_selected_rows(self, row_type):
+        """Get marked rows of a given type, or the focused row if none marked.
+
+        Returns a list of (row_key_str, meta) tuples.
+        """
+        # First check for marked rows
+        marked = [
+            (k, m)
+            for k, m in self._row_meta.items()
+            if m["mark"] and m["type"] == row_type
+        ]
+        if marked:
+            return marked
+        # Fall back to focused row
+        meta = self._get_focused_meta()
+        if meta and meta["type"] == row_type:
+            row_key = self._get_focused_row_key()
+            return [(row_key, meta)]
+        return []
+
+    def toggleMark(self):
+        """Toggle the mark on the focused row, then advance cursor."""
+        row_key = self._get_focused_row_key()
+        if row_key is None:
+            return
+        meta = self._row_meta.get(row_key)
+        if meta is None:
+            return
+
+        meta["mark"] = not meta["mark"]
+
+        # Update the visual display of the name column
+        table = self.query_one("#repo-list", DataTable)
+        if meta["type"] == ROW_TYPE_REPO:
+            indent = "  " if meta["topic_key"] is not None else ""
+            prefix = "%" if meta["mark"] else " "
+            style = STYLE_MARKED if meta["mark"] else meta["style"]
+            name_text = Text(prefix + indent + meta["name"])
+            name_text.stylize(style)
+        elif meta["type"] == ROW_TYPE_TOPIC:
+            prefix = "%" if meta["mark"] else " "
+            style = STYLE_MARKED if meta["mark"] else meta["style"]
+            name_text = Text(prefix + "[[ %s ]]" % meta["name"])
+            name_text.stylize(style)
+        else:
+            return
+
+        try:
+            table.update_cell(row_key, "name", name_text)
+        except Exception:
+            pass
+
+        # Advance cursor
+        if table.cursor_row < table.row_count - 1:
+            table.move_cursor(row=table.cursor_row + 1, animate=False)
+
+    # ---- Subscription toggle ----
+
+    def toggleSubscribed(self):
+        """Toggle subscription for selected/marked repository rows."""
+        rows = self._get_selected_rows(ROW_TYPE_REPO)
+        if not rows:
+            return
+        repo_keys = [meta["db_key"] for _, meta in rows]
+        subscribed_keys = []
+        with self.app.db.getSession() as session:
+            for key in repo_keys:
+                repository = session.getRepository(key)
+                repository.subscribed = not repository.subscribed
+                if repository.subscribed:
+                    subscribed_keys.append(key)
+        # Clear marks
+        for _, meta in rows:
+            meta["mark"] = False
+        # Submit sync tasks for newly subscribed repos
+        for key in subscribed_keys:
+            self.app.sync.submitTask(sync.SyncRepositoryTask(key))
+        self.refresh_data()
+
+    # ---- Command dispatch ----
+
     def handleCommand(self, command):
         """Handle a command dispatched from the app's keymap.
 
-        Returns True if the command was handled, False otherwise."""
+        Returns True if the command was handled, False otherwise.
+        """
+        if command == keymap.TOGGLE_LIST_REVIEWED:
+            self.unreviewed = not self.unreviewed
+            self.refresh_data()
+            return True
+        if command == keymap.TOGGLE_LIST_SUBSCRIBED:
+            self.subscribed = not self.subscribed
+            self.refresh_data()
+            return True
+        if command == keymap.TOGGLE_SUBSCRIBED:
+            self.toggleSubscribed()
+            return True
+        if command == keymap.TOGGLE_MARK:
+            self.toggleMark()
+            return True
+        if command == keymap.REFRESH:
+            self.app.sync.submitTask(
+                sync.SyncSubscribedRepositoriesTask(sync.HIGH_PRIORITY)
+            )
+            self.refresh_data()
+            return True
         return False

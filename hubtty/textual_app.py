@@ -403,10 +403,6 @@ class TextualApp(App, BaseApp):
             self.notify("Search not yet implemented", title="Search")
         elif command == keymap.LIST_HELD:
             self.doSearch("is:held")
-        elif command == keymap.REFRESH:
-            screen = self.screen
-            if hasattr(screen, "refresh_data"):
-                screen.refresh_data()
         else:
             # Forward to the active screen's command handler
             screen = self.screen
