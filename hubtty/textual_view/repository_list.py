@@ -17,8 +17,9 @@ import logging
 
 from rich.text import Text
 
-from textual.screen import Screen
-from textual.widgets import DataTable
+from textual.containers import Horizontal, Vertical
+from textual.screen import ModalScreen, Screen
+from textual.widgets import Button, DataTable, Input, Label, RadioButton, RadioSet
 
 from hubtty import keymap
 from hubtty import sync
@@ -66,6 +67,146 @@ def _parse_row_key(row_key):
             topic_key = int(parts[3])
         return (ROW_TYPE_REPO, int(parts[1]), topic_key)
     return (None, None, None)
+
+
+# ---- Modal dialog screens ----
+
+
+class TextInputDialog(ModalScreen):
+    """A modal dialog with a text input field."""
+
+    DEFAULT_CSS = """
+    TextInputDialog {
+        align: center middle;
+    }
+    #dialog-container {
+        width: 60;
+        height: auto;
+        max-height: 12;
+        border: thick $background 80%;
+        background: $surface;
+        padding: 1 2;
+    }
+    #dialog-container Label {
+        width: 100%;
+        margin-bottom: 1;
+    }
+    #dialog-container Input {
+        width: 100%;
+        margin-bottom: 1;
+    }
+    #dialog-buttons {
+        width: 100%;
+        height: 3;
+        align: right middle;
+    }
+    #dialog-buttons Button {
+        margin-left: 1;
+    }
+    """
+
+    def __init__(self, title, prompt, initial=""):
+        super().__init__()
+        self.dialog_title = title
+        self.prompt = prompt
+        self.initial = initial
+
+    def compose(self):
+        with Vertical(id="dialog-container"):
+            yield Label(self.dialog_title)
+            yield Input(value=self.initial, placeholder=self.prompt, id="dialog-input")
+            with Horizontal(id="dialog-buttons"):
+                yield Button("OK", variant="primary", id="ok-btn")
+                yield Button("Cancel", id="cancel-btn")
+
+    def on_mount(self):
+        self.query_one("#dialog-input", Input).focus()
+
+    def on_button_pressed(self, event):
+        if event.button.id == "ok-btn":
+            value = self.query_one("#dialog-input", Input).value
+            self.dismiss(value)
+        else:
+            self.dismiss(None)
+
+    def on_input_submitted(self, event):
+        """Handle Enter in the input field."""
+        self.dismiss(event.value)
+
+    def key_escape(self):
+        self.dismiss(None)
+
+
+class TopicSelectDialog(ModalScreen):
+    """A modal dialog for selecting a topic from a list."""
+
+    DEFAULT_CSS = """
+    TopicSelectDialog {
+        align: center middle;
+    }
+    #topic-dialog-container {
+        width: 60;
+        height: auto;
+        max-height: 20;
+        border: thick $background 80%;
+        background: $surface;
+        padding: 1 2;
+    }
+    #topic-dialog-container Label {
+        width: 100%;
+        margin-bottom: 1;
+    }
+    #topic-radio-set {
+        width: 100%;
+        max-height: 12;
+        margin-bottom: 1;
+    }
+    #topic-dialog-buttons {
+        width: 100%;
+        height: 3;
+        align: right middle;
+    }
+    #topic-dialog-buttons Button {
+        margin-left: 1;
+    }
+    """
+
+    def __init__(self, title, topics):
+        """topics is a list of (key, name) tuples."""
+        super().__init__()
+        self.dialog_title = title
+        self.topics = topics
+
+    def compose(self):
+        with Vertical(id="topic-dialog-container"):
+            yield Label(self.dialog_title)
+            with RadioSet(id="topic-radio-set"):
+                for key, name in self.topics:
+                    yield RadioButton(name, id="topic-%s" % key)
+            with Horizontal(id="topic-dialog-buttons"):
+                yield Button("OK", variant="primary", id="ok-btn")
+                yield Button("Cancel", id="cancel-btn")
+
+    def on_button_pressed(self, event):
+        if event.button.id == "ok-btn":
+            selected = self._get_selected()
+            self.dismiss(selected)
+        else:
+            self.dismiss(None)
+
+    def _get_selected(self):
+        """Return the topic key of the selected radio button, or None."""
+        radio_set = self.query_one("#topic-radio-set", RadioSet)
+        index = radio_set.pressed_index
+        if index >= 0 and index < len(self.topics):
+            return self.topics[index][0]
+        return None
+
+    def key_escape(self):
+        self.dismiss(None)
+
+
+# ---- Main screen ----
 
 
 class RepositoryListScreen(Screen):
@@ -383,6 +524,121 @@ class RepositoryListScreen(Screen):
             self.app.sync.submitTask(sync.SyncRepositoryTask(key))
         self.refresh_data()
 
+    # ---- Topic CRUD operations ----
+
+    def createTopic(self):
+        """Show a dialog to create a new topic."""
+        dialog = TextInputDialog("Create a new topic", "Topic name")
+        self.app.push_screen(dialog, self._on_create_topic)
+
+    def _on_create_topic(self, result):
+        """Callback when the create topic dialog is dismissed."""
+        if result is None or not result.strip():
+            return
+        name = result.strip()
+        with self.app.db.getSession() as session:
+            topics = session.getTopics()
+            if topics:
+                seq = max(t.sequence for t in topics) + 1
+            else:
+                seq = 0
+            session.createTopic(name, seq)
+        self.refresh_data()
+
+    def deleteTopic(self):
+        """Delete selected/marked topic rows."""
+        rows = self._get_selected_rows(ROW_TYPE_TOPIC)
+        if not rows:
+            return
+        with self.app.db.getSession() as session:
+            for _, meta in rows:
+                topic = session.getTopic(meta["db_key"])
+                if topic:
+                    session.delete(topic)
+        self.refresh_data()
+
+    def renameTopic(self):
+        """Show a dialog to rename the focused topic."""
+        meta = self._get_focused_meta()
+        if not meta or meta["type"] != ROW_TYPE_TOPIC:
+            return
+        topic_key = meta["db_key"]
+        current_name = meta["name"]
+        dialog = TextInputDialog("Rename topic", "Topic name", initial=current_name)
+        self.app.push_screen(
+            dialog, lambda result: self._on_rename_topic(result, topic_key)
+        )
+
+    def _on_rename_topic(self, result, topic_key):
+        """Callback when the rename topic dialog is dismissed."""
+        if result is None or not result.strip():
+            return
+        name = result.strip()
+        with self.app.db.getSession() as session:
+            topic = session.getTopic(topic_key)
+            if topic:
+                topic.name = name
+        self.refresh_data()
+
+    def copyMoveToTopic(self, move):
+        """Show a dialog to copy or move repositories to a topic."""
+        rows = self._get_selected_rows(ROW_TYPE_REPO)
+        if not rows:
+            return
+        with self.app.db.getSession() as session:
+            topics = [(t.key, t.name) for t in session.getTopics()]
+        if not topics:
+            self.app.error("No topics exist. Create a topic first.")
+            return
+        verb = "Move" if move else "Copy"
+        dialog = TopicSelectDialog("%s to Topic" % verb, topics)
+        self.app.push_screen(
+            dialog, lambda result: self._on_copy_move_to_topic(result, rows, move)
+        )
+
+    def _on_copy_move_to_topic(self, selected_key, rows, move):
+        """Callback when the topic selection dialog is dismissed."""
+        if selected_key is None:
+            return
+        with self.app.db.getSession() as session:
+            new_topic = session.getTopic(selected_key)
+            if not new_topic:
+                self.app.error("Unable to find topic %s" % selected_key)
+                return
+            for _, meta in rows:
+                repository = session.getRepository(meta["db_key"])
+                if move and meta["topic_key"]:
+                    old_topic = session.getTopic(meta["topic_key"])
+                    if old_topic:
+                        self.logger.debug("Remove %s from %s", repository, old_topic)
+                        old_topic.removeRepository(repository)
+                self.logger.debug("Add %s to %s", repository, new_topic)
+                new_topic.addRepository(repository)
+        self.refresh_data()
+
+    def moveToTopic(self):
+        """Move selected repositories to a topic."""
+        self.copyMoveToTopic(True)
+
+    def copyToTopic(self):
+        """Copy selected repositories to a topic."""
+        self.copyMoveToTopic(False)
+
+    def removeFromTopic(self):
+        """Remove selected repositories from their topics."""
+        rows = self._get_selected_rows(ROW_TYPE_REPO)
+        rows = [(k, m) for k, m in rows if m["topic_key"]]
+        if not rows:
+            return
+        with self.app.db.getSession() as session:
+            for _, meta in rows:
+                repository = session.getRepository(meta["db_key"])
+                topic = session.getTopic(meta["topic_key"])
+                if repository and topic:
+                    self.logger.debug("Remove %s from %s", repository, topic)
+                    topic.removeRepository(repository)
+        self.refresh_data()
+
     # ---- Command dispatch ----
 
     def handleCommand(self, command):
@@ -409,5 +665,23 @@ class RepositoryListScreen(Screen):
                 sync.SyncSubscribedRepositoriesTask(sync.HIGH_PRIORITY)
             )
             self.refresh_data()
+            return True
+        if command == keymap.NEW_REPOSITORY_TOPIC:
+            self.createTopic()
+            return True
+        if command == keymap.DELETE_REPOSITORY_TOPIC:
+            self.deleteTopic()
+            return True
+        if command == keymap.RENAME_REPOSITORY_TOPIC:
+            self.renameTopic()
+            return True
+        if command == keymap.MOVE_REPOSITORY_TOPIC:
+            self.moveToTopic()
+            return True
+        if command == keymap.COPY_REPOSITORY_TOPIC:
+            self.copyToTopic()
+            return True
+        if command == keymap.REMOVE_REPOSITORY_TOPIC:
+            self.removeFromTopic()
             return True
         return False
