@@ -302,6 +302,10 @@ class RepositoryListView(Widget):
 
         table = self.query_one("#repo-list", DataTable)
 
+        # Guard: columns not yet configured (on_mount hasn't run)
+        if not table.columns:
+            return
+
         # Remember cursor position for restoration
         old_cursor_row = table.cursor_row
 

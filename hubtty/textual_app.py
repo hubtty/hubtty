@@ -397,6 +397,12 @@ class TextualApp(App, BaseApp):
             self.sync.offline = True
             self.hubtty_header.set_offline(True)
 
+    def on_resize(self, event) -> None:
+        """Refresh the current view when the terminal is resized."""
+        view = getattr(self, "_current_view", None)
+        if view and hasattr(view, "refresh_data"):
+            view.refresh_data()
+
     # ---- Key handling ----
 
     async def on_event(self, event) -> None:
