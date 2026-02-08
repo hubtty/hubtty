@@ -26,6 +26,104 @@ from hubtty import keymap
 import hubtty.version
 
 
+# ---- Palette to CSS conversion ----
+
+# Mapping from urwid 16-color names to Textual CSS color names.
+# Textual CSS uses 'ansi_X' for standard colors and 'ansi_bright_X'
+# for bright colors, matching ANSI terminal color indices 0-15.
+_URWID_COLOR_MAP = {
+    "default": "",
+    "black": "ansi_black",
+    "dark red": "ansi_red",
+    "dark green": "ansi_green",
+    "brown": "ansi_yellow",  # ANSI color 3 = dark yellow / brown
+    "dark blue": "ansi_blue",
+    "dark magenta": "ansi_magenta",
+    "dark cyan": "ansi_cyan",
+    "light gray": "ansi_white",  # ANSI color 7
+    "dark gray": "ansi_bright_black",  # ANSI color 8
+    "light red": "ansi_bright_red",
+    "light green": "ansi_bright_green",
+    "yellow": "ansi_bright_yellow",
+    "light blue": "ansi_bright_blue",
+    "light magenta": "ansi_bright_magenta",
+    "light cyan": "ansi_bright_cyan",
+    "white": "ansi_bright_white",  # ANSI color 15
+}
+
+# urwid text attributes to Textual text-style values
+_URWID_STYLE_MAP = {
+    "bold": "bold",
+    "standout": "reverse",
+    "underline": "underline",
+    "italics": "italic",
+    "italic": "italic",
+    "strikethrough": "strike",
+}
+
+
+def _parse_urwid_color_spec(spec):
+    """Parse an urwid foreground/background spec into (color, [styles]).
+
+    An urwid spec looks like 'dark cyan' or 'white,bold' or
+    'default,standout' or 'underline,bold' or just ''.
+
+    Returns (css_color_or_empty, list_of_css_styles).
+    """
+    if not spec:
+        return "", []
+
+    parts = [p.strip() for p in spec.split(",")]
+    color = ""
+    styles = []
+
+    for part in parts:
+        if part in _URWID_STYLE_MAP:
+            styles.append(_URWID_STYLE_MAP[part])
+        elif part in _URWID_COLOR_MAP:
+            color = _URWID_COLOR_MAP[part]
+        else:
+            # Try two-word color: check if this plus next makes a known color
+            # urwid colors like 'dark red' are already single entries in parts
+            # since comma splits on commas, not spaces.
+            color = _URWID_COLOR_MAP.get(part, "")
+
+    return color, styles
+
+
+def _palette_name_to_css_class(name):
+    """Convert a palette entry name to a valid CSS class name."""
+    return name  # Textual allows hyphens in class names
+
+
+def palette_to_css(palette_dict):
+    """Convert an urwid palette dict to a Textual CSS string.
+
+    Each palette entry becomes a CSS class rule using the '.' prefix.
+    """
+    rules = []
+    for name, (fg_spec, bg_spec) in palette_dict.items():
+        css_class = _palette_name_to_css_class(name)
+        fg_color, fg_styles = _parse_urwid_color_spec(fg_spec)
+        bg_color, bg_styles = _parse_urwid_color_spec(bg_spec)
+
+        props = []
+        if fg_color:
+            props.append(f"    color: {fg_color};")
+        if bg_color:
+            props.append(f"    background: {bg_color};")
+
+        all_styles = fg_styles + bg_styles
+        if all_styles:
+            props.append(f"    text-style: {' '.join(all_styles)};")
+
+        if props:
+            rule = ".%s {\n%s\n}" % (css_class, "\n".join(props))
+            rules.append(rule)
+
+    return "\n".join(rules)
+
+
 # ---- Key translation between urwid and Textual ----
 
 # Mapping from urwid special key names to Textual key names.
@@ -193,6 +291,11 @@ class TextualApp(App, BaseApp):
 
         self._disable_sync = disable_sync
         self.input_buffer = []
+
+        # Generate palette CSS from the hubtty palette config
+        palette_css = palette_to_css(self.config.palette.palette)
+        if palette_css:
+            self.stylesheet.add_source(palette_css)
 
     @property
     def title(self):
