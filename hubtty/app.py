@@ -901,9 +901,15 @@ def main():
                         help='color palette to use')
     parser.add_argument('-k', dest='keymap', default='default',
                         help='keymap to use')
+    parser.add_argument('--ui', dest='ui', default='urwid',
+                        choices=['urwid', 'textual'],
+                        help='UI framework to use (default: urwid)')
     parser.add_argument('server', nargs='?',
                         help='the server to use (as specified in config file)')
     args = parser.parse_args()
+    if args.ui == 'textual':
+        print("Textual UI not yet implemented")
+        sys.exit(1)
     g = App(args.server, args.palette, args.keymap, args.debug, args.verbose,
             args.no_sync, args.debug_sync, args.fetch_missing_refs, args.path)
     g.run()
