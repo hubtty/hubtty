@@ -399,40 +399,72 @@ class TextualApp(App, BaseApp):
 
     # ---- Key handling ----
 
-    def on_key(self, event) -> None:
-        """Handle all key events through the hubtty keymap system."""
-        # Skip keymap processing when a text input widget has focus,
-        # so the user can type freely into Input/TextArea widgets.
+    async def on_event(self, event) -> None:
+        """Intercept key events for keymap processing before Textual
+        forwards them to the focused widget.
+
+        This runs in the dispatch phase (before forwarding), not the
+        bubble phase (after).  That way, commands like searchStart()
+        can change focus synchronously and subsequent queued key events
+        will be routed to the newly-focused widget (e.g. the search
+        Input) instead of the previously-focused one (e.g. DataTable).
+        """
+        from textual import events
+
+        if isinstance(event, events.Key):
+            if self._process_keymap(event):
+                return  # consumed by keymap; don't forward
+        await super().on_event(event)
+
+    def _process_keymap(self, event) -> bool:
+        """Process a key event through the hubtty keymap system.
+
+        Returns True if the key was consumed (should not be forwarded
+        to the focused widget), False to let Textual handle it.
+        """
+        # When a text input widget has focus, let most keys pass through
+        # so the user can type freely.  But intercept keys that should
+        # control the search (INTERACTIVE_SEARCH to cycle results, and
+        # Escape to close the search bar).
         from textual.widgets import Input, TextArea
 
         focused = self.focused
         if isinstance(focused, (Input, TextArea)):
-            return
+            view = self._current_view
+            if view and hasattr(view, "_search_active") and view._search_active:
+                urwid_key = textual_key_to_urwid(event)
+                if urwid_key:
+                    cmds = self.config.keymap.getCommands([urwid_key])
+                    if keymap.INTERACTIVE_SEARCH in cmds:
+                        view._nextSearchResult()
+                        return True
+                if event.key == "escape":
+                    view._searchStop()
+                    return True
+            return False
 
         urwid_key = textual_key_to_urwid(event)
         if urwid_key is None:
-            return
+            return False
 
         keys = self.input_buffer + [urwid_key]
         commands = self.config.keymap.getCommands(keys)
 
         if not commands:
-            # No match; clear buffer and ignore
+            # No match; clear buffer and let Textual handle it
             self._clearInputBuffer()
-            return
+            return False
 
         if keymap.FURTHER_INPUT in commands:
             # Multi-key sequence in progress; buffer and wait
             self.input_buffer.append(urwid_key)
-            event.prevent_default()
-            event.stop()
             # Show the buffered keys in the header
             msg = "".join(self.input_buffer)
             further = self.config.keymap.getFurtherCommands(keys)
             completions = " ".join(fkey for fkey, cmds in further if cmds)
-            msg = f"{msg}: {completions}"
+            msg = "%s: %s" % (msg, completions)
             self.hubtty_header.set_message(msg)
-            return
+            return True  # consumed
 
         # We have a complete command match
         self._clearInputBuffer()
@@ -447,23 +479,18 @@ class TextualApp(App, BaseApp):
             # Only cursor commands resolved for this key
             if urwid_key in _NATIVE_NAV_KEYS:
                 # Let Textual handle it natively (don't consume)
-                return
-            # Vi-mode remapped key (j/k/g/G/etc): consume the event
-            # and invoke the action on the focused widget directly
-            event.prevent_default()
-            event.stop()
+                return False
+            # Vi-mode remapped key (j/k/g/G/etc): invoke the action
+            # on the focused widget directly
             focused = self.focused
             if focused:
                 for cmd in cursor_cmds:
                     action = _CURSOR_ACTION_MAP.get(cmd)
                     if action and hasattr(focused, action):
                         getattr(focused, action)()
-            return
+            return True  # consumed
 
-        # Non-cursor commands: consume the event and dispatch
-        event.prevent_default()
-        event.stop()
-
+        # Non-cursor commands: dispatch
         for command in other_cmds:
             self._handle_command(command, urwid_key)
 
@@ -475,6 +502,8 @@ class TextualApp(App, BaseApp):
                     action = _CURSOR_ACTION_MAP.get(cmd)
                     if action and hasattr(focused, action):
                         getattr(focused, action)()
+
+        return True  # consumed
 
     def _clearInputBuffer(self):
         if self.input_buffer:

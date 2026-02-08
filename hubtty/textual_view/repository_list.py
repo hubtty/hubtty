@@ -673,7 +673,7 @@ class RepositoryListView(Widget):
         search_bar = self.query_one("#search-bar", Input)
         search_bar.value = ""
         search_bar.add_class("visible")
-        search_bar.focus()
+        self.screen.set_focus(search_bar)
         # Update header to show search mode
         if hasattr(self.app, "hubtty_header"):
             self.app.hubtty_header.set_message("Search: ")
@@ -687,7 +687,7 @@ class RepositoryListView(Widget):
         search_bar.remove_class("visible")
         # Restore focus to the data table
         table = self.query_one("#repo-list", DataTable)
-        table.focus()
+        self.screen.set_focus(table)
         # Restore header title
         if hasattr(self.app, "hubtty_header"):
             self.app.hubtty_header.set_message(None)
@@ -708,31 +708,6 @@ class RepositoryListView(Widget):
         if event.input.id != "search-bar":
             return
         self._searchStop()
-
-    def on_key(self, event):
-        """Handle special keys during search mode."""
-        if not self._search_active:
-            return
-        if event.key == "escape":
-            self._searchStop()
-            event.prevent_default()
-            event.stop()
-            return
-        # Check if this key triggers INTERACTIVE_SEARCH to cycle results
-        from hubtty.textual_app import textual_key_to_urwid
-
-        urwid_key = textual_key_to_urwid(event)
-        if urwid_key:
-            commands = self.app.config.keymap.getCommands([urwid_key])
-            if keymap.INTERACTIVE_SEARCH in commands:
-                self._nextSearchResult()
-                event.prevent_default()
-                event.stop()
-        elif event.key in ("ctrl+s", "slash"):
-            # Cycle to next search result
-            self._nextSearchResult()
-            event.prevent_default()
-            event.stop()
 
     def _performSearch(self, search):
         """Search repository names and highlight/navigate to matches."""
