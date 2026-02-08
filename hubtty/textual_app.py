@@ -343,6 +343,14 @@ class TextualApp(App, BaseApp):
 
     def on_key(self, event) -> None:
         """Handle all key events through the hubtty keymap system."""
+        # Skip keymap processing when a text input widget has focus,
+        # so the user can type freely into Input/TextArea widgets.
+        from textual.widgets import Input, TextArea
+
+        focused = self.focused
+        if isinstance(focused, (Input, TextArea)):
+            return
+
         urwid_key = textual_key_to_urwid(event)
         if urwid_key is None:
             return

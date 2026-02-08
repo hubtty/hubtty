@@ -19,7 +19,14 @@ from rich.text import Text
 
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, DataTable, Input, Label, RadioButton, RadioSet
+from textual.widgets import (
+    Button,
+    DataTable,
+    Input,
+    Label,
+    RadioButton,
+    RadioSet,
+)
 
 from hubtty import keymap
 from hubtty import sync
@@ -223,6 +230,14 @@ class RepositoryListScreen(Screen):
     RepositoryListScreen DataTable {
         height: 1fr;
     }
+    #search-bar {
+        dock: bottom;
+        height: 1;
+        display: none;
+    }
+    #search-bar.visible {
+        display: block;
+    }
     """
 
     def __init__(self):
@@ -233,6 +248,10 @@ class RepositoryListScreen(Screen):
         self.open_topics = set()
         # Maps row_key_str -> {type, db_key, topic_key, style, mark, name}
         self._row_meta = {}
+        # Search state
+        self._search_active = False
+        self._search_results = []
+        self._search_result_index = 0
 
     def compose(self):
         table = DataTable(id="repo-list")
@@ -240,6 +259,7 @@ class RepositoryListScreen(Screen):
         table.zebra_stripes = False
         table.show_row_labels = False
         yield table
+        yield Input(placeholder="Search...", id="search-bar")
 
     def on_mount(self):
         table = self.query_one("#repo-list", DataTable)
@@ -639,6 +659,117 @@ class RepositoryListScreen(Screen):
                     topic.removeRepository(repository)
         self.refresh_data()
 
+    # ---- Interactive search ----
+
+    def searchStart(self):
+        """Activate interactive search mode."""
+        if self._search_active:
+            # Already searching; cycle to next result
+            self._nextSearchResult()
+            return
+        self._search_active = True
+        self._search_results = []
+        self._search_result_index = 0
+        search_bar = self.query_one("#search-bar", Input)
+        search_bar.value = ""
+        search_bar.add_class("visible")
+        search_bar.focus()
+        # Update header to show search mode
+        if hasattr(self.app, "hubtty_header"):
+            self.app.hubtty_header.set_message("Search: ")
+
+    def _searchStop(self):
+        """Deactivate interactive search mode."""
+        self._search_active = False
+        self._search_results = []
+        self._search_result_index = 0
+        search_bar = self.query_one("#search-bar", Input)
+        search_bar.remove_class("visible")
+        # Restore focus to the data table
+        table = self.query_one("#repo-list", DataTable)
+        table.focus()
+        # Restore header title
+        if hasattr(self.app, "hubtty_header"):
+            self.app.hubtty_header.set_message(None)
+
+    def on_input_changed(self, event):
+        """Handle search text changes."""
+        if not self._search_active:
+            return
+        if event.input.id != "search-bar":
+            return
+        search = event.value
+        if hasattr(self.app, "hubtty_header"):
+            self.app.hubtty_header.set_message("Search: %s" % search)
+        self._performSearch(search)
+
+    def on_input_submitted(self, event):
+        """Handle Enter in the search bar."""
+        if event.input.id != "search-bar":
+            return
+        self._searchStop()
+
+    def on_key(self, event):
+        """Handle special keys during search mode."""
+        if not self._search_active:
+            return
+        if event.key == "escape":
+            self._searchStop()
+            event.prevent_default()
+            event.stop()
+            return
+        # Check if this key triggers INTERACTIVE_SEARCH to cycle results
+        from hubtty.textual_app import textual_key_to_urwid
+
+        urwid_key = textual_key_to_urwid(event)
+        if urwid_key:
+            commands = self.app.config.keymap.getCommands([urwid_key])
+            if keymap.INTERACTIVE_SEARCH in commands:
+                self._nextSearchResult()
+                event.prevent_default()
+                event.stop()
+        elif event.key in ("ctrl+s", "slash"):
+            # Cycle to next search result
+            self._nextSearchResult()
+            event.prevent_default()
+            event.stop()
+
+    def _performSearch(self, search):
+        """Search repository names and highlight/navigate to matches."""
+        self._search_results = []
+        self._search_result_index = 0
+        if not search:
+            return
+        search_lower = search.lower()
+        table = self.query_one("#repo-list", DataTable)
+        for i, (row_key_str, meta) in enumerate(self._ordered_row_meta(table)):
+            if meta["type"] == ROW_TYPE_REPO:
+                if search_lower in meta["name"].lower():
+                    self._search_results.append(i)
+        # Move cursor to first result
+        if self._search_results:
+            table.move_cursor(row=self._search_results[0], animate=False)
+
+    def _nextSearchResult(self):
+        """Cycle to the next search result."""
+        if not self._search_results:
+            return
+        self._search_result_index += 1
+        if self._search_result_index >= len(self._search_results):
+            self._search_result_index = 0
+        table = self.query_one("#repo-list", DataTable)
+        table.move_cursor(
+            row=self._search_results[self._search_result_index], animate=False
+        )
+
+    def _ordered_row_meta(self, table):
+        """Yield (row_key_str, meta) in display order."""
+        for row in table.ordered_rows:
+            key_str = str(row.key)
+            meta = self._row_meta.get(key_str)
+            if meta:
+                yield (key_str, meta)
+
     # ---- Command dispatch ----
 
     def handleCommand(self, command):
@@ -646,6 +777,9 @@ class RepositoryListScreen(Screen):
 
         Returns True if the command was handled, False otherwise.
         """
+        if command == keymap.INTERACTIVE_SEARCH:
+            self.searchStart()
+            return True
         if command == keymap.TOGGLE_LIST_REVIEWED:
             self.unreviewed = not self.unreviewed
             self.refresh_data()
