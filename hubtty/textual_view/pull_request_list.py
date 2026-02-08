@@ -32,6 +32,24 @@ STYLE_STARRED = "starred-pr"
 STYLE_HELD = "held-pr"
 STYLE_MARKED = "marked-pr"
 
+# Map column keys to db sort-by values (only sortable columns)
+_COLUMN_SORT_MAP = {
+    "number": "number",
+    "repository": "repository",
+    "updated": "updated",
+}
+
+# Base column labels (without sort indicators)
+_COLUMN_LABELS = {
+    "number": " #",
+    "title": " Title",
+    "repository": "Repository",
+    "branch": "Branch",
+    "author": "Author",
+    "updated": "Updated",
+    "review": "CR",
+}
+
 
 def _pr_style(pr, mark=False):
     """Determine the display style for a PR based on state."""
@@ -163,6 +181,36 @@ class PullRequestListView(Widget):
             table.add_column("Author", key="author")
         table.add_column("Updated", key="updated", width=10)
         table.add_column("CR", key="review", width=2)
+        self._update_column_labels()
+        self.refresh_data()
+
+    # ---- Column sorting via header click ----
+
+    def _update_column_labels(self):
+        """Update column header labels with sort indicators."""
+        table = self.query_one("#pr-list", DataTable)
+        for col_key, column in table.columns.items():
+            key_str = col_key.value
+            base_label = _COLUMN_LABELS.get(key_str, key_str)
+            sort_field = _COLUMN_SORT_MAP.get(key_str)
+            if sort_field and sort_field == self._sort_by:
+                indicator = " ▼" if self._reverse else " ▲"
+                column.label = Text(base_label + indicator)
+            else:
+                column.label = Text(base_label)
+
+    def on_data_table_header_selected(self, event):
+        """Sort by the clicked column, or reverse if already sorted."""
+        col_key = event.column_key.value
+        sort_field = _COLUMN_SORT_MAP.get(col_key)
+        if sort_field is None:
+            return
+        if self._sort_by == sort_field:
+            self._reverse = not self._reverse
+        else:
+            self._sort_by = sort_field
+            self._reverse = False
+        self._update_column_labels()
         self.refresh_data()
 
     # ---- Event interest and data refresh ----
@@ -557,18 +605,22 @@ class PullRequestListView(Widget):
             return True
         if command == keymap.SORT_BY_NUMBER:
             self._sort_by = "number"
+            self._update_column_labels()
             self.refresh_data()
             return True
         if command == keymap.SORT_BY_UPDATED:
             self._sort_by = "updated"
+            self._update_column_labels()
             self.refresh_data()
             return True
         if command == keymap.SORT_BY_LAST_SEEN:
             self._sort_by = "last-seen"
+            self._update_column_labels()
             self.refresh_data()
             return True
         if command == keymap.SORT_BY_REVERSE:
             self._reverse = not self._reverse
+            self._update_column_labels()
             self.refresh_data()
             return True
         if command == keymap.REFRESH:
