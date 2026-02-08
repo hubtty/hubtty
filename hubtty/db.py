@@ -22,9 +22,26 @@ import alembic
 import alembic.config
 import alembic.migration
 import sqlalchemy
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, Text, UniqueConstraint
+from sqlalchemy import (
+    create_engine,
+    MetaData,
+    Table,
+    Column,
+    Integer,
+    String,
+    Boolean,
+    DateTime,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.schema import ForeignKey
-from sqlalchemy.orm import registry, sessionmaker, relationship, scoped_session, joinedload
+from sqlalchemy.orm import (
+    registry,
+    sessionmaker,
+    relationship,
+    scoped_session,
+    joinedload,
+)
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql import exists, text
 from sqlalchemy.sql.expression import and_
@@ -34,175 +51,193 @@ from hubtty import sync
 mapper = registry()
 metadata = MetaData()
 repository_table = Table(
-    'repository', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('name', String(255), index=True, unique=True, nullable=False),
-    Column('subscribed', Boolean, index=True, default=False),
-    Column('description', Text, nullable=False, default=''),
-    Column('can_push', Boolean, default=False),
-    Column('updated', DateTime),
-    )
+    "repository",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("name", String(255), index=True, unique=True, nullable=False),
+    Column("subscribed", Boolean, index=True, default=False),
+    Column("description", Text, nullable=False, default=""),
+    Column("can_push", Boolean, default=False),
+    Column("updated", DateTime),
+)
 branch_table = Table(
-    'branch', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('repository_key', Integer, ForeignKey("repository.key"), index=True),
-    Column('name', String(255), index=True, nullable=False),
-    )
+    "branch",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("repository_key", Integer, ForeignKey("repository.key"), index=True),
+    Column("name", String(255), index=True, nullable=False),
+)
 topic_table = Table(
-    'topic', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('name', String(255), index=True, nullable=False),
-    Column('sequence', Integer, index=True, unique=True, nullable=False),
-    )
+    "topic",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("name", String(255), index=True, nullable=False),
+    Column("sequence", Integer, index=True, unique=True, nullable=False),
+)
 repository_topic_table = Table(
-    'repository_topic', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('repository_key', Integer, ForeignKey("repository.key"), index=True),
-    Column('topic_key', Integer, ForeignKey("topic.key"), index=True),
-    Column('sequence', Integer, nullable=False),
-    UniqueConstraint('topic_key', 'sequence', name='topic_key_sequence_const'),
-    )
+    "repository_topic",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("repository_key", Integer, ForeignKey("repository.key"), index=True),
+    Column("topic_key", Integer, ForeignKey("topic.key"), index=True),
+    Column("sequence", Integer, nullable=False),
+    UniqueConstraint("topic_key", "sequence", name="topic_key_sequence_const"),
+)
 pull_request_table = Table(
-    'pull_request', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('repository_key', Integer, ForeignKey("repository.key"), index=True),
-    Column('id', Integer, index=True, unique=True, nullable=False),
-    Column('number', Integer, index=True, nullable=False),
-    Column('branch', String(255), index=True, nullable=False),
-    Column('pr_id', String(255), index=True, unique=True, nullable=False),
-    Column('account_key', Integer, ForeignKey("account.key"), index=True),
-    Column('title', String(255), nullable=False),
-    Column('body', Text, nullable=False),
-    Column('created', DateTime, index=True, nullable=False),
-    Column('updated', DateTime, index=True, nullable=False),
-    Column('state', String(16), index=True, nullable=False),
-    Column('additions', Integer, nullable=False),
-    Column('deletions', Integer, nullable=False),
-    Column('html_url', Text, nullable=False),
-    Column('hidden', Boolean, index=True, nullable=False),
-    Column('reviewed', Boolean, index=True, nullable=False),
-    Column('starred', Boolean, index=True, nullable=False),
-    Column('held', Boolean, index=True, nullable=False),
-    Column('pending_rebase', Boolean, index=True, nullable=False),
-    Column('pending_edit', Boolean, index=True, nullable=False),
-    Column('pending_labels', Boolean, index=True, nullable=False),
-    Column('pending_edit_message', Text),
-    Column('last_seen', DateTime, index=True),
-    Column('outdated', Boolean, index=True, nullable=False),
-    Column('merged', Boolean, index=True, nullable=False),
-    Column('mergeable', Boolean, index=True, nullable=False),
-    Column('draft', Boolean, index=True, nullable=False),
-    )
+    "pull_request",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("repository_key", Integer, ForeignKey("repository.key"), index=True),
+    Column("id", Integer, index=True, unique=True, nullable=False),
+    Column("number", Integer, index=True, nullable=False),
+    Column("branch", String(255), index=True, nullable=False),
+    Column("pr_id", String(255), index=True, unique=True, nullable=False),
+    Column("account_key", Integer, ForeignKey("account.key"), index=True),
+    Column("title", String(255), nullable=False),
+    Column("body", Text, nullable=False),
+    Column("created", DateTime, index=True, nullable=False),
+    Column("updated", DateTime, index=True, nullable=False),
+    Column("state", String(16), index=True, nullable=False),
+    Column("additions", Integer, nullable=False),
+    Column("deletions", Integer, nullable=False),
+    Column("html_url", Text, nullable=False),
+    Column("hidden", Boolean, index=True, nullable=False),
+    Column("reviewed", Boolean, index=True, nullable=False),
+    Column("starred", Boolean, index=True, nullable=False),
+    Column("held", Boolean, index=True, nullable=False),
+    Column("pending_rebase", Boolean, index=True, nullable=False),
+    Column("pending_edit", Boolean, index=True, nullable=False),
+    Column("pending_labels", Boolean, index=True, nullable=False),
+    Column("pending_edit_message", Text),
+    Column("last_seen", DateTime, index=True),
+    Column("outdated", Boolean, index=True, nullable=False),
+    Column("merged", Boolean, index=True, nullable=False),
+    Column("mergeable", Boolean, index=True, nullable=False),
+    Column("draft", Boolean, index=True, nullable=False),
+)
 commit_table = Table(
-    'commit', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('pr_key', Integer, ForeignKey("pull_request.key"), index=True),
-    Column('message', Text, nullable=False),
-    Column('sha', String(64), index=True, nullable=False),
-    Column('parent', String(64), index=True, nullable=False),
-    )
+    "commit",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("pr_key", Integer, ForeignKey("pull_request.key"), index=True),
+    Column("message", Text, nullable=False),
+    Column("sha", String(64), index=True, nullable=False),
+    Column("parent", String(64), index=True, nullable=False),
+)
 message_table = Table(
-    'message', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('pr_key', Integer, ForeignKey("pull_request.key"), index=True),
-    Column('commit_key', Integer, ForeignKey("commit.key"), index=True),
-    Column('account_key', Integer, ForeignKey("account.key"), index=True),
-    Column('id', Integer, index=True), #, unique=True, nullable=False),
-    Column('created', DateTime, index=True, nullable=False),
-    Column('message', Text, nullable=False),
-    Column('draft', Boolean, index=True, nullable=False),
-    Column('pending', Boolean, index=True, nullable=False),
-    )
+    "message",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("pr_key", Integer, ForeignKey("pull_request.key"), index=True),
+    Column("commit_key", Integer, ForeignKey("commit.key"), index=True),
+    Column("account_key", Integer, ForeignKey("account.key"), index=True),
+    Column("id", Integer, index=True),  # , unique=True, nullable=False),
+    Column("created", DateTime, index=True, nullable=False),
+    Column("message", Text, nullable=False),
+    Column("draft", Boolean, index=True, nullable=False),
+    Column("pending", Boolean, index=True, nullable=False),
+)
 comment_table = Table(
-    'comment', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('message_key', Integer, ForeignKey("message.key"), index=True),
-    Column('file_key', Integer, ForeignKey("file.key"), index=True),
-    Column('account_key', Integer, ForeignKey("account.key"), index=True),
-    Column('id', Integer, index=True), #, unique=True, nullable=False),
-    Column('in_reply_to', Integer, index=True),
-    Column('created', DateTime, index=True, nullable=False),
-    Column('updated', DateTime, nullable=False),
-    Column('parent', Boolean, nullable=False),
-    Column('commit_id', String(64), nullable=False),
-    Column('original_commit_id', String(64), nullable=False),
-    Column('line', Integer, index=True),
-    Column('original_line', Integer),
-    Column('message', Text, nullable=False),
-    Column('draft', Boolean, index=True, nullable=False),
-    Column('url', Text()),
-    )
+    "comment",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("message_key", Integer, ForeignKey("message.key"), index=True),
+    Column("file_key", Integer, ForeignKey("file.key"), index=True),
+    Column("account_key", Integer, ForeignKey("account.key"), index=True),
+    Column("id", Integer, index=True),  # , unique=True, nullable=False),
+    Column("in_reply_to", Integer, index=True),
+    Column("created", DateTime, index=True, nullable=False),
+    Column("updated", DateTime, nullable=False),
+    Column("parent", Boolean, nullable=False),
+    Column("commit_id", String(64), nullable=False),
+    Column("original_commit_id", String(64), nullable=False),
+    Column("line", Integer, index=True),
+    Column("original_line", Integer),
+    Column("message", Text, nullable=False),
+    Column("draft", Boolean, index=True, nullable=False),
+    Column("url", Text()),
+)
 approval_table = Table(
-    'approval', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('pr_key', Integer, ForeignKey("pull_request.key"), index=True),
-    Column('account_key', Integer, ForeignKey("account.key"), index=True),
-    Column('state', String(32), index=True, nullable=False),
-    Column('sha', String(64), nullable=False),
-    Column('draft', Boolean, index=True, nullable=False),
-    UniqueConstraint('pr_key', 'account_key', 'sha', name='approval_pr_key_account_key_sha_const'),
-    )
+    "approval",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("pr_key", Integer, ForeignKey("pull_request.key"), index=True),
+    Column("account_key", Integer, ForeignKey("account.key"), index=True),
+    Column("state", String(32), index=True, nullable=False),
+    Column("sha", String(64), nullable=False),
+    Column("draft", Boolean, index=True, nullable=False),
+    UniqueConstraint(
+        "pr_key", "account_key", "sha", name="approval_pr_key_account_key_sha_const"
+    ),
+)
 account_table = Table(
-    'account', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('id', Integer, index=True, unique=True, nullable=False),
-    Column('name', String(255), index=True),
-    Column('username', String(255), index=True),
-    Column('email', String(255), index=True),
-    )
+    "account",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("id", Integer, index=True, unique=True, nullable=False),
+    Column("name", String(255), index=True),
+    Column("username", String(255), index=True),
+    Column("email", String(255), index=True),
+)
 pending_merge_table = Table(
-    'pending_merge', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('pr_key', Integer, ForeignKey("pull_request.key"), index=True),
-    Column('commit_title', String(255)),
-    Column('commit_message', Text),
-    Column('sha', String(255), nullable=False),
-    Column('merge_method', String(255), nullable=False),
-    )
+    "pending_merge",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("pr_key", Integer, ForeignKey("pull_request.key"), index=True),
+    Column("commit_title", String(255)),
+    Column("commit_message", Text),
+    Column("sha", String(255), nullable=False),
+    Column("merge_method", String(255), nullable=False),
+)
 file_table = Table(
-    'file', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('commit_key', Integer, ForeignKey("commit.key"), index=True),
-    Column('path', Text, nullable=False, index=True),
-    Column('old_path', Text, index=True),
-    Column('inserted', Integer),
-    Column('deleted', Integer),
-    Column('status', String(16), index=True, nullable=False),
-    )
+    "file",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("commit_key", Integer, ForeignKey("commit.key"), index=True),
+    Column("path", Text, nullable=False, index=True),
+    Column("old_path", Text, index=True),
+    Column("inserted", Integer),
+    Column("deleted", Integer),
+    Column("status", String(16), index=True, nullable=False),
+)
 server_table = Table(
-    'server', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('own_account_key', Integer, ForeignKey("account.key"), index=True),
-    )
+    "server",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("own_account_key", Integer, ForeignKey("account.key"), index=True),
+)
 check_table = Table(
-    'check', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('commit_key', Integer, ForeignKey("commit.key"), index=True),
-    Column('state', String(16), nullable=False),
-    Column('name', String(255), index=True),
-    Column('url', Text),
-    Column('message', Text),
-    Column('started', DateTime),
-    Column('finished', DateTime),
-    Column('created', DateTime, nullable=False),
-    Column('updated', DateTime, nullable=False),
-    )
+    "check",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("commit_key", Integer, ForeignKey("commit.key"), index=True),
+    Column("state", String(16), nullable=False),
+    Column("name", String(255), index=True),
+    Column("url", Text),
+    Column("message", Text),
+    Column("started", DateTime),
+    Column("finished", DateTime),
+    Column("created", DateTime, nullable=False),
+    Column("updated", DateTime, nullable=False),
+)
 label_table = Table(
-    'label', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('repository_key', Integer, ForeignKey("repository.key"), index=True),
-    Column('id', Integer, nullable=False, index=True),
-    Column('name', String(length=255), nullable=False),
-    Column('color', String(length=8), nullable=False),
-    Column('description', Text),
-    )
+    "label",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("repository_key", Integer, ForeignKey("repository.key"), index=True),
+    Column("id", Integer, nullable=False, index=True),
+    Column("name", String(length=255), nullable=False),
+    Column("color", String(length=8), nullable=False),
+    Column("description", Text),
+)
 pull_request_label_table = Table(
-    'pull_request_label', metadata,
-    Column('key', Integer, primary_key=True),
-    Column('pr_key', Integer, ForeignKey("pull_request.key"), index=True),
-    Column('label_key', Integer, ForeignKey("label.key"), index=True),
-    UniqueConstraint('pr_key', 'label_key', name='pr_key_label_key_const'),
-    )
+    "pull_request_label",
+    metadata,
+    Column("key", Integer, primary_key=True),
+    Column("pr_key", Integer, ForeignKey("pull_request.key"), index=True),
+    Column("label_key", Integer, ForeignKey("label.key"), index=True),
+    UniqueConstraint("pr_key", "label_key", name="pr_key_label_key_const"),
+)
 
 
 class Account:
@@ -212,8 +247,9 @@ class Account:
         self.username = username
         self.email = email
 
+
 class Repository:
-    def __init__(self, name, subscribed=False, description='', can_push=False):
+    def __init__(self, name, subscribed=False, description="", can_push=False):
         self.name = name
         self.subscribed = subscribed
         self.description = description
@@ -246,16 +282,19 @@ class Repository:
         session.flush()
         return l
 
+
 class Branch:
     def __init__(self, repository, name):
         self.repository_key = repository.key
         self.name = name
+
 
 class RepositoryTopic:
     def __init__(self, repository, topic, sequence):
         self.repository_key = repository.key
         self.topic_key = topic.key
         self.sequence = sequence
+
 
 class Topic:
     def __init__(self, name, sequence):
@@ -265,7 +304,7 @@ class Topic:
     def addRepository(self, repository):
         session = Session.object_session(self)
         seq = max([x.sequence for x in self.repository_topics] + [0])
-        rt = RepositoryTopic(repository, self, seq+1)
+        rt = RepositoryTopic(repository, self, seq + 1)
         self.repository_topics.append(rt)
         self.repositories.append(repository)
         session.add(rt)
@@ -280,6 +319,7 @@ class Topic:
         self.repositories.remove(repository)
         session.flush()
 
+
 class Label:
     def __init__(self, repository, id, name, color, description=None):
         self.repository_key = repository.key
@@ -288,19 +328,43 @@ class Label:
         self.color = color
         self.description = description
 
+
 class PullRequestLabel:
     def __init__(self, pull_request, label):
         self.pr_key = pull_request.key
         self.label_key = label.key
 
+
 class PullRequest:
-    def __init__(self, repository, id, author, number, branch, pr_id,
-                 title, body, created, updated, state, additions, deletions,
-                 html_url, merged, mergeable, draft=False, hidden=False,
-                 reviewed=False, starred=False, held=False,
-                 pending_rebase=False, pending_edit=False,
-                 pending_edit_message=None, pending_labels=False,
-                 outdated=False):
+    def __init__(
+        self,
+        repository,
+        id,
+        author,
+        number,
+        branch,
+        pr_id,
+        title,
+        body,
+        created,
+        updated,
+        state,
+        additions,
+        deletions,
+        html_url,
+        merged,
+        mergeable,
+        draft=False,
+        hidden=False,
+        reviewed=False,
+        starred=False,
+        held=False,
+        pending_rebase=False,
+        pending_edit=False,
+        pending_edit_message=None,
+        pending_labels=False,
+        outdated=False,
+    ):
         self.repository_key = repository.key
         self.account_key = author.key
         self.id = id
@@ -331,13 +395,13 @@ class PullRequest:
     def getReviewState(self):
         last_commit = self.commits[-1].sha
         approvals = [a.state for a in self.approvals if a.sha == last_commit]
-        if 'APPROVED' in approvals or 'APPROVE' in approvals:
-            return 'APPROVED'
-        elif 'CHANGES_REQUESTED' in approvals or 'REQUEST_CHANGES' in approvals:
-            return 'CHANGES_REQUESTED'
+        if "APPROVED" in approvals or "APPROVE" in approvals:
+            return "APPROVED"
+        elif "CHANGES_REQUESTED" in approvals or "REQUEST_CHANGES" in approvals:
+            return "CHANGES_REQUESTED"
         elif approvals:
-            return 'COMMENTED'
-        return ''
+            return "COMMENTED"
+        return ""
 
     def getCommitBySha(self, sha):
         for commit in self.commits:
@@ -412,7 +476,7 @@ class PullRequest:
 
     @property
     def author_name(self):
-        author_name = 'Anonymous Coward'
+        author_name = "Anonymous Coward"
         if self.author:
             if self.author.name:
                 author_name = self.author.name
@@ -421,6 +485,7 @@ class PullRequest:
             elif self.author.email:
                 author_name = self.author.email
         return author_name
+
 
 class Commit:
     def __init__(self, pull_request, message, sha, parent):
@@ -436,7 +501,7 @@ class Commit:
         self.files.append(f)
         session.add(f)
         session.flush()
-        if hasattr(self, '_file_cache'):
+        if hasattr(self, "_file_cache"):
             self._file_cache[f.path] = f
         return f
 
@@ -450,7 +515,7 @@ class Commit:
         return c
 
     def getFile(self, path):
-        if not hasattr(self, '_file_cache'):
+        if not hasattr(self, "_file_cache"):
             self._file_cache = {}
             for f in self.files:
                 self._file_cache[f.path] = f
@@ -470,7 +535,17 @@ class Commit:
 
 
 class Message:
-    def __init__(self, pull_request, commit_id, id, author, created, message, draft=False, pending=False):
+    def __init__(
+        self,
+        pull_request,
+        commit_id,
+        id,
+        author,
+        created,
+        message,
+        draft=False,
+        pending=False,
+    ):
         self.pr_key = pull_request.key
         self.commit_key = commit_id
         self.account_key = author.key
@@ -482,7 +557,7 @@ class Message:
 
     @property
     def author_name(self):
-        author_name = 'Anonymous Coward'
+        author_name = "Anonymous Coward"
         if self.author:
             if self.author.name:
                 author_name = self.author.name
@@ -501,10 +576,26 @@ class Message:
         session.flush()
         return c
 
+
 class Comment:
-    def __init__(self, message_obj, file_id, id, author, in_reply_to, created,
-                 updated, parent, commit_id, original_commit_id, line,
-                 original_line, message, draft=False, url=None):
+    def __init__(
+        self,
+        message_obj,
+        file_id,
+        id,
+        author,
+        in_reply_to,
+        created,
+        updated,
+        parent,
+        commit_id,
+        original_commit_id,
+        line,
+        original_line,
+        message,
+        draft=False,
+        url=None,
+    ):
         self.message_key = message_obj.key
         self.file_key = file_id
         self.account_key = author.key
@@ -521,6 +612,7 @@ class Comment:
         self.draft = draft
         self.url = url
 
+
 class Approval:
     def __init__(self, pull_request, reviewer, state, sha, draft=False):
         self.pr_key = pull_request.key
@@ -531,7 +623,7 @@ class Approval:
 
     @property
     def reviewer_name(self):
-        reviewer_name = 'Anonymous Coward'
+        reviewer_name = "Anonymous Coward"
         if self.reviewer:
             if self.reviewer.name:
                 reviewer_name = self.reviewer.name
@@ -541,18 +633,22 @@ class Approval:
                 reviewer_name = self.reviewer.email
         return reviewer_name
 
+
 class PendingMerge:
-    def __init__(self, pull_request, sha, merge_method, commit_title=None,
-            commit_message=None):
+    def __init__(
+        self, pull_request, sha, merge_method, commit_title=None, commit_message=None
+    ):
         self.pr_key = pull_request.key
         self.commit_title = commit_title
         self.commit_message = commit_message
         self.sha = sha
         self.merge_method = merge_method
 
+
 class File:
-    def __init__(self, commit, path, status, old_path=None,
-                 inserted=None, deleted=None):
+    def __init__(
+        self, commit, path, status, old_path=None, inserted=None, deleted=None
+    ):
         self.commit_key = commit.key
         self.path = path
         self.status = status
@@ -571,22 +667,24 @@ class File:
                 pre.append(self.old_path[start])
             else:
                 break
-        pre = ''.join(pre)
-        for end in range(1, min(len(self.old_path), len(self.path))-1):
-            if self.path[0-end] == self.old_path[0-end]:
-                post.insert(0, self.old_path[0-end])
+        pre = "".join(pre)
+        for end in range(1, min(len(self.old_path), len(self.path)) - 1):
+            if self.path[0 - end] == self.old_path[0 - end]:
+                post.insert(0, self.old_path[0 - end])
             else:
                 break
-        post = ''.join(post)
+        post = "".join(post)
         if pre and post:
-            mid = f'{{{self.old_path[start:0-end+1]} => {self.path[start:0-end+1]}}}'
+            mid = f"{{{self.old_path[start : 0 - end + 1]} => {self.path[start : 0 - end + 1]}}}"
             return pre + mid + post
         else:
-            return f'{self.old_path} => {self.path}'
+            return f"{self.old_path} => {self.path}"
+
 
 class Server:
     def __init__(self):
         pass
+
 
 class Check:
     def __init__(self, commit, name, state, created, updated):
@@ -596,111 +694,189 @@ class Check:
         self.created = created
         self.updated = updated
 
+
 mapper.map_imperatively(Account, account_table)
-mapper.map_imperatively(Repository, repository_table, properties=dict(
-    branches=relationship(Branch, backref='repository',
-                          order_by=branch_table.c.name,
-                          cascade='all, delete-orphan'),
-    pull_requests=relationship(PullRequest, backref='repository',
-                         order_by=pull_request_table.c.number,
-                         cascade='all, delete-orphan'),
-    labels=relationship(Label, backref='repository',
-                          order_by=label_table.c.name,
-                          cascade='all, delete-orphan'),
-    topics=relationship(Topic,
-                        secondary=repository_topic_table,
-                        order_by=topic_table.c.name,
-                        viewonly=True),
-    unreviewed_prs=relationship(PullRequest,
-                                primaryjoin=and_(repository_table.c.key==pull_request_table.c.repository_key,
-                                                 pull_request_table.c.hidden==False,
-                                                 pull_request_table.c.state=='open',
-                                                 pull_request_table.c.reviewed==False),
-                                order_by=pull_request_table.c.number,
-                                overlaps="pull_requests,repository"),
-    open_prs=relationship(PullRequest,
-                          primaryjoin=and_(repository_table.c.key==pull_request_table.c.repository_key,
-                                           pull_request_table.c.state=='open'),
-                          order_by=pull_request_table.c.number,
-                          overlaps="pull_requests,repository,unreviewed_prs"),
-))
+mapper.map_imperatively(
+    Repository,
+    repository_table,
+    properties=dict(
+        branches=relationship(
+            Branch,
+            backref="repository",
+            order_by=branch_table.c.name,
+            cascade="all, delete-orphan",
+        ),
+        pull_requests=relationship(
+            PullRequest,
+            backref="repository",
+            order_by=pull_request_table.c.number,
+            cascade="all, delete-orphan",
+        ),
+        labels=relationship(
+            Label,
+            backref="repository",
+            order_by=label_table.c.name,
+            cascade="all, delete-orphan",
+        ),
+        topics=relationship(
+            Topic,
+            secondary=repository_topic_table,
+            order_by=topic_table.c.name,
+            viewonly=True,
+        ),
+        unreviewed_prs=relationship(
+            PullRequest,
+            primaryjoin=and_(
+                repository_table.c.key == pull_request_table.c.repository_key,
+                pull_request_table.c.hidden == False,
+                pull_request_table.c.state == "open",
+                pull_request_table.c.reviewed == False,
+            ),
+            order_by=pull_request_table.c.number,
+            overlaps="pull_requests,repository",
+        ),
+        open_prs=relationship(
+            PullRequest,
+            primaryjoin=and_(
+                repository_table.c.key == pull_request_table.c.repository_key,
+                pull_request_table.c.state == "open",
+            ),
+            order_by=pull_request_table.c.number,
+            overlaps="pull_requests,repository,unreviewed_prs",
+        ),
+    ),
+)
 mapper.map_imperatively(Branch, branch_table)
-mapper.map_imperatively(Topic, topic_table, properties=dict(
-    repositories=relationship(Repository,
-                          secondary=repository_topic_table,
-                          order_by=repository_table.c.name,
-                          viewonly=True),
-    repository_topics=relationship(RepositoryTopic),
-))
+mapper.map_imperatively(
+    Topic,
+    topic_table,
+    properties=dict(
+        repositories=relationship(
+            Repository,
+            secondary=repository_topic_table,
+            order_by=repository_table.c.name,
+            viewonly=True,
+        ),
+        repository_topics=relationship(RepositoryTopic),
+    ),
+)
 mapper.map_imperatively(RepositoryTopic, repository_topic_table)
-mapper.map_imperatively(PullRequest, pull_request_table, properties=dict(
+mapper.map_imperatively(
+    PullRequest,
+    pull_request_table,
+    properties=dict(
         author=relationship(Account),
-        commits=relationship(Commit, backref='pull_request',
-                             order_by=commit_table.c.key,
-                             cascade='all, delete-orphan'),
-        messages=relationship(Message, backref='pull_request',
-                              order_by=message_table.c.created,
-                              cascade='all, delete-orphan'),
-        approvals=relationship(Approval, backref='pull_request',
-                               order_by=approval_table.c.state,
-                               cascade='all, delete-orphan'),
-        pending_merge=relationship(PendingMerge, backref='pull_request',
-                                   cascade='all, delete-orphan'),
-        labels=relationship(Label,
-                            secondary=pull_request_label_table,
-                            order_by=label_table.c.name,
-                            viewonly=True),
+        commits=relationship(
+            Commit,
+            backref="pull_request",
+            order_by=commit_table.c.key,
+            cascade="all, delete-orphan",
+        ),
+        messages=relationship(
+            Message,
+            backref="pull_request",
+            order_by=message_table.c.created,
+            cascade="all, delete-orphan",
+        ),
+        approvals=relationship(
+            Approval,
+            backref="pull_request",
+            order_by=approval_table.c.state,
+            cascade="all, delete-orphan",
+        ),
+        pending_merge=relationship(
+            PendingMerge, backref="pull_request", cascade="all, delete-orphan"
+        ),
+        labels=relationship(
+            Label,
+            secondary=pull_request_label_table,
+            order_by=label_table.c.name,
+            viewonly=True,
+        ),
         pull_request_labels=relationship(PullRequestLabel),
-        draft_approvals=relationship(Approval,
-                                     primaryjoin=and_(pull_request_table.c.key==approval_table.c.pr_key,
-                                                      approval_table.c.draft==True),
-                                     order_by=approval_table.c.state,
-                                     overlaps="approvals,pull_request")
-        ))
-mapper.map_imperatively(Commit, commit_table, properties=dict(
-        messages=relationship(Message, backref='commit',
-                              order_by=message_table.c.created,
-                              cascade='all, delete-orphan'),
-        files=relationship(File, backref='commit',
-                           cascade='all, delete-orphan'),
-        checks=relationship(Check, backref='commit',
-                            order_by=check_table.c.name,
-                            cascade='all, delete-orphan'),
-
-        ))
-mapper.map_imperatively(Message, message_table, properties=dict(
+        draft_approvals=relationship(
+            Approval,
+            primaryjoin=and_(
+                pull_request_table.c.key == approval_table.c.pr_key,
+                approval_table.c.draft == True,
+            ),
+            order_by=approval_table.c.state,
+            overlaps="approvals,pull_request",
+        ),
+    ),
+)
+mapper.map_imperatively(
+    Commit,
+    commit_table,
+    properties=dict(
+        messages=relationship(
+            Message,
+            backref="commit",
+            order_by=message_table.c.created,
+            cascade="all, delete-orphan",
+        ),
+        files=relationship(File, backref="commit", cascade="all, delete-orphan"),
+        checks=relationship(
+            Check,
+            backref="commit",
+            order_by=check_table.c.name,
+            cascade="all, delete-orphan",
+        ),
+    ),
+)
+mapper.map_imperatively(
+    Message,
+    message_table,
+    properties=dict(
         author=relationship(Account),
-        comments=relationship(Comment, backref='pull_request',
-                              order_by=comment_table.c.created,
-                              cascade='all, delete-orphan'),
-        ))
-mapper.map_imperatively(File, file_table, properties=dict(
-       comments=relationship(Comment, backref='file',
-                             order_by=(comment_table.c.line,
-                                       comment_table.c.created),
-                             cascade='all, delete-orphan'),
-       current_comments=relationship(Comment,
-                                     primaryjoin=and_(file_table.c.key==comment_table.c.file_key,
-                                                      comment_table.c.line>0),
-                                     order_by=(comment_table.c.line,
-                                               comment_table.c.created),
-                                     overlaps="comments,file"),
-       draft_comments=relationship(Comment,
-                                   primaryjoin=and_(file_table.c.key==comment_table.c.file_key,
-                                                    comment_table.c.draft==True),
-                                   order_by=(comment_table.c.line,
-                                             comment_table.c.created),
-                                   overlaps="comments,current_comments,file"),
-       ))
+        comments=relationship(
+            Comment,
+            backref="pull_request",
+            order_by=comment_table.c.created,
+            cascade="all, delete-orphan",
+        ),
+    ),
+)
+mapper.map_imperatively(
+    File,
+    file_table,
+    properties=dict(
+        comments=relationship(
+            Comment,
+            backref="file",
+            order_by=(comment_table.c.line, comment_table.c.created),
+            cascade="all, delete-orphan",
+        ),
+        current_comments=relationship(
+            Comment,
+            primaryjoin=and_(
+                file_table.c.key == comment_table.c.file_key, comment_table.c.line > 0
+            ),
+            order_by=(comment_table.c.line, comment_table.c.created),
+            overlaps="comments,file",
+        ),
+        draft_comments=relationship(
+            Comment,
+            primaryjoin=and_(
+                file_table.c.key == comment_table.c.file_key,
+                comment_table.c.draft == True,
+            ),
+            order_by=(comment_table.c.line, comment_table.c.created),
+            overlaps="comments,current_comments,file",
+        ),
+    ),
+)
 
-mapper.map_imperatively(Comment, comment_table, properties=dict(
-        author=relationship(Account)))
-mapper.map_imperatively(Approval, approval_table, properties=dict(
-        reviewer=relationship(Account)))
+mapper.map_imperatively(
+    Comment, comment_table, properties=dict(author=relationship(Account))
+)
+mapper.map_imperatively(
+    Approval, approval_table, properties=dict(reviewer=relationship(Account))
+)
 mapper.map_imperatively(PendingMerge, pending_merge_table)
-mapper.map_imperatively(Server, server_table, properties=dict(
-    own_account=relationship(Account)
-    ))
+mapper.map_imperatively(
+    Server, server_table, properties=dict(own_account=relationship(Account))
+)
 mapper.map_imperatively(Check, check_table)
 mapper.map_imperatively(Label, label_table)
 mapper.map_imperatively(PullRequestLabel, pull_request_label_table)
@@ -711,6 +887,7 @@ def match(expr, item):
         return False
     return re.match(expr, item) is not None
 
+
 @sqlalchemy.event.listens_for(sqlalchemy.engine.Engine, "connect")
 def add_sqlite_match(dbapi_connection, connection_record):
     dbapi_connection.create_function("matches", 2, match)
@@ -718,22 +895,22 @@ def add_sqlite_match(dbapi_connection, connection_record):
 
 class Database:
     def __init__(self, app, dburi, search):
-        self.log = logging.getLogger('hubtty.db')
+        self.log = logging.getLogger("hubtty.db")
         self.own_account_key = None
         self.dburi = dburi
         self.search = search
         self.engine = create_engine(self.dburi)
         self.app = app
-        #metadata.create_all(self.engine)
+        # metadata.create_all(self.engine)
         self.migrate(app)
         # If we want the objects returned from query() to be usable
         # outside of the session, we need to expunge them from the session,
         # and since the DatabaseSession always calls commit() on the session
         # when the context manager exits, we need to inform the session to
         # expire objects when it does so.
-        self.session_factory = sessionmaker(bind=self.engine,
-                                            expire_on_commit=False,
-                                            autoflush=False)
+        self.session_factory = sessionmaker(
+            bind=self.engine, expire_on_commit=False, autoflush=False
+        )
         self.session = scoped_session(self.session_factory)
         self.lock = threading.Lock()
 
@@ -744,7 +921,7 @@ class Database:
         conn = self.engine.connect()
         context = alembic.migration.MigrationContext.configure(conn)
         current_rev = context.get_current_revision()
-        self.log.debug('Current migration revision: %s', current_rev)
+        self.log.debug("Current migration revision: %s", current_rev)
 
         has_table = self.engine.dialect.has_table(conn, "repository")
 
@@ -754,9 +931,10 @@ class Database:
         config.hubtty_app = app
 
         if current_rev is None and has_table:
-            self.log.debug('Stamping database as initial revision')
+            self.log.debug("Stamping database as initial revision")
             alembic.command.stamp(config, "a2af1e2e44ee")
-        alembic.command.upgrade(config, 'head')
+        alembic.command.upgrade(config, "head")
+
 
 class DatabaseSession:
     def __init__(self, database):
@@ -777,7 +955,7 @@ class DatabaseSession:
         self.session().close()
         self.session = None
         end = time.time()
-        self.database.log.debug("Database lock held %s seconds", end-self.start)
+        self.database.log.debug("Database lock held %s seconds", end - self.start)
         self.database.lock.release()
 
     def abort(self):
@@ -839,7 +1017,11 @@ class DatabaseSession:
     def getPullRequest(self, key, lazy=True):
         query = self.session().query(PullRequest).filter_by(key=key)
         if not lazy:
-            query = query.options(joinedload(PullRequest.commits).joinedload(Commit.files).joinedload(File.comments))
+            query = query.options(
+                joinedload(PullRequest.commits)
+                .joinedload(Commit.files)
+                .joinedload(File.comments)
+            )
         try:
             return query.one()
         except sqlalchemy.orm.exc.NoResultFound:
@@ -872,22 +1054,34 @@ class DatabaseSession:
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
-    def getPullRequests(self, query, unreviewed=False, sort_by='number'):
+    def getPullRequests(self, query, unreviewed=False, sort_by="number"):
         self.database.log.debug("Search query: %s sort: %s", query, sort_by)
         q = self.session().query(PullRequest).filter(self.search.parse(query))
         if not isinstance(sort_by, (list, tuple)):
             sort_by = [sort_by]
         if unreviewed:
-            q = q.filter(pull_request_table.c.hidden==False, pull_request_table.c.reviewed==False)
+            q = q.filter(
+                pull_request_table.c.hidden == False,
+                pull_request_table.c.reviewed == False,
+            )
         for s in sort_by:
-            if s == 'updated':
+            if s == "updated":
                 q = q.order_by(pull_request_table.c.updated)
-            elif s == 'last-seen':
+            elif s == "last-seen":
                 q = q.order_by(pull_request_table.c.last_seen)
-            elif s == 'number':
+            elif s == "number":
                 q = q.order_by(pull_request_table.c.number)
-            elif s == 'repository':
-                q = q.filter(repository_table.c.key == pull_request_table.c.repository_key)
+            elif s == "title":
+                q = q.order_by(pull_request_table.c.title)
+            elif s == "branch":
+                q = q.order_by(pull_request_table.c.branch)
+            elif s == "author":
+                q = q.filter(account_table.c.key == pull_request_table.c.account_key)
+                q = q.order_by(account_table.c.name)
+            elif s == "repository":
+                q = q.filter(
+                    repository_table.c.key == pull_request_table.c.repository_key
+                )
                 q = q.order_by(repository_table.c.name)
         self.database.log.debug("Search SQL: %s", q)
         try:
@@ -897,7 +1091,8 @@ class DatabaseSession:
                     validPullRequests.append(c)
                 else:
                     self.database.app.sync.submitTask(
-                        sync.SyncPullRequestTask(c.pr_id, priority=sync.HIGH_PRIORITY))
+                        sync.SyncPullRequestTask(c.pr_id, priority=sync.HIGH_PRIORITY)
+                    )
             return validPullRequests
         except sqlalchemy.orm.exc.NoResultFound:
             return []
@@ -954,8 +1149,12 @@ class DatabaseSession:
 
     def getApproval(self, pull_request, account, sha):
         try:
-            return self.session().query(Approval).filter_by(
-                pr_key=pull_request.key, account_key=account.key, sha=sha).one()
+            return (
+                self.session()
+                .query(Approval)
+                .filter_by(pr_key=pull_request.key, account_key=account.key, sha=sha)
+                .one()
+            )
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 
@@ -990,7 +1189,8 @@ class DatabaseSession:
             account = self.createAccount(id)
             if username:
                 self.database.app.sync.submitTask(
-                    sync.SyncAccountTask(username, sync.NORMAL_PRIORITY))
+                    sync.SyncAccountTask(username, sync.NORMAL_PRIORITY)
+                )
         if name is not None and account.name != name:
             account.name = name
         if username is not None and account.username != username:
@@ -1006,7 +1206,7 @@ class DatabaseSession:
             return None
 
     def getSystemAccount(self):
-        return self.getAccountByID(0, 'Github Code Review')
+        return self.getAccountByID(0, "Github Code Review")
 
     def setOwnAccount(self, account):
         try:
@@ -1026,7 +1226,12 @@ class DatabaseSession:
                 return None
             self.database.own_account_key = server.own_account.key
         try:
-            return self.session().query(Account).filter_by(key=self.database.own_account_key).one()
+            return (
+                self.session()
+                .query(Account)
+                .filter_by(key=self.database.own_account_key)
+                .one()
+            )
         except sqlalchemy.orm.exc.NoResultFound:
             return None
 

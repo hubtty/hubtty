@@ -35,7 +35,10 @@ STYLE_MARKED = "marked-pr"
 # Map column keys to db sort-by values (only sortable columns)
 _COLUMN_SORT_MAP = {
     "number": "number",
+    "title": "title",
     "repository": "repository",
+    "branch": "branch",
+    "author": "author",
     "updated": "updated",
 }
 
