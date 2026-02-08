@@ -461,7 +461,11 @@ class RepositoryListView(Widget):
             repo_key,
             self.app.config.repository_pr_list_query,
         )
-        self.app.changeScreen(PullRequestListView(query, title=repo_name))
+        self.app.changeScreen(
+            PullRequestListView(
+                query, title=repo_name, query_desc=repo_name, repository_key=repo_key
+            )
+        )
 
     def _toggle_topic(self, meta):
         """Toggle topic fold/collapse state."""

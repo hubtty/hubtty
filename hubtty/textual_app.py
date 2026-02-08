@@ -602,6 +602,7 @@ class TextualApp(App, BaseApp):
         self._current_view.display = False
         content.mount(view)
         self._current_view = view
+        self.call_later(self.screen.focus_next)
 
     def backScreen(self, target_widget=None):
         """Navigate back to the previous view."""
