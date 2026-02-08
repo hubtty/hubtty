@@ -192,6 +192,55 @@ def textual_key_to_urwid(event):
     return key
 
 
+# ---- Cursor/navigation command handling ----
+
+# Cursor commands that should be forwarded to the focused widget rather
+# than handled by _handle_command.  In the urwid app these go through
+# urwid's command_map; in Textual we either let the native key pass
+# through or invoke the widget action programmatically (for vi keys).
+_CURSOR_COMMANDS = frozenset(
+    (
+        keymap.CURSOR_UP,
+        keymap.CURSOR_DOWN,
+        keymap.CURSOR_LEFT,
+        keymap.CURSOR_RIGHT,
+        keymap.CURSOR_PAGE_UP,
+        keymap.CURSOR_PAGE_DOWN,
+        keymap.CURSOR_MAX_LEFT,
+        keymap.CURSOR_MAX_RIGHT,
+        keymap.ACTIVATE,
+    )
+)
+
+# Map cursor commands to Textual widget action method names.
+_CURSOR_ACTION_MAP = {
+    keymap.CURSOR_UP: "action_cursor_up",
+    keymap.CURSOR_DOWN: "action_cursor_down",
+    keymap.CURSOR_PAGE_UP: "action_page_up",
+    keymap.CURSOR_PAGE_DOWN: "action_page_down",
+    keymap.CURSOR_MAX_LEFT: "action_scroll_home",
+    keymap.CURSOR_MAX_RIGHT: "action_scroll_end",
+    keymap.ACTIVATE: "action_select_cursor",
+}
+
+# urwid key names that Textual/DataTable already handle natively.
+# When the resolved commands are all cursor commands AND the key is
+# one of these, we let the event pass through untouched.
+_NATIVE_NAV_KEYS = frozenset(
+    (
+        "up",
+        "down",
+        "left",
+        "right",
+        "page up",
+        "page down",
+        "home",
+        "end",
+        "enter",
+    )
+)
+
+
 class HubttyHeader(Static):
     """Status header showing title, sync status, and indicators."""
 
@@ -377,14 +426,46 @@ class TextualApp(App, BaseApp):
             return
 
         # We have a complete command match
-        event.prevent_default()
-        event.stop()
         self._clearInputBuffer()
 
-        for command in commands:
-            if command == keymap.FURTHER_INPUT:
-                continue
+        # Separate cursor commands from non-cursor commands
+        real_commands = [c for c in commands if c != keymap.FURTHER_INPUT]
+        cursor_cmds = [c for c in real_commands if c in _CURSOR_COMMANDS]
+        other_cmds = [c for c in real_commands if c not in _CURSOR_COMMANDS]
+
+        # Handle cursor/navigation commands
+        if cursor_cmds and not other_cmds:
+            # Only cursor commands resolved for this key
+            if urwid_key in _NATIVE_NAV_KEYS:
+                # Let Textual handle it natively (don't consume)
+                return
+            # Vi-mode remapped key (j/k/g/G/etc): consume the event
+            # and invoke the action on the focused widget directly
+            event.prevent_default()
+            event.stop()
+            focused = self.focused
+            if focused:
+                for cmd in cursor_cmds:
+                    action = _CURSOR_ACTION_MAP.get(cmd)
+                    if action and hasattr(focused, action):
+                        getattr(focused, action)()
+            return
+
+        # Non-cursor commands: consume the event and dispatch
+        event.prevent_default()
+        event.stop()
+
+        for command in other_cmds:
             self._handle_command(command, urwid_key)
+
+        # Also handle any cursor commands that came alongside
+        if cursor_cmds:
+            focused = self.focused
+            if focused:
+                for cmd in cursor_cmds:
+                    action = _CURSOR_ACTION_MAP.get(cmd)
+                    if action and hasattr(focused, action):
+                        getattr(focused, action)()
 
     def _clearInputBuffer(self):
         if self.input_buffer:
