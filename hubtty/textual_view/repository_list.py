@@ -214,6 +214,21 @@ class TopicSelectDialog(ModalScreen):
         self.dismiss(None)
 
 
+# ---- Column sorting ----
+
+_COLUMN_SORT_MAP = {
+    "name": "name",
+    "unreviewed": "unreviewed",
+    "open": "open",
+}
+
+_COLUMN_LABELS = {
+    "name": " Repository",
+    "unreviewed": "Unreviewed",
+    "open": "Open",
+}
+
+
 # ---- Main view ----
 
 
@@ -250,6 +265,9 @@ class RepositoryListView(Widget):
         self.open_topics = set()
         # Maps row_key_str -> {type, db_key, topic_key, style, mark, name}
         self._row_meta = {}
+        # Sort state
+        self._sort_by = "name"
+        self._reverse = False
         # Search state
         self._search_active = False
         self._search_results = []
@@ -263,11 +281,66 @@ class RepositoryListView(Widget):
         yield table
         yield Input(placeholder="Search...", id="search-bar")
 
+    # Fixed column widths for Unreviewed and Open
+    _FIXED_WIDTHS = {"unreviewed": 12, "open": 6}
+
     def on_mount(self):
         table = self.query_one("#repo-list", DataTable)
         table.add_column(" Repository", key="name")
-        table.add_column("Unreviewed", key="unreviewed")
-        table.add_column("Open", key="open")
+        table.add_column(
+            "Unreviewed", key="unreviewed", width=self._FIXED_WIDTHS["unreviewed"]
+        )
+        table.add_column("Open", key="open", width=self._FIXED_WIDTHS["open"])
+        self._update_column_labels()
+        self._resize_name_column()
+        self.refresh_data()
+
+    def on_resize(self, event):
+        self._resize_name_column()
+
+    def _resize_name_column(self):
+        """Set the name column width to fill remaining space."""
+        table = self.query_one("#repo-list", DataTable)
+        if not table.columns:
+            return
+        from textual.widgets._data_table import ColumnKey
+
+        name_col = table.columns.get(ColumnKey("name"))
+        if name_col is None:
+            return
+        fixed_total = sum(self._FIXED_WIDTHS.values())
+        padding = table.cell_padding * 2 * len(table.columns)
+        available = table.size.width - fixed_total - padding
+        name_col.width = max(available, 10)
+        name_col.auto_width = False
+
+    # ---- Column sorting via header click ----
+
+    def _update_column_labels(self):
+        """Update column header labels with sort indicators."""
+        table = self.query_one("#repo-list", DataTable)
+        for col_key, column in table.columns.items():
+            key_str = col_key.value
+            base_label = _COLUMN_LABELS.get(key_str, key_str)
+            sort_field = _COLUMN_SORT_MAP.get(key_str)
+            if sort_field and sort_field == self._sort_by:
+                indicator = " ▼" if self._reverse else " ▲"
+                column.label = Text(base_label + indicator)
+            else:
+                column.label = Text(base_label)
+
+    def on_data_table_header_selected(self, event):
+        """Sort by the clicked column, or reverse if already sorted."""
+        col_key = event.column_key.value
+        sort_field = _COLUMN_SORT_MAP.get(col_key)
+        if sort_field is None:
+            return
+        if self._sort_by == sort_field:
+            self._reverse = not self._reverse
+        else:
+            self._sort_by = sort_field
+            self._reverse = False
+        self._update_column_labels()
         self.refresh_data()
 
     # ---- Event interest and data refresh ----
@@ -313,32 +386,10 @@ class RepositoryListView(Widget):
         self._row_meta = {}
 
         with self.app.db.getSession() as session:
-            # Topicless repositories
-            for repository in session.getRepositories(
-                topicless=True, subscribed=self.subscribed, unreviewed=self.unreviewed
-            ):
-                self._add_repository_row(table, repository, None)
-
-            # Repositories grouped by topic
-            for topic in session.getTopics():
-                self._add_topic_row(table, topic)
-                topic_unreviewed = 0
-                topic_open = 0
-                for repository in topic.repositories:
-                    cache = self.app.repository_cache.get(repository)
-                    topic_unreviewed += cache["unreviewed_prs"]
-                    topic_open += cache["open_prs"]
-                    if self.subscribed:
-                        if not repository.subscribed:
-                            continue
-                        if self.unreviewed and not cache["unreviewed_prs"]:
-                            continue
-                    if topic.key in self.open_topics:
-                        self._add_repository_row(table, repository, topic)
-                # Update topic row with aggregate counts
-                self._update_topic_counts(
-                    table, topic.key, topic_unreviewed, topic_open
-                )
+            if self._sort_by != "name":
+                self._refresh_sorted(table, session)
+            else:
+                self._refresh_by_name(table, session)
 
         # Restore cursor position
         if table.row_count > 0:
@@ -346,6 +397,56 @@ class RepositoryListView(Widget):
                 table.move_cursor(row=old_cursor_row, animate=False)
             else:
                 table.move_cursor(row=table.row_count - 1, animate=False)
+
+    def _refresh_by_name(self, table, session):
+        """Populate the table sorted by name, with topic grouping."""
+        # Topicless repositories
+        repos = session.getRepositories(
+            topicless=True, subscribed=self.subscribed, unreviewed=self.unreviewed
+        )
+        if self._reverse:
+            repos = list(reversed(repos))
+        for repository in repos:
+            self._add_repository_row(table, repository, None)
+
+        # Repositories grouped by topic
+        for topic in session.getTopics():
+            self._add_topic_row(table, topic)
+            topic_unreviewed = 0
+            topic_open = 0
+            for repository in topic.repositories:
+                cache = self.app.repository_cache.get(repository)
+                topic_unreviewed += cache["unreviewed_prs"]
+                topic_open += cache["open_prs"]
+                if self.subscribed:
+                    if not repository.subscribed:
+                        continue
+                    if self.unreviewed and not cache["unreviewed_prs"]:
+                        continue
+                if topic.key in self.open_topics:
+                    self._add_repository_row(table, repository, topic)
+            # Update topic row with aggregate counts
+            self._update_topic_counts(table, topic.key, topic_unreviewed, topic_open)
+
+    def _refresh_sorted(self, table, session):
+        """Populate the table sorted by a non-name column (flat, no topics)."""
+        # Collect all visible repositories with their cache data
+        all_repos = []
+        for repository in session.getRepositories(
+            subscribed=self.subscribed, unreviewed=self.unreviewed
+        ):
+            cache = self.app.repository_cache.get(repository)
+            all_repos.append((repository, cache))
+
+        # Sort by the selected field
+        if self._sort_by == "unreviewed":
+            sort_key = lambda rc: rc[1]["unreviewed_prs"]
+        else:  # 'open'
+            sort_key = lambda rc: rc[1]["open_prs"]
+        all_repos.sort(key=sort_key, reverse=not self._reverse)
+
+        for repository, _ in all_repos:
+            self._add_repository_row(table, repository, None)
 
     # ---- Row building helpers ----
 
@@ -373,10 +474,10 @@ class RepositoryListView(Widget):
         name_text = Text(" " + indent + repository.name)
         name_text.stylize(style)
 
-        unreviewed_text = Text("%i " % cache["unreviewed_prs"], justify="right")
+        unreviewed_text = Text(str(cache["unreviewed_prs"]), justify="center")
         unreviewed_text.stylize(style)
 
-        open_text = Text("%i " % cache["open_prs"], justify="right")
+        open_text = Text(str(cache["open_prs"]), justify="center")
         open_text.stylize(style)
 
         table.add_row(name_text, unreviewed_text, open_text, key=row_key_str)
@@ -413,9 +514,9 @@ class RepositoryListView(Widget):
         """Update a topic row's aggregate PR counts."""
         row_key_str = _make_topic_key(topic_key)
         try:
-            unreviewed_text = Text("%i " % unreviewed, justify="right")
+            unreviewed_text = Text(str(unreviewed), justify="center")
             unreviewed_text.stylize(STYLE_TOPIC)
-            open_text = Text("%i " % open_prs, justify="right")
+            open_text = Text(str(open_prs), justify="center")
             open_text.stylize(STYLE_TOPIC)
             table.update_cell(row_key_str, "unreviewed", unreviewed_text)
             table.update_cell(row_key_str, "open", open_text)

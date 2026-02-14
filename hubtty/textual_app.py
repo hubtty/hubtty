@@ -400,7 +400,7 @@ class TextualApp(App, BaseApp):
     def on_resize(self, event) -> None:
         """Refresh the current view when the terminal is resized."""
         view = getattr(self, "_current_view", None)
-        if view and hasattr(view, "refresh_data"):
+        if view and view.is_mounted and hasattr(view, "refresh_data"):
             view.refresh_data()
 
     # ---- Key handling ----
