@@ -15,6 +15,7 @@
 
 import logging
 
+from rich.table import Table
 from rich.text import Text
 
 from textual.widget import Widget
@@ -40,14 +41,15 @@ class DiffView(Widget):
         height: 1fr;
     }
     #diff-file-reminder {
-        height: 1;
+        height: auto;
+        max-height: 1;
         dock: top;
     }
     #diff-content {
         height: auto;
     }
     .diff-file-header {
-        padding: 0 0;
+        height: auto;
     }
     .diff-line {
         height: auto;
@@ -67,22 +69,30 @@ class DiffView(Widget):
         self.commit_key = commit_key
         self.title = "Diff"
         self._file_header_indices = []
-        self._last_half_width = None
 
     def _style(self, name):
         """Look up a palette entry name and return a Rich style string."""
         return self.app.rich_palette.get(name, "")
 
-    def _compute_half_width(self):
-        """Compute half-width for side-by-side diff columns.
+    def _make_table(self, old_col_style="", new_col_style=""):
+        """Create a 5-column Rich Table for side-by-side layout.
 
-        Layout: [old_ln (5)] [old_content (half)] [sep (1)] [new_ln (5)] [new_content (half)]
-        Fixed chars: LN_COL_WIDTH * 2 + 1 = 11
+        Columns: old_ln (fixed) | old_content (1fr) | sep (1) |
+                 new_ln (fixed) | new_content (1fr)
         """
-        scrollbar = 2
-        available = self.app.size.width - scrollbar
-        half = (available - LN_COL_WIDTH * 2 - 1) // 2
-        return max(half, 10)
+        table = Table(
+            show_header=False,
+            box=None,
+            padding=(0, 0),
+            expand=True,
+            show_edge=False,
+        )
+        table.add_column(width=LN_COL_WIDTH, no_wrap=True)
+        table.add_column(ratio=1, style=old_col_style)
+        table.add_column(width=1, no_wrap=True)
+        table.add_column(width=LN_COL_WIDTH, no_wrap=True)
+        table.add_column(ratio=1, style=new_col_style)
+        return table
 
     def compose(self):
         yield Static(id="diff-file-reminder")
@@ -91,12 +101,6 @@ class DiffView(Widget):
 
     def on_mount(self):
         self.refresh_data()
-
-    def on_resize(self, event):
-        """Rebuild diff when terminal is resized so columns stay aligned."""
-        new_half = self._compute_half_width()
-        if self._last_half_width is not None and new_half != self._last_half_width:
-            self.refresh_data()
 
     # ---- Event interest ----
 
@@ -205,9 +209,6 @@ class DiffView(Widget):
         container = self.query_one("#diff-content", Vertical)
         container.remove_children()
 
-        half_width = self._compute_half_width()
-        self._last_half_width = half_width
-
         widgets = []
         self._file_header_indices = []
         first_old_name = None
@@ -234,7 +235,7 @@ class DiffView(Widget):
                 new_key = new_file_keys.get(diff.newname)
 
             # File header
-            widgets.append(self._build_file_header(diff, half_width))
+            widgets.append(self._build_file_header(diff))
 
             # File-level comments
             widgets.extend(self._pop_comments(comment_lists, diff, None, None))
@@ -251,9 +252,7 @@ class DiffView(Widget):
                         # Small enough to show all
                         for line in chunk.lines:
                             widgets.append(
-                                self._build_diff_line(
-                                    diff, line, old_key, new_key, half_width
-                                )
+                                self._build_diff_line(diff, line, old_key, new_key)
                             )
                             widgets.extend(
                                 self._pop_comments(
@@ -267,9 +266,7 @@ class DiffView(Widget):
                         if not chunk.first:
                             for line in first_lines:
                                 widgets.append(
-                                    self._build_diff_line(
-                                        diff, line, old_key, new_key, half_width
-                                    )
+                                    self._build_diff_line(diff, line, old_key, new_key)
                                 )
                                 widgets.extend(
                                     self._pop_comments(
@@ -285,9 +282,7 @@ class DiffView(Widget):
                         if not chunk.last:
                             for line in last_lines:
                                 widgets.append(
-                                    self._build_diff_line(
-                                        diff, line, old_key, new_key, half_width
-                                    )
+                                    self._build_diff_line(diff, line, old_key, new_key)
                                 )
                                 widgets.extend(
                                     self._pop_comments(
@@ -301,9 +296,7 @@ class DiffView(Widget):
                     # Changed chunk -- show all lines
                     for line in chunk.lines:
                         widgets.append(
-                            self._build_diff_line(
-                                diff, line, old_key, new_key, half_width
-                            )
+                            self._build_diff_line(diff, line, old_key, new_key)
                         )
                         widgets.extend(
                             self._pop_comments(
@@ -323,83 +316,69 @@ class DiffView(Widget):
         if first_old_name:
             self._update_file_reminder(first_old_name, first_new_name)
 
-    def _build_file_header(self, diff, half_width):
-        """Build a file header widget with side-by-side layout."""
+    def _build_file_header(self, diff):
+        """Build a file header widget with side-by-side table layout."""
         old = diff.oldname or ""
         new = diff.newname or ""
 
-        text = Text(no_wrap=True)
+        table = self._make_table()
+        table.add_row(
+            Text(""),
+            Text(old, style=self._style("filename"), no_wrap=True),
+            Text("|"),
+            Text(""),
+            Text(new, style=self._style("filename"), no_wrap=True),
+        )
+        return Static(table, classes="diff-file-header")
 
-        # Old side: padded to LN_COL_WIDTH + half_width
-        old_side_width = LN_COL_WIDTH + half_width
-        old_text = Text(no_wrap=True)
-        old_text.append(old, style=self._style("filename"))
-        old_text.truncate(old_side_width)
-        pad = old_side_width - old_text.cell_len
-        if pad > 0:
-            old_text.append(" " * pad)
-        text.append_text(old_text)
-
-        # Separator
-        text.append("|")
-
-        # New side
-        text.append(new, style=self._style("filename"))
-
-        return Static(text, classes="diff-file-header")
-
-    def _build_diff_line(self, diff, line, old_key, new_key, half_width):
-        """Build a single side-by-side diff line widget."""
+    def _build_diff_line(self, diff, line, old_key, new_key):
+        """Build a single side-by-side diff line widget using Rich Table."""
         old_side = line[gitrepo.OLD]
         new_side = line[gitrepo.NEW]
         old_ln, old_action, old_content = old_side
         new_ln, new_action, new_content = new_side
 
-        text = Text(no_wrap=True)
+        # Column styles for nonexistent sides
+        old_col_style = self._style("nonexistent") if old_action == "" else ""
+        new_col_style = self._style("nonexistent") if new_action == "" else ""
+        table = self._make_table(old_col_style, new_col_style)
 
-        # === Old side ===
-        # Line number
+        # Old line number
         if old_ln is not None:
-            text.append(
+            old_ln_text = Text(
                 "%*i " % (LN_COL_WIDTH - 1, old_ln), style=self._style("line-number")
             )
         else:
-            text.append(" " * LN_COL_WIDTH, style=self._style("line-number"))
+            old_ln_text = Text(" " * LN_COL_WIDTH, style=self._style("line-number"))
 
-        # Content (padded/clipped to half_width)
-        old_text = Text(no_wrap=True)
-        self._append_line_content(old_text, old_action, old_content, half_width)
-        old_text.truncate(half_width)
-        pad = half_width - old_text.cell_len
-        if pad > 0:
-            if old_action == "":
-                pad_style = self._style("nonexistent")
-            else:
-                pad_style = ""
-            old_text.append(" " * pad, style=pad_style)
-        text.append_text(old_text)
+        # Old content
+        old_content_text = Text()
+        if old_action != "":
+            self._append_line_content(old_content_text, old_action, old_content)
 
-        # Separator
-        text.append("|")
-
-        # === New side ===
-        # Line number
+        # New line number
         if new_ln is not None:
-            text.append(
+            new_ln_text = Text(
                 "%*i " % (LN_COL_WIDTH - 1, new_ln), style=self._style("line-number")
             )
         else:
-            text.append(" " * LN_COL_WIDTH, style=self._style("line-number"))
+            new_ln_text = Text(" " * LN_COL_WIDTH, style=self._style("line-number"))
 
-        # Content (right side -- truncated to half_width)
-        new_text = Text(no_wrap=True)
-        self._append_line_content(new_text, new_action, new_content, half_width)
-        new_text.truncate(half_width)
-        text.append_text(new_text)
+        # New content
+        new_content_text = Text()
+        if new_action != "":
+            self._append_line_content(new_content_text, new_action, new_content)
 
-        return Static(text, classes="diff-line")
+        table.add_row(
+            old_ln_text,
+            old_content_text,
+            Text("|"),
+            new_ln_text,
+            new_content_text,
+        )
+        return Static(table, classes="diff-line")
 
-    def _append_line_content(self, text, action, content, half_width=20):
+    def _append_line_content(self, text, action, content):
         """Append diff line content to a Rich Text object.
 
         Content can be:
@@ -408,8 +387,6 @@ class DiffView(Widget):
         - A tuple of (style, text) (simple markup)
         """
         if action == "":
-            # Nonexistent side (e.g., new file has no old side)
-            text.append(" " * half_width, style=self._style("nonexistent"))
             return
 
         if isinstance(content, str):
@@ -497,27 +474,15 @@ class DiffView(Widget):
     def _update_file_reminder(self, old_name, new_name):
         """Update the sticky file reminder header with side-by-side layout."""
         reminder = self.query_one("#diff-file-reminder", Static)
-        half_width = self._compute_half_width()
-
-        text = Text(no_wrap=True)
-
-        # Old side: padded to LN_COL_WIDTH + half_width
-        old_side_width = LN_COL_WIDTH + half_width
-        old_text = Text(no_wrap=True)
-        old_text.append(old_name or "", style=self._style("filename"))
-        old_text.truncate(old_side_width)
-        pad = old_side_width - old_text.cell_len
-        if pad > 0:
-            old_text.append(" " * pad)
-        text.append_text(old_text)
-
-        # Separator
-        text.append("|")
-
-        # New side
-        text.append(new_name or "", style=self._style("filename"))
-
-        reminder.update(text)
+        table = self._make_table()
+        table.add_row(
+            Text(""),
+            Text(old_name or "", style=self._style("filename"), no_wrap=True),
+            Text("|"),
+            Text(""),
+            Text(new_name or "", style=self._style("filename"), no_wrap=True),
+        )
+        reminder.update(table)
 
     # ---- Scroll tracking for file reminder ----
 
