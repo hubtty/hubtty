@@ -310,7 +310,9 @@ class RepositoryListView(Widget):
             return
         fixed_total = sum(self._FIXED_WIDTHS.values())
         padding = table.cell_padding * 2 * len(table.columns)
-        available = table.size.width - fixed_total - padding
+        available = (
+            table.size.width - fixed_total - padding - table.scrollbar_size_vertical
+        )
         name_col.width = max(available, 10)
         name_col.auto_width = False
         table._require_update_dimensions = True

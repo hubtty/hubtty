@@ -218,7 +218,9 @@ class PullRequestListView(Widget):
             if ColumnKey(key_str) in table.columns:
                 fixed_total += width
         padding = table.cell_padding * 2 * len(table.columns)
-        available = table.size.width - fixed_total - padding
+        available = (
+            table.size.width - fixed_total - padding - table.scrollbar_size_vertical
+        )
         title_col.width = max(available, 10)
         title_col.auto_width = False
         table._require_update_dimensions = True
