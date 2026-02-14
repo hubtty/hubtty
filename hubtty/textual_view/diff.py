@@ -391,8 +391,11 @@ class DiffView(Widget):
         else:
             text.append(" " * LN_COL_WIDTH, style=self._style("line-number"))
 
-        # Content (right side -- no padding needed, clipped by widget)
-        self._append_line_content(text, new_action, new_content, half_width)
+        # Content (right side -- truncated to half_width)
+        new_text = Text(no_wrap=True)
+        self._append_line_content(new_text, new_action, new_content, half_width)
+        new_text.truncate(half_width)
+        text.append_text(new_text)
 
         return Static(text, classes="diff-line")
 
