@@ -75,10 +75,12 @@ class DiffView(Widget):
         return self.app.rich_palette.get(name, "")
 
     def _make_table(self, old_col_style="", new_col_style=""):
-        """Create a 5-column Rich Table for side-by-side layout.
+        """Create a 4-column Rich Table for side-by-side layout.
 
-        Columns: old_ln (fixed) | old_content (1fr) | sep (1) |
+        Columns: old_ln (fixed) | old_content (1fr) |
                  new_ln (fixed) | new_content (1fr)
+
+        Line number columns act as natural visual separators.
         """
         table = Table(
             show_header=False,
@@ -89,7 +91,6 @@ class DiffView(Widget):
         )
         table.add_column(width=LN_COL_WIDTH, no_wrap=True)
         table.add_column(ratio=1, style=old_col_style)
-        table.add_column(width=1, no_wrap=True)
         table.add_column(width=LN_COL_WIDTH, no_wrap=True)
         table.add_column(ratio=1, style=new_col_style)
         return table
@@ -325,7 +326,6 @@ class DiffView(Widget):
         table.add_row(
             Text(""),
             Text(old, style=self._style("filename"), no_wrap=True),
-            Text("|"),
             Text(""),
             Text(new, style=self._style("filename"), no_wrap=True),
         )
@@ -372,7 +372,6 @@ class DiffView(Widget):
         table.add_row(
             old_ln_text,
             old_content_text,
-            Text("|"),
             new_ln_text,
             new_content_text,
         )
@@ -478,7 +477,6 @@ class DiffView(Widget):
         table.add_row(
             Text(""),
             Text(old_name or "", style=self._style("filename"), no_wrap=True),
-            Text("|"),
             Text(""),
             Text(new_name or "", style=self._style("filename"), no_wrap=True),
         )
