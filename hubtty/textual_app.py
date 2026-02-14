@@ -282,14 +282,16 @@ _CURSOR_COMMANDS = frozenset(
 )
 
 # Map cursor commands to Textual widget action method names.
+# Each value is a tuple of action names to try in order, so that
+# widgets with different APIs (DataTable vs VerticalScroll) all work.
 _CURSOR_ACTION_MAP = {
-    keymap.CURSOR_UP: "action_cursor_up",
-    keymap.CURSOR_DOWN: "action_cursor_down",
-    keymap.CURSOR_PAGE_UP: "action_page_up",
-    keymap.CURSOR_PAGE_DOWN: "action_page_down",
-    keymap.CURSOR_MAX_LEFT: "action_scroll_top",
-    keymap.CURSOR_MAX_RIGHT: "action_scroll_bottom",
-    keymap.ACTIVATE: "action_select_cursor",
+    keymap.CURSOR_UP: ("action_cursor_up", "action_scroll_up"),
+    keymap.CURSOR_DOWN: ("action_cursor_down", "action_scroll_down"),
+    keymap.CURSOR_PAGE_UP: ("action_page_up",),
+    keymap.CURSOR_PAGE_DOWN: ("action_page_down",),
+    keymap.CURSOR_MAX_LEFT: ("action_scroll_top", "action_scroll_home"),
+    keymap.CURSOR_MAX_RIGHT: ("action_scroll_bottom", "action_scroll_end"),
+    keymap.ACTIVATE: ("action_select_cursor",),
 }
 
 # urwid key names that Textual/DataTable already handle natively.
@@ -561,9 +563,7 @@ class TextualApp(App, BaseApp):
             focused = self.focused
             if focused:
                 for cmd in cursor_cmds:
-                    action = _CURSOR_ACTION_MAP.get(cmd)
-                    if action and hasattr(focused, action):
-                        getattr(focused, action)()
+                    self._invoke_cursor_action(focused, cmd)
             return True  # consumed
 
         # Non-cursor commands: dispatch
@@ -575,9 +575,7 @@ class TextualApp(App, BaseApp):
             focused = self.focused
             if focused:
                 for cmd in cursor_cmds:
-                    action = _CURSOR_ACTION_MAP.get(cmd)
-                    if action and hasattr(focused, action):
-                        getattr(focused, action)()
+                    self._invoke_cursor_action(focused, cmd)
 
         return True  # consumed
 
@@ -586,6 +584,18 @@ class TextualApp(App, BaseApp):
             self.input_buffer = []
             if hasattr(self, "hubtty_header"):
                 self.hubtty_header.set_message(None)
+
+    def _invoke_cursor_action(self, widget, cmd):
+        """Invoke the first matching action for a cursor command on *widget*.
+
+        _CURSOR_ACTION_MAP values are tuples of action names to try, so
+        widgets with different APIs (DataTable vs VerticalScroll) all work.
+        """
+        actions = _CURSOR_ACTION_MAP.get(cmd, ())
+        for action in actions:
+            if hasattr(widget, action):
+                getattr(widget, action)()
+                return
 
     def _handle_command(self, command, key):
         """Dispatch a hubtty command. Global commands are handled here;
