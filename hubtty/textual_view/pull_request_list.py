@@ -129,6 +129,16 @@ class PullRequestListView(Widget):
     }
     """
 
+    # Fixed column widths for all columns except Title
+    _FIXED_WIDTHS = {
+        "number": 6,
+        "repository": 20,
+        "branch": 16,
+        "author": 20,
+        "updated": 12,
+        "review": 2,
+    }
+
     def __init__(
         self,
         query,
@@ -175,17 +185,44 @@ class PullRequestListView(Widget):
             self._reverse = self.app.config.pr_list_options["reverse"]
 
         table = self.query_one("#pr-list", DataTable)
-        table.add_column(" #", key="number", width=6)
+        fw = self._FIXED_WIDTHS
+        table.add_column(" #", key="number", width=fw["number"])
         table.add_column(" Title", key="title")
         if not self._hide_repository:
-            table.add_column("Repository", key="repository")
-        table.add_column("Branch", key="branch")
+            table.add_column("Repository", key="repository", width=fw["repository"])
+        table.add_column("Branch", key="branch", width=fw["branch"])
         if not self._hide_author:
-            table.add_column("Author", key="author")
-        table.add_column("Updated", key="updated", width=10)
-        table.add_column("CR", key="review", width=2)
+            table.add_column("Author", key="author", width=fw["author"])
+        table.add_column("Updated", key="updated", width=fw["updated"])
+        table.add_column("CR", key="review", width=fw["review"])
         self._update_column_labels()
+        self._resize_title_column()
         self.refresh_data()
+
+    def on_resize(self, event):
+        self._resize_title_column()
+
+    def _resize_title_column(self):
+        """Set the title column width to fill remaining space."""
+        table = self.query_one("#pr-list", DataTable)
+        if not table.columns:
+            return
+        from textual.widgets._data_table import ColumnKey
+
+        title_col = table.columns.get(ColumnKey("title"))
+        if title_col is None:
+            return
+        # Sum up fixed widths of all visible columns (excluding title)
+        fixed_total = 0
+        for key_str, width in self._FIXED_WIDTHS.items():
+            if ColumnKey(key_str) in table.columns:
+                fixed_total += width
+        padding = table.cell_padding * 2 * len(table.columns)
+        available = table.size.width - fixed_total - padding
+        title_col.width = max(available, 10)
+        title_col.auto_width = False
+        table._require_update_dimensions = True
+        table.refresh()
 
     # ---- Column sorting via header click ----
 
