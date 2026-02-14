@@ -27,6 +27,75 @@ from hubtty import keymap
 import hubtty.version
 
 
+# ---- urwid color name mappings ----
+
+# Mapping from urwid 16-color names to Rich style color names.
+# Rich uses 'red', 'bright_red', etc. for standard terminal colors.
+_URWID_TO_RICH_COLOR = {
+    "default": "",
+    "black": "black",
+    "dark red": "red",
+    "dark green": "green",
+    "brown": "yellow",  # ANSI color 3
+    "dark blue": "blue",
+    "dark magenta": "magenta",
+    "dark cyan": "cyan",
+    "light gray": "white",  # ANSI color 7
+    "dark gray": "bright_black",
+    "light red": "bright_red",
+    "light green": "bright_green",
+    "yellow": "bright_yellow",
+    "light blue": "bright_blue",
+    "light magenta": "bright_magenta",
+    "light cyan": "bright_cyan",
+    "white": "bright_white",  # ANSI color 15
+}
+
+# urwid text attributes to Rich style keywords
+_URWID_TO_RICH_STYLE = {
+    "bold": "bold",
+    "standout": "reverse",
+    "underline": "underline",
+    "italics": "italic",
+    "italic": "italic",
+    "strikethrough": "strike",
+}
+
+
+def _urwid_spec_to_rich_style(spec):
+    """Convert an urwid foreground spec like 'light blue' or 'white,bold'
+    to a Rich style string like 'bright_blue' or 'bright_white bold'."""
+    if not spec:
+        return ""
+    parts = [p.strip() for p in spec.split(",")]
+    color = ""
+    styles = []
+    for part in parts:
+        if part in _URWID_TO_RICH_STYLE:
+            styles.append(_URWID_TO_RICH_STYLE[part])
+        elif part in _URWID_TO_RICH_COLOR:
+            color = _URWID_TO_RICH_COLOR[part]
+    tokens = []
+    if color:
+        tokens.append(color)
+    tokens.extend(styles)
+    return " ".join(tokens)
+
+
+def palette_to_rich_styles(palette_dict):
+    """Convert an urwid palette dict to a dict of {name: rich_style_string}.
+
+    Only includes the foreground spec; background is ignored for Rich Text
+    spans (use CSS classes for background colors).
+    """
+    result = {}
+    for name, (fg_spec, bg_spec) in palette_dict.items():
+        rich_style = _urwid_spec_to_rich_style(fg_spec)
+        if rich_style:
+            result[name] = rich_style
+    return result
+
+
 # ---- Palette to CSS conversion ----
 
 # Mapping from urwid 16-color names to Textual CSS color names.
@@ -344,6 +413,9 @@ class TextualApp(App, BaseApp):
         palette_css = palette_to_css(self.config.palette.palette)
         if palette_css:
             self.stylesheet.add_source(palette_css)
+
+        # Build Rich style lookup for palette entry names
+        self.rich_palette = palette_to_rich_styles(self.config.palette.palette)
 
     @property
     def title(self):
