@@ -52,6 +52,7 @@ class PullRequestView(Widget):
     }
     #pr-messages-container {
         padding: 0 2;
+        height: auto;
     }
     .pr-messages-header {
         padding: 0;
