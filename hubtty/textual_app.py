@@ -590,11 +590,21 @@ class TextualApp(App, BaseApp):
 
         _CURSOR_ACTION_MAP values are tuples of action names to try, so
         widgets with different APIs (DataTable vs VerticalScroll) all work.
+
+        SkipAction is caught because Textual widgets raise it when the
+        action is not applicable (e.g. scrolling when content fits), but
+        we call the method directly instead of through Textual's binding
+        dispatch which normally handles it.
         """
+        from textual.actions import SkipAction
+
         actions = _CURSOR_ACTION_MAP.get(cmd, ())
         for action in actions:
             if hasattr(widget, action):
-                getattr(widget, action)()
+                try:
+                    getattr(widget, action)()
+                except SkipAction:
+                    pass
                 return
 
     def _handle_command(self, command, key):
