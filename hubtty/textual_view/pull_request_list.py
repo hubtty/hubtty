@@ -379,16 +379,15 @@ class PullRequestListView(Widget):
         return self._row_meta.get(row_key)
 
     def on_data_table_row_selected(self, event):
-        """Handle Enter/click on a row."""
+        """Handle Enter/click on a row — navigate to PR detail view."""
         row_key_str = event.row_key.value
         meta = self._row_meta.get(row_key_str)
         if meta is None:
             return
-        # TODO: navigate to PR detail view (Phase 3)
-        self.app.notify(
-            "PR #%s detail view not yet implemented" % meta["number"],
-            title=meta["title"],
-        )
+        from hubtty.textual_view.pull_request import PullRequestView
+
+        view = PullRequestView(meta["pr_key"])
+        self.app.changeScreen(view)
 
     def _advance_cursor(self):
         """Move cursor down one row."""
