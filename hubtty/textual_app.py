@@ -218,8 +218,8 @@ _CURSOR_ACTION_MAP = {
     keymap.CURSOR_DOWN: "action_cursor_down",
     keymap.CURSOR_PAGE_UP: "action_page_up",
     keymap.CURSOR_PAGE_DOWN: "action_page_down",
-    keymap.CURSOR_MAX_LEFT: "action_scroll_home",
-    keymap.CURSOR_MAX_RIGHT: "action_scroll_end",
+    keymap.CURSOR_MAX_LEFT: "action_scroll_top",
+    keymap.CURSOR_MAX_RIGHT: "action_scroll_bottom",
     keymap.ACTIVATE: "action_select_cursor",
 }
 
@@ -234,8 +234,6 @@ _NATIVE_NAV_KEYS = frozenset(
         "right",
         "page up",
         "page down",
-        "home",
-        "end",
         "enter",
     )
 )
