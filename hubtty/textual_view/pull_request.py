@@ -475,6 +475,9 @@ class PullRequestView(Widget):
         if command == keymap.SEARCH_RESULTS:
             self.app.backScreen()
             return True
+        if command == keymap.DIFF:
+            self._openDiff()
+            return True
         return False
 
     def _pr_id(self):
@@ -484,6 +487,20 @@ class PullRequestView(Widget):
             if pr:
                 return pr.pr_id
         return None
+
+    def _openDiff(self):
+        """Open the diff view for the first commit."""
+        commit_key = None
+        with self.app.db.getSession() as session:
+            pr = session.getPullRequest(self.pr_key)
+            if pr and pr.commits:
+                commit_key = pr.commits[0].key
+        if commit_key is None:
+            return
+        from hubtty.textual_view.diff import DiffView
+
+        view = DiffView(self.pr_key, commit_key)
+        self.app.changeScreen(view)
 
     # ---- Toggle operations ----
 
