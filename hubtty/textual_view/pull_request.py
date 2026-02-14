@@ -21,7 +21,7 @@ from rich.text import Text
 
 from textual.widget import Widget
 from textual.widgets import Static, Markdown, Rule
-from textual.containers import VerticalScroll
+from textual.containers import Vertical, VerticalScroll
 
 from hubtty import keymap
 from hubtty import sync
@@ -50,11 +50,23 @@ class PullRequestView(Widget):
     .pr-commits-section {
         padding: 0 2;
     }
-    .pr-messages-section {
+    #pr-messages-container {
         padding: 0 2;
     }
-    .pr-message {
-        padding: 1 0;
+    .pr-messages-header {
+        padding: 0;
+    }
+    .pr-message-header {
+        padding: 1 0 0 0;
+    }
+    .pr-message-body {
+        padding: 0 0 0 2;
+    }
+    .pr-inline-file {
+        padding: 0 0 0 2;
+    }
+    .pr-inline-comment {
+        padding: 0 0 0 4;
     }
     .pr-commit-files {
         padding: 0 2;
@@ -81,7 +93,7 @@ class PullRequestView(Widget):
             yield Rule()
             yield Static(id="pr-commits-section", classes="pr-commits-section")
             yield Rule()
-            yield Static(id="pr-messages-section", classes="pr-messages-section")
+            yield Vertical(id="pr-messages-container")
 
     def on_mount(self):
         self.refresh_data()
@@ -325,19 +337,23 @@ class PullRequestView(Widget):
         commits_widget.update(text)
 
     def _update_messages(self, pr):
-        """Build the messages section."""
-        messages_widget = self.query_one("#pr-messages-section", Static)
+        """Build the messages section with markdown-rendered bodies."""
+        container = self.query_one("#pr-messages-container", Vertical)
+        container.remove_children()
 
         if not pr.messages:
-            messages_widget.update(Text("No messages", style="dim"))
+            container.mount(Static("No messages", classes="pr-messages-header"))
             return
 
         # Filter hidden comments if configured
         hide_comments = getattr(self.app.config, "hide_comments", [])
 
-        text = Text()
-        text.append("Messages\n", style=self._style("table-header"))
+        widgets = []
+        header = Text()
+        header.append("Messages", style=self._style("table-header"))
+        widgets.append(Static(header, classes="pr-messages-header"))
 
+        first = True
         for message in pr.messages:
             # Skip hidden comments
             if hide_comments and message.author:
@@ -350,9 +366,12 @@ class PullRequestView(Widget):
                 if skip:
                     continue
 
-            text.append("\n")
+            if not first:
+                widgets.append(Rule())
+            first = False
 
-            # Author and timestamp
+            # Author and timestamp header
+            hdr = Text()
             author_name = "Unknown"
             is_own = False
             if message.author:
@@ -371,52 +390,61 @@ class PullRequestView(Widget):
                 "pr-message-own-header" if is_own else "pr-message-header"
             )
 
-            text.append(author_name, style=name_style)
-
+            hdr.append(author_name, style=name_style)
             if message.created:
                 time_str = self._format_time(message.created)
-                text.append(" (%s)" % time_str, style=header_style)
-
+                hdr.append(" (%s)" % time_str, style=header_style)
             if message.draft and not message.pending:
-                text.append(" (draft)", style=self._style("pr-message-draft"))
+                hdr.append(" (draft)", style=self._style("pr-message-draft"))
 
-            text.append("\n")
+            widgets.append(Static(hdr, classes="pr-message-header"))
 
-            # Message body
+            # Message body (rendered as markdown)
             if message.message:
-                text.append(message.message)
-                if not message.message.endswith("\n"):
-                    text.append("\n")
+                widgets.append(Markdown(message.message, classes="pr-message-body"))
 
             # Inline comments
-            if hasattr(message, "commit") and message.commit:
-                self._render_inline_comments(text, message)
+            widgets.extend(self._build_inline_comment_widgets(message))
 
-        messages_widget.update(text)
+        container.mount_all(widgets)
 
-    def _render_inline_comments(self, text, message):
-        """Render inline comments for a message."""
-        if not message.commit or not message.commit.files:
-            return
+    def _build_inline_comment_widgets(self, message):
+        """Build widgets for inline comments on a message.
 
-        for f in message.commit.files:
-            file_comments = [c for c in f.comments if c.message_key == message.key]
-            if not file_comments:
-                continue
+        Uses message.comments (the direct relationship) rather than
+        walking message.commit.files, because inline comments may
+        reference files from a different commit than the message's own.
+        """
+        if not message.comments:
+            return []
 
+        # Group comments by file path
+        by_file = {}
+        for comment in message.comments:
+            f = comment.file
             path = f.display_path if hasattr(f, "display_path") else f.path
-            text.append("  ")
-            text.append(path or "unknown", style=self._style("filename-inline-comment"))
-            text.append("\n")
+            path = path or "unknown"
+            by_file.setdefault(path, []).append(comment)
 
-            for comment in sorted(file_comments, key=lambda c: c.line or 0):
-                text.append("    ")
+        widgets = []
+        for path, comments in by_file.items():
+            file_label = Text()
+            file_label.append(path, style=self._style("filename-inline-comment"))
+            widgets.append(Static(file_label, classes="pr-inline-file"))
+
+            for comment in sorted(comments, key=lambda c: c.line or 0):
+                if not comment.message:
+                    continue
+                prefix = ""
                 if comment.line:
-                    text.append("line %d: " % comment.line)
-                if comment.message:
-                    text.append(comment.message)
-                    if not comment.message.endswith("\n"):
-                        text.append("\n")
+                    prefix = "line %d" % comment.line
+                # Render comment body as markdown; prepend line reference
+                body = comment.message
+                if prefix:
+                    body = "**%s**\n%s" % (prefix, body)
+                widgets.append(Markdown(body, classes="pr-inline-comment"))
+
+        return widgets
 
     # ---- Command dispatch ----
 
