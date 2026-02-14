@@ -313,6 +313,8 @@ class RepositoryListView(Widget):
         available = table.size.width - fixed_total - padding
         name_col.width = max(available, 10)
         name_col.auto_width = False
+        table._require_update_dimensions = True
+        table.refresh()
 
     # ---- Column sorting via header click ----
 
