@@ -101,7 +101,12 @@ class DiffView(Widget):
             yield Vertical(id="diff-content")
 
     def on_mount(self):
+        scroll = self.query_one("#diff-scroll", VerticalScroll)
+        self.watch(scroll, "scroll_y", self._on_scroll_changed)
         self.refresh_data()
+
+    def _on_scroll_changed(self, scroll_y):
+        self._update_file_reminder_from_scroll()
 
     # ---- Event interest ----
 
@@ -212,8 +217,6 @@ class DiffView(Widget):
 
         widgets = []
         self._file_header_indices = []
-        first_old_name = None
-        first_new_name = None
 
         for i, diff in enumerate(diffs):
             if i > 0:
@@ -221,9 +224,6 @@ class DiffView(Widget):
 
             # Track file header position
             self._file_header_indices.append((len(widgets), diff.oldname, diff.newname))
-            if first_old_name is None:
-                first_old_name = diff.oldname
-                first_new_name = diff.newname
 
             # Determine file keys for this diff
             old_key = None
@@ -313,9 +313,10 @@ class DiffView(Widget):
         else:
             container.mount(Static("No diff available"))
 
-        # Set initial file reminder
-        if first_old_name:
-            self._update_file_reminder(first_old_name, first_new_name)
+        # Clear the file reminder initially -- the in-content file
+        # header is visible at the top, so no need to duplicate it.
+        reminder = self.query_one("#diff-file-reminder", Static)
+        reminder.update("")
 
     def _build_file_header(self, diff):
         """Build a file header widget with side-by-side table layout."""
@@ -484,19 +485,18 @@ class DiffView(Widget):
 
     # ---- Scroll tracking for file reminder ----
 
-    def on_scroll_y(self, event):
-        """Update file reminder when scrolling."""
-        self._update_file_reminder_from_scroll()
-
     def _update_file_reminder_from_scroll(self):
-        """Determine which file is at the top of the visible area."""
+        """Determine which file is at the top of the visible area.
+
+        Only show the docked file reminder for a file whose in-content
+        header has scrolled above the viewport (strict < check).
+        This avoids duplicating the filename when the header is visible.
+        """
         if not self._file_header_indices:
             return
         scroll = self.query_one("#diff-scroll", VerticalScroll)
         scroll_y = scroll.scroll_y
 
-        # Find the file header nearest to or above the scroll position
-        # We use child widget offsets
         container = self.query_one("#diff-content", Vertical)
         children = list(container.children)
         if not children:
@@ -507,13 +507,19 @@ class DiffView(Widget):
         for idx, old_name, new_name in self._file_header_indices:
             if idx < len(children):
                 child = children[idx]
-                # child.region.y gives the Y offset within the container
-                if hasattr(child, "region") and child.region.y <= scroll_y:
+                # virtual_region is in content-space coordinates
+                # (same as scroll_y), unlike region which is screen coords
+                vr = child.virtual_region
+                if vr.height > 0 and vr.y + vr.height <= scroll_y:
                     best_old = old_name
                     best_new = new_name
 
+        reminder = self.query_one("#diff-file-reminder", Static)
         if best_old is not None:
             self._update_file_reminder(best_old, best_new)
+        else:
+            # No file header has scrolled past -- clear the reminder
+            reminder.update("")
 
     # ---- Commit navigation ----
 
