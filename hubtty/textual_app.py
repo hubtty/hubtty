@@ -394,6 +394,7 @@ class TextualApp(App, BaseApp):
     ):
         # Initialize Textual App first
         App.__init__(self)
+        self.animation_level = "none"
         # Initialize BaseApp (config, db, sync, etc.)
         BaseApp.__init__(
             self,
