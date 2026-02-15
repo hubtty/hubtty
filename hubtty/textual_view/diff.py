@@ -37,10 +37,10 @@ LN_COL_WIDTH = 5
 _SYNTAX_THEME = ANSISyntaxTheme(ANSI_DARK)
 
 # Diff background styles (subtle tints)
-_ADDED_BG = Style(bgcolor="#002a00")
-_REMOVED_BG = Style(bgcolor="#2a0000")
-_ADDED_WORD_BG = Style(bgcolor="#004400")
-_REMOVED_WORD_BG = Style(bgcolor="#440000")
+_ADDED_BG = Style(bgcolor="#0d2816")
+_REMOVED_BG = Style(bgcolor="#3b1113")
+_ADDED_WORD_BG = Style(bgcolor="#174525")
+_REMOVED_WORD_BG = Style(bgcolor="#5c2425")
 
 
 class DiffView(Widget):
