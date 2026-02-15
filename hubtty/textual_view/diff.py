@@ -15,6 +15,11 @@
 
 import logging
 
+from pygments.lexers import get_lexer_for_filename
+from pygments.util import ClassNotFound
+
+from rich.style import Style
+from rich.syntax import ANSISyntaxTheme, ANSI_DARK
 from rich.table import Table
 from rich.text import Text
 
@@ -27,6 +32,15 @@ from hubtty import keymap
 from hubtty import sync
 
 LN_COL_WIDTH = 5
+
+# Syntax highlighting theme (foreground-only, no bgcolor baked in)
+_SYNTAX_THEME = ANSISyntaxTheme(ANSI_DARK)
+
+# Diff background styles (subtle tints)
+_ADDED_BG = Style(bgcolor="#002a00")
+_REMOVED_BG = Style(bgcolor="#2a0000")
+_ADDED_WORD_BG = Style(bgcolor="#004400")
+_REMOVED_WORD_BG = Style(bgcolor="#440000")
 
 
 class DiffView(Widget):
@@ -69,10 +83,56 @@ class DiffView(Widget):
         self.commit_key = commit_key
         self.title = "Diff"
         self._file_header_indices = []
+        self._lexer_cache = {}
 
     def _style(self, name):
         """Look up a palette entry name and return a Rich style string."""
         return self.app.rich_palette.get(name, "")
+
+    def _get_lexer(self, filename):
+        """Get a Pygments lexer for a filename, cached. Returns None on failure."""
+        if filename in self._lexer_cache:
+            return self._lexer_cache[filename]
+        lexer = None
+        if filename:
+            try:
+                lexer = get_lexer_for_filename(filename, stripnl=False, ensurenl=False)
+            except ClassNotFound:
+                pass
+        self._lexer_cache[filename] = lexer
+        return lexer
+
+    @staticmethod
+    def _extract_raw_text(content):
+        """Extract plain text from diff content (str, tuple, or list)."""
+        if isinstance(content, str):
+            return content
+        if isinstance(content, tuple):
+            return content[1]
+        if isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, tuple):
+                    parts.append(item[1])
+                elif isinstance(item, list):
+                    for sub in item:
+                        if isinstance(sub, tuple):
+                            parts.append(sub[1])
+            return "".join(parts)
+        return str(content)
+
+    def _syntax_highlight(self, raw_text, lexer):
+        """Tokenize raw_text with Pygments and return a Rich Text with
+        syntax foreground colors (no background)."""
+        text = Text()
+        text.append_tokens(
+            (token_text, _SYNTAX_THEME.get_style_for_token(token_type))
+            for token_type, token_text in lexer.get_tokens(raw_text)
+        )
+        # Strip trailing newline that Pygments may add
+        if text.plain.endswith("\n") and not raw_text.endswith("\n"):
+            text.right_crop(1)
+        return text
 
     def _make_table(self, old_col_style="", new_col_style=""):
         """Create a 4-column Rich Table for side-by-side layout.
@@ -235,6 +295,9 @@ class DiffView(Widget):
             if not diff.new_empty:
                 new_key = new_file_keys.get(diff.newname)
 
+            # Resolve syntax highlighting lexer for this file
+            lexer = self._get_lexer(diff.newname or diff.oldname)
+
             # File header
             widgets.append(self._build_file_header(diff))
 
@@ -253,7 +316,9 @@ class DiffView(Widget):
                         # Small enough to show all
                         for line in chunk.lines:
                             widgets.append(
-                                self._build_diff_line(diff, line, old_key, new_key)
+                                self._build_diff_line(
+                                    diff, line, old_key, new_key, lexer
+                                )
                             )
                             widgets.extend(
                                 self._pop_comments(
@@ -267,7 +332,9 @@ class DiffView(Widget):
                         if not chunk.first:
                             for line in first_lines:
                                 widgets.append(
-                                    self._build_diff_line(diff, line, old_key, new_key)
+                                    self._build_diff_line(
+                                        diff, line, old_key, new_key, lexer
+                                    )
                                 )
                                 widgets.extend(
                                     self._pop_comments(
@@ -283,7 +350,9 @@ class DiffView(Widget):
                         if not chunk.last:
                             for line in last_lines:
                                 widgets.append(
-                                    self._build_diff_line(diff, line, old_key, new_key)
+                                    self._build_diff_line(
+                                        diff, line, old_key, new_key, lexer
+                                    )
                                 )
                                 widgets.extend(
                                     self._pop_comments(
@@ -297,7 +366,7 @@ class DiffView(Widget):
                     # Changed chunk -- show all lines
                     for line in chunk.lines:
                         widgets.append(
-                            self._build_diff_line(diff, line, old_key, new_key)
+                            self._build_diff_line(diff, line, old_key, new_key, lexer)
                         )
                         widgets.extend(
                             self._pop_comments(
@@ -332,7 +401,16 @@ class DiffView(Widget):
         )
         return Static(table, classes="diff-file-header")
 
-    def _build_diff_line(self, diff, line, old_key, new_key):
+    @staticmethod
+    def _diff_bg(action):
+        """Return the background Style for a diff action."""
+        if action == "+":
+            return _ADDED_BG
+        if action == "-":
+            return _REMOVED_BG
+        return None
+
+    def _build_diff_line(self, diff, line, old_key, new_key, lexer):
         """Build a single side-by-side diff line widget using Rich Table."""
         old_side = line[gitrepo.OLD]
         new_side = line[gitrepo.NEW]
@@ -344,31 +422,37 @@ class DiffView(Widget):
         new_col_style = self._style("nonexistent") if new_action == "" else ""
         table = self._make_table(old_col_style, new_col_style)
 
+        old_bg = self._diff_bg(old_action)
+        new_bg = self._diff_bg(new_action)
+
         # Old line number
+        ln_fg = self._style("line-number")
         if old_ln is not None:
-            old_ln_text = Text(
-                "%*i " % (LN_COL_WIDTH - 1, old_ln), style=self._style("line-number")
-            )
+            old_ln_text = Text("%*i " % (LN_COL_WIDTH - 1, old_ln), style=ln_fg)
         else:
-            old_ln_text = Text(" " * LN_COL_WIDTH, style=self._style("line-number"))
+            old_ln_text = Text(" " * LN_COL_WIDTH, style=ln_fg)
+        if old_bg:
+            old_ln_text.stylize(old_bg)
 
         # Old content
-        old_content_text = Text()
         if old_action != "":
-            self._append_line_content(old_content_text, old_action, old_content)
+            old_content_text = self._build_line_content(old_action, old_content, lexer)
+        else:
+            old_content_text = Text()
 
         # New line number
         if new_ln is not None:
-            new_ln_text = Text(
-                "%*i " % (LN_COL_WIDTH - 1, new_ln), style=self._style("line-number")
-            )
+            new_ln_text = Text("%*i " % (LN_COL_WIDTH - 1, new_ln), style=ln_fg)
         else:
-            new_ln_text = Text(" " * LN_COL_WIDTH, style=self._style("line-number"))
+            new_ln_text = Text(" " * LN_COL_WIDTH, style=ln_fg)
+        if new_bg:
+            new_ln_text.stylize(new_bg)
 
         # New content
-        new_content_text = Text()
         if new_action != "":
-            self._append_line_content(new_content_text, new_action, new_content)
+            new_content_text = self._build_line_content(new_action, new_content, lexer)
+        else:
+            new_content_text = Text()
 
         table.add_row(
             old_ln_text,
@@ -378,41 +462,61 @@ class DiffView(Widget):
         )
         return Static(table, classes="diff-line")
 
-    def _append_line_content(self, text, action, content):
-        """Append diff line content to a Rich Text object.
+    def _build_line_content(self, action, content, lexer):
+        """Build a Rich Text for one side of a diff line.
 
-        Content can be:
-        - A plain string (context lines)
-        - A list of (style, text) tuples (intraline diff markup)
-        - A tuple of (style, text) (simple markup)
+        Combines syntax highlighting (foreground) with diff background
+        tinting, plus intraline word-emphasis overlays.
         """
-        if action == "":
+        raw = self._extract_raw_text(content)
+        bg = self._diff_bg(action)
+
+        # Build base text: syntax highlighted or plain
+        if lexer:
+            text = self._syntax_highlight(raw, lexer)
+        else:
+            text = Text(raw)
+
+        # Apply diff background tint
+        if bg:
+            text.style = bg
+
+        # Overlay intraline word emphasis backgrounds
+        if isinstance(content, (list, tuple)) and not isinstance(content, str):
+            self._apply_word_emphasis(text, action, content)
+
+        return text
+
+    def _apply_word_emphasis(self, text, action, content):
+        """Overlay brighter backgrounds on word-emphasis segments."""
+        if action == "+":
+            word_bg = _ADDED_WORD_BG
+            word_suffix = "-word"
+        elif action == "-":
+            word_bg = _REMOVED_WORD_BG
+            word_suffix = "-word"
+        else:
             return
 
-        if isinstance(content, str):
-            # Plain text -- determine style from action
-            if action == "+":
-                style = self._style("added-line")
-            elif action == "-":
-                style = self._style("removed-line")
-            else:
-                style = ""
-            text.append(content, style=style)
+        # Flatten content into (style_name, text) pairs with offsets
+        segments = []
+        if isinstance(content, tuple):
+            segments.append((content[0], content[1]))
         elif isinstance(content, list):
-            # Intraline diff markup -- list of (style, text) tuples
             for item in content:
                 if isinstance(item, tuple):
-                    style_name, line_text = item
-                    text.append(line_text, style=self._style(style_name))
+                    segments.append((item[0], item[1]))
                 elif isinstance(item, list):
-                    # Nested list from _emph_trail_ws
-                    for sub_item in item:
-                        if isinstance(sub_item, tuple):
-                            style_name, line_text = sub_item
-                            text.append(line_text, style=self._style(style_name))
-        elif isinstance(content, tuple):
-            style_name, line_text = content
-            text.append(line_text, style=self._style(style_name))
+                    for sub in item:
+                        if isinstance(sub, tuple):
+                            segments.append((sub[0], sub[1]))
+
+        offset = 0
+        for style_name, seg_text in segments:
+            seg_len = len(seg_text)
+            if style_name.endswith(word_suffix) or style_name == "trailing-ws":
+                text.stylize(word_bg, offset, offset + seg_len)
+            offset += seg_len
 
     def _build_context_indicator(self, count):
         """Build a context collapse indicator."""
