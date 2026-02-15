@@ -104,11 +104,15 @@ class DiffView(Widget):
 
     @staticmethod
     def _extract_raw_text(content):
-        """Extract plain text from diff content (str, tuple, or list)."""
+        """Extract plain text from diff content (str, tuple, or list).
+
+        Also replaces the » tab indicator with a plain space (the
+        tab-stop padding spaces from gitrepo.expand_tabs are preserved).
+        """
         if isinstance(content, str):
-            return content
+            return content.replace("»", " ")
         if isinstance(content, tuple):
-            return content[1]
+            return content[1].replace("»", " ")
         if isinstance(content, list):
             parts = []
             for item in content:
@@ -118,7 +122,7 @@ class DiffView(Widget):
                     for sub in item:
                         if isinstance(sub, tuple):
                             parts.append(sub[1])
-            return "".join(parts)
+            return "".join(parts).replace("»", " ")
         return str(content)
 
     def _syntax_highlight(self, raw_text, lexer):
