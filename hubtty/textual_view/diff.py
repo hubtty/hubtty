@@ -25,7 +25,7 @@ from rich.text import Text
 
 from textual.widget import Widget
 from textual.widgets import Markdown, Static, Rule
-from textual.containers import Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 
 from hubtty import gitrepo
 from hubtty import keymap
@@ -68,12 +68,19 @@ class DiffView(Widget):
     .diff-line {
         height: auto;
     }
+    .diff-comment-row {
+        height: auto;
+    }
+    .diff-comment-pad {
+        width: 1fr;
+    }
     .diff-comment {
         background: #1a2332;
         border-left: thick #4a9eff;
         padding: 0 1 0 1;
         margin: 1 0;
         height: auto;
+        width: 1fr;
     }
     .diff-comment Static {
         margin: 0;
@@ -89,6 +96,7 @@ class DiffView(Widget):
         padding: 0 1 0 1;
         margin: 1 0;
         height: auto;
+        width: 1fr;
     }
     .diff-draft-comment Static {
         margin: 0;
@@ -595,11 +603,16 @@ class DiffView(Widget):
         header.append(prefix + " ", style="dim")
         if author:
             header.append(author, style=self._style("comment-name"))
-        return Vertical(
+        comment = Vertical(
             Static(header),
             Markdown(body),
             classes="diff-comment",
         )
+        pad = Static("", classes="diff-comment-pad")
+        if side == "old":
+            return Horizontal(comment, pad, classes="diff-comment-row")
+        else:
+            return Horizontal(pad, comment, classes="diff-comment-row")
 
     def _build_draft_comment(self, side, message):
         """Build a read-only draft comment widget."""
@@ -607,11 +620,16 @@ class DiffView(Widget):
         header = Text()
         header.append(prefix + " ", style="dim")
         header.append("(draft)", style=self._style("pr-message-draft"))
-        return Vertical(
+        comment = Vertical(
             Static(header),
             Markdown(str(message)),
             classes="diff-draft-comment",
         )
+        pad = Static("", classes="diff-comment-pad")
+        if side == "old":
+            return Horizontal(comment, pad, classes="diff-comment-row")
+        else:
+            return Horizontal(pad, comment, classes="diff-comment-row")
 
     def _update_file_reminder(self, old_name, new_name):
         """Update the sticky file reminder header with side-by-side layout."""
