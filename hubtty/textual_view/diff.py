@@ -24,7 +24,7 @@ from rich.table import Table
 from rich.text import Text
 
 from textual.widget import Widget
-from textual.widgets import Static, Rule
+from textual.widgets import Markdown, Static, Rule
 from textual.containers import Vertical, VerticalScroll
 
 from hubtty import gitrepo
@@ -69,7 +69,34 @@ class DiffView(Widget):
         height: auto;
     }
     .diff-comment {
-        padding: 0 0 0 0;
+        background: #1a2332;
+        border-left: thick #4a9eff;
+        padding: 0 1 0 1;
+        margin: 1 0;
+        height: auto;
+    }
+    .diff-comment Static {
+        margin: 0;
+        padding: 0;
+    }
+    .diff-comment Markdown {
+        margin: 0;
+        padding: 0;
+    }
+    .diff-draft-comment {
+        background: #2a1a1a;
+        border-left: thick #e05050;
+        padding: 0 1 0 1;
+        margin: 1 0;
+        height: auto;
+    }
+    .diff-draft-comment Static {
+        margin: 0;
+        padding: 0;
+    }
+    .diff-draft-comment Markdown {
+        margin: 0;
+        padding: 0;
     }
     .diff-context-btn {
         height: 1;
@@ -558,26 +585,33 @@ class DiffView(Widget):
 
     def _build_comment(self, side, message):
         """Build a read-only inline comment widget."""
-        text = Text()
         if isinstance(message, tuple):
             author, body = message
-            text.append(author, style=self._style("comment-name"))
-            text.append(": ", style=self._style("comment"))
-            text.append(body, style=self._style("comment"))
         else:
-            text.append(str(message), style=self._style("comment"))
-        prefix = "  < " if side == "old" else "  > "
-        result = Text()
-        result.append(prefix, style="dim")
-        result.append_text(text)
-        return Static(result, classes="diff-comment")
+            author = None
+            body = str(message)
+        prefix = "<" if side == "old" else ">"
+        header = Text()
+        header.append(prefix + " ", style="dim")
+        if author:
+            header.append(author, style=self._style("comment-name"))
+        return Vertical(
+            Static(header),
+            Markdown(body),
+            classes="diff-comment",
+        )
 
     def _build_draft_comment(self, side, message):
         """Build a read-only draft comment widget."""
-        text = Text()
-        text.append("  (draft) ", style=self._style("pr-message-draft"))
-        text.append(str(message), style=self._style("draft-comment"))
-        return Static(text, classes="diff-comment")
+        prefix = "<" if side == "old" else ">"
+        header = Text()
+        header.append(prefix + " ", style="dim")
+        header.append("(draft)", style=self._style("pr-message-draft"))
+        return Vertical(
+            Static(header),
+            Markdown(str(message)),
+            classes="diff-draft-comment",
+        )
 
     def _update_file_reminder(self, old_name, new_name):
         """Update the sticky file reminder header with side-by-side layout."""
