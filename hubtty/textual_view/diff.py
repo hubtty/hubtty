@@ -556,8 +556,9 @@ class DiffView(Widget):
         raw = self._extract_raw_text(content)
         bg = self._diff_bg(action)
 
-        # Build base text: syntax highlighted or plain
-        if lexer:
+        # Build base text: syntax highlighted for changed lines, plain
+        # for context lines (where highlighting adds little value)
+        if lexer and action != " ":
             text = self._syntax_highlight(raw, lexer)
         else:
             text = Text(raw)
