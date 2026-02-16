@@ -426,6 +426,10 @@ class DiffView(Widget):
         reminder = self.query_one("#diff-file-reminder", Static)
         reminder.update("")
 
+        # Scroll to top (important when navigating between commits)
+        scroll = self.query_one("#diff-scroll", VerticalScroll)
+        scroll.scroll_home(animate=False)
+
     def _build_file_header(self, diff):
         """Build a file header widget with side-by-side table layout."""
         old = diff.oldname or ""
