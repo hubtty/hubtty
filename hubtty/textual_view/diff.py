@@ -310,48 +310,19 @@ class DiffView(Widget):
         container.remove_children()
         container.mount(Static(message))
 
-    @staticmethod
-    def _flush_batch(batch, widgets):
+    def _flush_batch(self, batch, widgets):
         """Flush accumulated row data into a single multi-row Table widget.
 
-        Each entry in *batch* is a tuple of
+        Each entry in *batch* is a 4-tuple of
         (old_ln_text, old_content_text, new_ln_text, new_content_text)
-        produced by _build_diff_line_data().  The companion
-        ``_batch_col_styles`` tuple provides the column styles for
-        the entire batch.
+        produced by _build_diff_line_data().
         """
         if not batch:
             return
-        # Build a 4-column table; column styles are stored per-batch
-        # (flushed whenever they change).
-        table = Table(
-            show_header=False,
-            box=None,
-            padding=(0, 0),
-            expand=True,
-            show_edge=False,
-        )
-        table.add_column(width=LN_COL_WIDTH, no_wrap=True)
-        table.add_column(ratio=1, style=batch[0][4])
-        table.add_column(width=LN_COL_WIDTH, no_wrap=True)
-        table.add_column(ratio=1, style=batch[0][5])
-        for old_ln, old_ct, new_ln, new_ct, _ocs, _ncs in batch:
+        table = self._make_table()
+        for old_ln, old_ct, new_ln, new_ct in batch:
             table.add_row(old_ln, old_ct, new_ln, new_ct)
         widgets.append(Static(table, classes="diff-line"))
-
-    def _append_to_batch(self, batch, row_data, widgets):
-        """Append row data to batch, flushing first if column styles change.
-
-        Returns the (possibly reset) batch list.
-        """
-        if batch:
-            old_styles = (batch[0][4], batch[0][5])
-            new_styles = (row_data[4], row_data[5])
-            if old_styles != new_styles:
-                self._flush_batch(batch, widgets)
-                batch = []
-        batch.append(row_data)
-        return batch
 
     def _build_diff_widgets(self, diffs, comment_lists):
         """Build all diff widgets and mount them.
@@ -400,7 +371,7 @@ class DiffView(Widget):
                                 with self._perf_counters.count("_build_diff_line"):
                                     row = self._build_diff_line_data(diff, line, lexer)
                                     line_count += 1
-                                batch = self._append_to_batch(batch, row, widgets)
+                                batch.append(row)
                                 comments = self._pop_comments(
                                     comment_lists,
                                     diff,
@@ -421,7 +392,7 @@ class DiffView(Widget):
                                             diff, line, lexer
                                         )
                                         line_count += 1
-                                    batch = self._append_to_batch(batch, row, widgets)
+                                    batch.append(row)
                                     comments = self._pop_comments(
                                         comment_lists,
                                         diff,
@@ -446,7 +417,7 @@ class DiffView(Widget):
                                             diff, line, lexer
                                         )
                                         line_count += 1
-                                    batch = self._append_to_batch(batch, row, widgets)
+                                    batch.append(row)
                                     comments = self._pop_comments(
                                         comment_lists,
                                         diff,
@@ -466,7 +437,7 @@ class DiffView(Widget):
                             with self._perf_counters.count("_build_diff_line"):
                                 row = self._build_diff_line_data(diff, line, lexer)
                                 line_count += 1
-                            batch = self._append_to_batch(batch, row, widgets)
+                            batch.append(row)
                             comments = self._pop_comments(
                                 comment_lists,
                                 diff,
@@ -529,17 +500,18 @@ class DiffView(Widget):
         """Build row data for a single side-by-side diff line.
 
         Returns a tuple of (old_ln_text, old_content_text,
-        new_ln_text, new_content_text, old_col_style, new_col_style)
-        suitable for adding to a batched Rich Table via _flush_batch().
+        new_ln_text, new_content_text) suitable for adding to a
+        batched Rich Table via _flush_batch().
+
+        The "nonexistent" palette style (for sides that don't exist
+        in the diff) is applied directly to the cell Text objects
+        rather than as a column-level style.  This avoids batch
+        flushes when +/- lines alternate within a chunk.
         """
         old_side = line[gitrepo.OLD]
         new_side = line[gitrepo.NEW]
         old_ln, old_action, old_content = old_side
         new_ln, new_action, new_content = new_side
-
-        # Column styles for nonexistent sides
-        old_col_style = self._style("nonexistent") if old_action == "" else ""
-        new_col_style = self._style("nonexistent") if new_action == "" else ""
 
         old_bg = self._diff_bg(old_action)
         new_bg = self._diff_bg(new_action)
@@ -557,7 +529,7 @@ class DiffView(Widget):
         if old_action != "":
             old_content_text = self._build_line_content(old_action, old_content, lexer)
         else:
-            old_content_text = Text()
+            old_content_text = Text(style=self._style("nonexistent"))
 
         # New line number
         if new_ln is not None:
@@ -571,16 +543,9 @@ class DiffView(Widget):
         if new_action != "":
             new_content_text = self._build_line_content(new_action, new_content, lexer)
         else:
-            new_content_text = Text()
+            new_content_text = Text(style=self._style("nonexistent"))
 
-        return (
-            old_ln_text,
-            old_content_text,
-            new_ln_text,
-            new_content_text,
-            old_col_style,
-            new_col_style,
-        )
+        return (old_ln_text, old_content_text, new_ln_text, new_content_text)
 
     def _build_line_content(self, action, content, lexer):
         """Build a Rich Text for one side of a diff line.
