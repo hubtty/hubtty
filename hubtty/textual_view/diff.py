@@ -23,6 +23,7 @@ from rich.syntax import ANSISyntaxTheme, ANSI_DARK
 from rich.table import Table
 from rich.text import Text
 
+from textual import work
 from textual.widget import Widget
 from textual.widgets import Markdown, Static, Rule
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -223,12 +224,30 @@ class DiffView(Widget):
     # ---- Data loading and rendering ----
 
     def refresh_data(self):
-        """Load diff data and build the view."""
-        with perf_log("DiffView.refresh_data"):
-            with perf_log("DiffView.refresh_data.db_session"):
+        """Kick off background diff loading.
+
+        The heavy work (DB queries, git diff, row data building) runs
+        in a thread worker so the UI stays responsive.  When the worker
+        finishes it hands the prepared data to _mount_diff() on the
+        main thread for widget construction and mounting.
+        """
+        self.loading = True
+        self._load_diff_data()
+
+    @work(thread=True, exclusive=True, group="diff-load")
+    def _load_diff_data(self):
+        """Worker: load diff data and build row tuples (background thread).
+
+        Produces an instruction list of plain Python / Rich objects
+        that _mount_diff() converts into Textual widgets on the main
+        thread.
+        """
+        with perf_log("DiffView._load_diff_data"):
+            with perf_log("DiffView._load_diff_data.db_session"):
                 with self.app.db.getSession() as session:
                     new_commit = session.getCommit(self.commit_key)
                     if new_commit is None:
+                        self.app.call_from_thread(self._mount_diff, None)
                         return
 
                     pr = new_commit.pull_request
@@ -237,15 +256,13 @@ class DiffView(Widget):
                     base_sha = new_commit.parent
                     sha = new_commit.sha
 
-                    self.title = "Diff of %s from %s to %s" % (
+                    title = "Diff of %s from %s to %s" % (
                         repository_name,
                         base_sha[:7],
                         sha[:7],
                     )
-                    if hasattr(self.app, "hubtty_header"):
-                        self.app.hubtty_header.set_title(self.title)
 
-                    # Collect comments
+                    # Collect comments into plain dicts
                     comment_lists = {}
                     comment_filenames = set()
                     for f in new_commit.files:
@@ -278,19 +295,19 @@ class DiffView(Widget):
             # Get diff from git repo (outside DB session)
             try:
                 repo = gitrepo.get_repo(repository_name, self.app.config)
-                with perf_log("DiffView.refresh_data.repo_diff"):
+                with perf_log("DiffView._load_diff_data.repo_diff"):
                     diffs = repo.diff(base_sha, sha)
             except Exception as e:
                 self.logger.error("Error loading diff: %s", e)
-                self._show_error("Error loading diff: %s" % e)
+                self.app.call_from_thread(
+                    self._mount_diff_error, "Error loading diff: %s" % e
+                )
                 return
 
-            # Remove files that are already in the diff from comment_filenames
+            # Add files that have comments but no diff
             for diff in diffs:
                 comment_filenames.discard(diff.oldname)
                 comment_filenames.discard(diff.newname)
-
-            # Create fake diffs for files with comments but no diff
             for filename in comment_filenames:
                 try:
                     diff = repo.getFile(base_sha, sha, filename)
@@ -301,171 +318,263 @@ class DiffView(Widget):
                         "Unable to find file %s in commit %s", filename, sha
                     )
 
-            # Build widgets
-            self._build_diff_widgets(diffs, comment_lists)
+            # Build instruction list (plain Python / Rich objects only)
+            with perf_log("DiffView._load_diff_data.build_instructions"):
+                instructions = self._build_instructions(diffs, comment_lists)
 
-    def _show_error(self, message):
-        """Display an error in the diff content area."""
+        self.app.call_from_thread(self._mount_diff, instructions, title)
+
+    # ---- Instruction types used between worker and main thread ----
+    # Each instruction is a tuple whose first element identifies its type.
+    _INST_RULE = "rule"
+    _INST_FILE_HEADER = "file_header"
+    _INST_BATCH = "batch"  # (type, [row_data, ...])
+    _INST_CONTEXT_IND = "context"  # (type, count)
+    _INST_COMMENT = "comment"  # (type, side, message)
+    _INST_DRAFT = "draft"  # (type, side, message)
+
+    def _build_instructions(self, diffs, comment_lists):
+        """Build an instruction list from diffs (runs in worker thread).
+
+        Returns a list of tuples describing what widgets to create.
+        All heavy work (syntax highlighting, row data building) happens
+        here.  The instructions contain only plain Python objects and
+        Rich renderables (Text, Table) -- no Textual widgets.
+        """
+        self._perf_counters.reset()
+        instructions = []
+        file_headers = []
+        line_count = 0
+
+        for i, diff in enumerate(diffs):
+            if i > 0:
+                instructions.append((self._INST_RULE,))
+
+            # Track file header position (index into instructions)
+            file_headers.append((len(instructions), diff.oldname, diff.newname))
+
+            # File header data
+            instructions.append(
+                (self._INST_FILE_HEADER, diff.oldname or "", diff.newname or "")
+            )
+
+            # File-level comment data
+            self._collect_comment_instructions(
+                instructions, comment_lists, diff, None, None
+            )
+
+            # Chunks -- one batch spans across chunk boundaries
+            batch = []
+            lexer = self._get_lexer(diff.newname or diff.oldname)
+
+            for chunk in diff.chunks:
+                if chunk.context and len(chunk.lines) > 20:
+                    if not chunk.first:
+                        for line in chunk.lines[:10]:
+                            with self._perf_counters.count("_build_diff_line"):
+                                batch.append(
+                                    self._build_diff_line_data(diff, line, lexer)
+                                )
+                                line_count += 1
+                            batch, line_count = self._maybe_flush_for_comments(
+                                batch,
+                                instructions,
+                                comment_lists,
+                                diff,
+                                line,
+                                line_count,
+                            )
+                    # Flush before context indicator
+                    if batch:
+                        instructions.append((self._INST_BATCH, batch))
+                        batch = []
+                    middle_count = len(chunk.lines) - 10
+                    if chunk.first:
+                        middle_count = len(chunk.lines)
+                    if not chunk.last:
+                        middle_count -= 10
+                    if middle_count > 0:
+                        instructions.append((self._INST_CONTEXT_IND, middle_count))
+                    if not chunk.last:
+                        for line in chunk.lines[-10:]:
+                            with self._perf_counters.count("_build_diff_line"):
+                                batch.append(
+                                    self._build_diff_line_data(diff, line, lexer)
+                                )
+                                line_count += 1
+                            batch, line_count = self._maybe_flush_for_comments(
+                                batch,
+                                instructions,
+                                comment_lists,
+                                diff,
+                                line,
+                                line_count,
+                            )
+                else:
+                    for line in chunk.lines:
+                        with self._perf_counters.count("_build_diff_line"):
+                            batch.append(self._build_diff_line_data(diff, line, lexer))
+                            line_count += 1
+                        batch, line_count = self._maybe_flush_for_comments(
+                            batch,
+                            instructions,
+                            comment_lists,
+                            diff,
+                            line,
+                            line_count,
+                        )
+            # Flush remaining rows for this file
+            if batch:
+                instructions.append((self._INST_BATCH, batch))
+
+        self.logger.info(
+            "[perf] DiffView._build_instructions: %d instructions (%d diff lines)",
+            len(instructions),
+            line_count,
+        )
+        self._perf_counters.log_summary("DiffView._build_instructions")
+        return (instructions, file_headers)
+
+    def _maybe_flush_for_comments(
+        self, batch, instructions, comment_lists, diff, line, line_count
+    ):
+        """Check for comments at this line; if any, flush the batch and
+        append comment instructions.  Returns the (possibly reset) batch
+        and unchanged line_count."""
+        comment_data = self._pop_comment_data(
+            comment_lists,
+            diff,
+            line[gitrepo.OLD][gitrepo.LINENO],
+            line[gitrepo.NEW][gitrepo.LINENO],
+        )
+        if comment_data:
+            if batch:
+                instructions.append((self._INST_BATCH, batch))
+                batch = []
+            instructions.extend(comment_data)
+        return batch, line_count
+
+    def _collect_comment_instructions(
+        self, instructions, comment_lists, diff, old_ln, new_ln
+    ):
+        """Append comment instructions for a given line position."""
+        instructions.extend(self._pop_comment_data(comment_lists, diff, old_ln, new_ln))
+
+    def _pop_comment_data(self, comment_lists, diff, old_ln, new_ln):
+        """Pop comment data for a given line and return instruction tuples.
+
+        Unlike _pop_comments() this does not create Textual widgets --
+        it returns lightweight instruction tuples that _mount_diff()
+        will turn into widgets on the main thread.
+        """
+        result = []
+        for side, ln, name in (
+            ("old", old_ln, diff.oldname),
+            ("new", new_ln, diff.newname),
+        ):
+            key = "%s-%s-%s" % (side, ln, name)
+            for _ck, message in comment_lists.pop(key, []):
+                result.append((self._INST_COMMENT, side, message))
+        for side, ln, name in (
+            ("old", old_ln, diff.oldname),
+            ("new", new_ln, diff.newname),
+        ):
+            key = "%sdraft-%s-%s" % (side, ln, name)
+            for _ck, message in comment_lists.pop(key, []):
+                result.append((self._INST_DRAFT, side, message))
+        return result
+
+    # ---- Main-thread widget construction and mounting ----
+
+    def _mount_diff_error(self, message):
+        """Show an error message (called on main thread)."""
+        self.loading = False
         container = self.query_one("#diff-content", Vertical)
         container.remove_children()
         container.mount(Static(message))
 
-    def _flush_batch(self, batch, widgets):
-        """Flush accumulated row data into a single multi-row Table widget.
+    def _mount_diff(self, data, title=None):
+        """Convert instructions into Textual widgets and mount them.
 
-        Each entry in *batch* is a 4-tuple of
-        (old_ln_text, old_content_text, new_ln_text, new_content_text)
-        produced by _build_diff_line_data().
+        Called on the main thread by the worker via call_from_thread.
         """
-        if not batch:
-            return
-        table = self._make_table()
-        for old_ln, old_ct, new_ln, new_ct in batch:
-            table.add_row(old_ln, old_ct, new_ln, new_ct)
-        widgets.append(Static(table, classes="diff-line"))
-
-    def _build_diff_widgets(self, diffs, comment_lists):
-        """Build all diff widgets and mount them.
-
-        Diff lines are batched into multi-row Rich Tables so that many
-        consecutive lines share a single Textual widget, dramatically
-        reducing mount overhead.
-        """
-        with perf_log("DiffView._build_diff_widgets"):
+        with perf_log("DiffView._mount_diff"):
+            self.loading = False
             container = self.query_one("#diff-content", Vertical)
-            with perf_log("DiffView._build_diff_widgets.remove_children"):
-                container.remove_children()
+            container.remove_children()
 
-            self._perf_counters.reset()
-            widgets = []
+            if data is None:
+                return
+
+            instructions, file_headers = data
+
+            if title:
+                self.title = title
+                if hasattr(self.app, "hubtty_header"):
+                    self.app.hubtty_header.set_title(title)
+
             self._file_header_indices = []
-            line_count = 0
+            widgets = []
 
-            for i, diff in enumerate(diffs):
-                if i > 0:
+            for inst in instructions:
+                itype = inst[0]
+                if itype == self._INST_RULE:
                     widgets.append(Rule())
+                elif itype == self._INST_FILE_HEADER:
+                    _, old_name, new_name = inst
+                    table = self._make_table()
+                    table.add_row(
+                        Text(""),
+                        Text(old_name, style=self._style("filename"), no_wrap=True),
+                        Text(""),
+                        Text(new_name, style=self._style("filename"), no_wrap=True),
+                    )
+                    widgets.append(Static(table, classes="diff-file-header"))
+                elif itype == self._INST_BATCH:
+                    _, batch = inst
+                    table = self._make_table()
+                    for old_ln, old_ct, new_ln, new_ct in batch:
+                        table.add_row(old_ln, old_ct, new_ln, new_ct)
+                    widgets.append(Static(table, classes="diff-line"))
+                elif itype == self._INST_CONTEXT_IND:
+                    _, count = inst
+                    text = Text()
+                    text.append(
+                        "  ... %d lines of context ..." % count,
+                        style=self._style("context-button"),
+                    )
+                    widgets.append(Static(text, classes="diff-context-btn"))
+                elif itype == self._INST_COMMENT:
+                    _, side, message = inst
+                    widgets.append(self._build_comment(side, message))
+                elif itype == self._INST_DRAFT:
+                    _, side, message = inst
+                    widgets.append(self._build_draft_comment(side, message))
 
-                # Track file header position
-                self._file_header_indices.append(
-                    (len(widgets), diff.oldname, diff.newname)
-                )
-
-                # Resolve syntax highlighting lexer for this file
-                lexer = self._get_lexer(diff.newname or diff.oldname)
-
-                # File header
-                widgets.append(self._build_file_header(diff))
-
-                # File-level comments
-                widgets.extend(self._pop_comments(comment_lists, diff, None, None))
-
-                # Chunks -- one batch spans across chunk boundaries
-                # within a file; only flushed for context indicators,
-                # inline comments, or at the end of the file.
-                batch = []
-                for chunk in diff.chunks:
-                    if chunk.context and len(chunk.lines) > 20:
-                        # Large context: show first/last 10 lines
-                        # with a collapse indicator in between.
-                        if not chunk.first:
-                            for line in chunk.lines[:10]:
-                                with self._perf_counters.count("_build_diff_line"):
-                                    row = self._build_diff_line_data(diff, line, lexer)
-                                    line_count += 1
-                                batch.append(row)
-                                comments = self._pop_comments(
-                                    comment_lists,
-                                    diff,
-                                    line[gitrepo.OLD][gitrepo.LINENO],
-                                    line[gitrepo.NEW][gitrepo.LINENO],
-                                )
-                                if comments:
-                                    self._flush_batch(batch, widgets)
-                                    batch = []
-                                    widgets.extend(comments)
-                        # Flush before context indicator
-                        self._flush_batch(batch, widgets)
-                        batch = []
-                        middle_count = len(chunk.lines) - 10
-                        if chunk.first:
-                            middle_count = len(chunk.lines)
-                        if not chunk.last:
-                            middle_count -= 10
-                        if middle_count > 0:
-                            widgets.append(self._build_context_indicator(middle_count))
-                        if not chunk.last:
-                            for line in chunk.lines[-10:]:
-                                with self._perf_counters.count("_build_diff_line"):
-                                    row = self._build_diff_line_data(diff, line, lexer)
-                                    line_count += 1
-                                batch.append(row)
-                                comments = self._pop_comments(
-                                    comment_lists,
-                                    diff,
-                                    line[gitrepo.OLD][gitrepo.LINENO],
-                                    line[gitrepo.NEW][gitrepo.LINENO],
-                                )
-                                if comments:
-                                    self._flush_batch(batch, widgets)
-                                    batch = []
-                                    widgets.extend(comments)
-                    else:
-                        # Small context (<=20 lines) or changed chunk:
-                        # append all lines to the current batch.
-                        for line in chunk.lines:
-                            with self._perf_counters.count("_build_diff_line"):
-                                row = self._build_diff_line_data(diff, line, lexer)
-                                line_count += 1
-                            batch.append(row)
-                            comments = self._pop_comments(
-                                comment_lists,
-                                diff,
-                                line[gitrepo.OLD][gitrepo.LINENO],
-                                line[gitrepo.NEW][gitrepo.LINENO],
-                            )
-                            if comments:
-                                self._flush_batch(batch, widgets)
-                                batch = []
-                                widgets.extend(comments)
-                # Flush remaining rows for this file
-                self._flush_batch(batch, widgets)
-
-            self.logger.info(
-                "[perf] DiffView._build_diff_widgets: "
-                "%d widgets built (%d diff lines batched)",
-                len(widgets),
-                line_count,
-            )
-            self._perf_counters.log_summary("DiffView._build_diff_widgets")
+            # Rebuild file header indices from the instruction positions
+            # mapped to widget positions
+            inst_to_widget = {}
+            widget_idx = 0
+            for inst_idx, inst in enumerate(instructions):
+                inst_to_widget[inst_idx] = widget_idx
+                widget_idx += 1
+            for inst_idx, old_name, new_name in file_headers:
+                w_idx = inst_to_widget.get(inst_idx, 0)
+                self._file_header_indices.append((w_idx, old_name, new_name))
 
             if widgets:
-                with perf_log("DiffView._build_diff_widgets.mount_all"):
+                with perf_log("DiffView._mount_diff.mount_all"):
                     container.mount_all(widgets)
             else:
                 container.mount(Static("No diff available"))
 
-            # Clear the file reminder initially -- the in-content file
-            # header is visible at the top, so no need to duplicate it.
+            # Clear the file reminder initially
             reminder = self.query_one("#diff-file-reminder", Static)
             reminder.update("")
 
-            # Scroll to top (important when navigating between commits)
+            # Scroll to top
             scroll = self.query_one("#diff-scroll", VerticalScroll)
             scroll.scroll_home(animate=False)
-
-    def _build_file_header(self, diff):
-        """Build a file header widget with side-by-side table layout."""
-        old = diff.oldname or ""
-        new = diff.newname or ""
-
-        table = self._make_table()
-        table.add_row(
-            Text(""),
-            Text(old, style=self._style("filename"), no_wrap=True),
-            Text(""),
-            Text(new, style=self._style("filename"), no_wrap=True),
-        )
-        return Static(table, classes="diff-file-header")
 
     @staticmethod
     def _diff_bg(action):
@@ -480,13 +589,12 @@ class DiffView(Widget):
         """Build row data for a single side-by-side diff line.
 
         Returns a tuple of (old_ln_text, old_content_text,
-        new_ln_text, new_content_text) suitable for adding to a
-        batched Rich Table via _flush_batch().
+        new_ln_text, new_content_text) suitable for batching into a
+        Rich Table.
 
         The "nonexistent" palette style (for sides that don't exist
         in the diff) is applied directly to the cell Text objects
-        rather than as a column-level style.  This avoids batch
-        flushes when +/- lines alternate within a chunk.
+        so that lines with different actions can share one Table.
         """
         old_side = line[gitrepo.OLD]
         new_side = line[gitrepo.NEW]
@@ -583,40 +691,6 @@ class DiffView(Widget):
             if style_name.endswith(word_suffix) or style_name == "trailing-ws":
                 text.stylize(word_bg, offset, offset + seg_len)
             offset += seg_len
-
-    def _build_context_indicator(self, count):
-        """Build a context collapse indicator."""
-        text = Text()
-        text.append(
-            "  ... %d lines of context ..." % count, style=self._style("context-button")
-        )
-        return Static(text, classes="diff-context-btn")
-
-    def _pop_comments(self, comment_lists, diff, old_ln, new_ln):
-        """Pop and build comment widgets for a given line."""
-        widgets = []
-
-        # Non-draft comments
-        for side, ln, name in (
-            ("old", old_ln, diff.oldname),
-            ("new", new_ln, diff.newname),
-        ):
-            key = "%s-%s-%s" % (side, ln, name)
-            comments = comment_lists.pop(key, [])
-            for comment_key, message in comments:
-                widgets.append(self._build_comment(side, message))
-
-        # Draft comments (read-only for now)
-        for side, ln, name in (
-            ("old", old_ln, diff.oldname),
-            ("new", new_ln, diff.newname),
-        ):
-            key = "%sdraft-%s-%s" % (side, ln, name)
-            comments = comment_lists.pop(key, [])
-            for comment_key, message in comments:
-                widgets.append(self._build_draft_comment(side, message))
-
-        return widgets
 
     def _build_comment(self, side, message):
         """Build a read-only inline comment widget."""
