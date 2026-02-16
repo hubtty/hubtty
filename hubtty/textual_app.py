@@ -472,11 +472,20 @@ class TextualApp(App, BaseApp):
             self.hubtty_header.set_offline(True)
 
     def on_resize(self, event) -> None:
-        """Refresh the current view when the terminal is resized."""
+        """Refresh DataTable-based views when the terminal is resized.
+
+        DiffView and PullRequestView don't need a data refresh on resize
+        since Textual reflows their layout automatically.  Only the list
+        views (which use DataTable) may need column width recalculation.
+        """
+        from hubtty.textual_view.repository_list import RepositoryListView
+        from hubtty.textual_view.pull_request_list import PullRequestListView
+
         view = getattr(self, "_current_view", None)
         if view and view.is_mounted and hasattr(view, "refresh_data"):
-            with perf_log("TextualApp.on_resize.refresh_data"):
-                view.refresh_data()
+            if isinstance(view, (RepositoryListView, PullRequestListView)):
+                with perf_log("TextualApp.on_resize.refresh_data"):
+                    view.refresh_data()
 
     # ---- Key handling ----
 
