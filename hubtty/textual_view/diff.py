@@ -148,9 +148,9 @@ class DiffView(Widget):
         tab-stop padding spaces from gitrepo.expand_tabs are preserved).
         """
         if isinstance(content, str):
-            return content.replace("\u00bb", " ")
+            return content.replace("»", " ")
         if isinstance(content, tuple):
-            return content[1].replace("\u00bb", " ")
+            return content[1].replace("»", " ")
         if isinstance(content, list):
             parts = []
             for item in content:
@@ -160,7 +160,7 @@ class DiffView(Widget):
                     for sub in item:
                         if isinstance(sub, tuple):
                             parts.append(sub[1])
-            return "".join(parts).replace("\u00bb", " ")
+            return "".join(parts).replace("»", " ")
         return str(content)
 
     def _syntax_highlight(self, raw_text, lexer):
@@ -245,16 +245,6 @@ class DiffView(Widget):
                     if hasattr(self.app, "hubtty_header"):
                         self.app.hubtty_header.set_title(self.title)
 
-                    # Build file key mappings
-                    old_file_keys = {}
-                    new_file_keys = {}
-                    for f in new_commit.files:
-                        if f.old_path:
-                            old_file_keys[f.old_path] = f.key
-                        else:
-                            old_file_keys[f.path] = f.key
-                        new_file_keys[f.path] = f.key
-
                     # Collect comments
                     comment_lists = {}
                     comment_filenames = set()
@@ -312,7 +302,7 @@ class DiffView(Widget):
                     )
 
             # Build widgets
-            self._build_diff_widgets(diffs, comment_lists, old_file_keys, new_file_keys)
+            self._build_diff_widgets(diffs, comment_lists)
 
     def _show_error(self, message):
         """Display an error in the diff content area."""
@@ -320,8 +310,56 @@ class DiffView(Widget):
         container.remove_children()
         container.mount(Static(message))
 
-    def _build_diff_widgets(self, diffs, comment_lists, old_file_keys, new_file_keys):
-        """Build all diff widgets and mount them."""
+    @staticmethod
+    def _flush_batch(batch, widgets):
+        """Flush accumulated row data into a single multi-row Table widget.
+
+        Each entry in *batch* is a tuple of
+        (old_ln_text, old_content_text, new_ln_text, new_content_text)
+        produced by _build_diff_line_data().  The companion
+        ``_batch_col_styles`` tuple provides the column styles for
+        the entire batch.
+        """
+        if not batch:
+            return
+        # Build a 4-column table; column styles are stored per-batch
+        # (flushed whenever they change).
+        table = Table(
+            show_header=False,
+            box=None,
+            padding=(0, 0),
+            expand=True,
+            show_edge=False,
+        )
+        table.add_column(width=LN_COL_WIDTH, no_wrap=True)
+        table.add_column(ratio=1, style=batch[0][4])
+        table.add_column(width=LN_COL_WIDTH, no_wrap=True)
+        table.add_column(ratio=1, style=batch[0][5])
+        for old_ln, old_ct, new_ln, new_ct, _ocs, _ncs in batch:
+            table.add_row(old_ln, old_ct, new_ln, new_ct)
+        widgets.append(Static(table, classes="diff-line"))
+
+    def _append_to_batch(self, batch, row_data, widgets):
+        """Append row data to batch, flushing first if column styles change.
+
+        Returns the (possibly reset) batch list.
+        """
+        if batch:
+            old_styles = (batch[0][4], batch[0][5])
+            new_styles = (row_data[4], row_data[5])
+            if old_styles != new_styles:
+                self._flush_batch(batch, widgets)
+                batch = []
+        batch.append(row_data)
+        return batch
+
+    def _build_diff_widgets(self, diffs, comment_lists):
+        """Build all diff widgets and mount them.
+
+        Diff lines are batched into multi-row Rich Tables so that many
+        consecutive lines share a single Textual widget, dramatically
+        reducing mount overhead.
+        """
         with perf_log("DiffView._build_diff_widgets"):
             container = self.query_one("#diff-content", Vertical)
             with perf_log("DiffView._build_diff_widgets.remove_children"):
@@ -330,6 +368,7 @@ class DiffView(Widget):
             self._perf_counters.reset()
             widgets = []
             self._file_header_indices = []
+            line_count = 0
 
             for i, diff in enumerate(diffs):
                 if i > 0:
@@ -339,16 +378,6 @@ class DiffView(Widget):
                 self._file_header_indices.append(
                     (len(widgets), diff.oldname, diff.newname)
                 )
-
-                # Determine file keys for this diff
-                old_key = None
-                new_key = None
-                if not diff.old_empty:
-                    old_key = old_file_keys.get(diff.oldname) or old_file_keys.get(
-                        diff.newname
-                    )
-                if not diff.new_empty:
-                    new_key = new_file_keys.get(diff.newname)
 
                 # Resolve syntax highlighting lexer for this file
                 lexer = self._get_lexer(diff.newname or diff.oldname)
@@ -362,87 +391,99 @@ class DiffView(Widget):
                 # Chunks
                 for chunk in diff.chunks:
                     if chunk.context:
-                        # Show first 10 and last 10 context lines
-                        # with an expand indicator in between
                         first_lines = chunk.lines[:10]
                         last_lines = chunk.lines[-10:]
                         middle_count = len(chunk.lines) - len(first_lines)
                         if len(chunk.lines) <= 20:
-                            # Small enough to show all
+                            batch = []
                             for line in chunk.lines:
                                 with self._perf_counters.count("_build_diff_line"):
-                                    widgets.append(
-                                        self._build_diff_line(
-                                            diff, line, old_key, new_key, lexer
+                                    row = self._build_diff_line_data(diff, line, lexer)
+                                    line_count += 1
+                                batch = self._append_to_batch(batch, row, widgets)
+                                comments = self._pop_comments(
+                                    comment_lists,
+                                    diff,
+                                    line[gitrepo.OLD][gitrepo.LINENO],
+                                    line[gitrepo.NEW][gitrepo.LINENO],
+                                )
+                                if comments:
+                                    self._flush_batch(batch, widgets)
+                                    batch = []
+                                    widgets.extend(comments)
+                            self._flush_batch(batch, widgets)
+                        else:
+                            if not chunk.first:
+                                batch = []
+                                for line in first_lines:
+                                    with self._perf_counters.count("_build_diff_line"):
+                                        row = self._build_diff_line_data(
+                                            diff, line, lexer
                                         )
-                                    )
-                                widgets.extend(
-                                    self._pop_comments(
+                                        line_count += 1
+                                    batch = self._append_to_batch(batch, row, widgets)
+                                    comments = self._pop_comments(
                                         comment_lists,
                                         diff,
                                         line[gitrepo.OLD][gitrepo.LINENO],
                                         line[gitrepo.NEW][gitrepo.LINENO],
                                     )
-                                )
-                        else:
-                            if not chunk.first:
-                                for line in first_lines:
-                                    with self._perf_counters.count("_build_diff_line"):
-                                        widgets.append(
-                                            self._build_diff_line(
-                                                diff, line, old_key, new_key, lexer
-                                            )
-                                        )
-                                    widgets.extend(
-                                        self._pop_comments(
-                                            comment_lists,
-                                            diff,
-                                            line[gitrepo.OLD][gitrepo.LINENO],
-                                            line[gitrepo.NEW][gitrepo.LINENO],
-                                        )
-                                    )
+                                    if comments:
+                                        self._flush_batch(batch, widgets)
+                                        batch = []
+                                        widgets.extend(comments)
+                                self._flush_batch(batch, widgets)
                             # Context collapse indicator
                             if middle_count > 0:
                                 widgets.append(
                                     self._build_context_indicator(middle_count)
                                 )
                             if not chunk.last:
+                                batch = []
                                 for line in last_lines:
                                     with self._perf_counters.count("_build_diff_line"):
-                                        widgets.append(
-                                            self._build_diff_line(
-                                                diff, line, old_key, new_key, lexer
-                                            )
+                                        row = self._build_diff_line_data(
+                                            diff, line, lexer
                                         )
-                                    widgets.extend(
-                                        self._pop_comments(
-                                            comment_lists,
-                                            diff,
-                                            line[gitrepo.OLD][gitrepo.LINENO],
-                                            line[gitrepo.NEW][gitrepo.LINENO],
-                                        )
+                                        line_count += 1
+                                    batch = self._append_to_batch(batch, row, widgets)
+                                    comments = self._pop_comments(
+                                        comment_lists,
+                                        diff,
+                                        line[gitrepo.OLD][gitrepo.LINENO],
+                                        line[gitrepo.NEW][gitrepo.LINENO],
                                     )
+                                    if comments:
+                                        self._flush_batch(batch, widgets)
+                                        batch = []
+                                        widgets.extend(comments)
+                                self._flush_batch(batch, widgets)
                     else:
-                        # Changed chunk -- show all lines
+                        # Changed chunk -- batch lines, flushing on
+                        # column style changes (e.g. +/- transitions)
+                        batch = []
                         for line in chunk.lines:
                             with self._perf_counters.count("_build_diff_line"):
-                                widgets.append(
-                                    self._build_diff_line(
-                                        diff, line, old_key, new_key, lexer
-                                    )
-                                )
-                            widgets.extend(
-                                self._pop_comments(
-                                    comment_lists,
-                                    diff,
-                                    line[gitrepo.OLD][gitrepo.LINENO],
-                                    line[gitrepo.NEW][gitrepo.LINENO],
-                                )
+                                row = self._build_diff_line_data(diff, line, lexer)
+                                line_count += 1
+                            batch = self._append_to_batch(batch, row, widgets)
+                            comments = self._pop_comments(
+                                comment_lists,
+                                diff,
+                                line[gitrepo.OLD][gitrepo.LINENO],
+                                line[gitrepo.NEW][gitrepo.LINENO],
                             )
+                            if comments:
+                                self._flush_batch(batch, widgets)
+                                batch = []
+                                widgets.extend(comments)
+                        self._flush_batch(batch, widgets)
 
             self.logger.info(
-                "[perf] DiffView._build_diff_widgets: %d widgets built",
+                "[perf] DiffView._build_diff_widgets: "
+                "%d widgets built (%d diff lines batched)",
                 len(widgets),
+                line_count,
             )
             self._perf_counters.log_summary("DiffView._build_diff_widgets")
 
@@ -484,8 +525,13 @@ class DiffView(Widget):
             return _REMOVED_BG
         return None
 
-    def _build_diff_line(self, diff, line, old_key, new_key, lexer):
-        """Build a single side-by-side diff line widget using Rich Table."""
+    def _build_diff_line_data(self, diff, line, lexer):
+        """Build row data for a single side-by-side diff line.
+
+        Returns a tuple of (old_ln_text, old_content_text,
+        new_ln_text, new_content_text, old_col_style, new_col_style)
+        suitable for adding to a batched Rich Table via _flush_batch().
+        """
         old_side = line[gitrepo.OLD]
         new_side = line[gitrepo.NEW]
         old_ln, old_action, old_content = old_side
@@ -494,7 +540,6 @@ class DiffView(Widget):
         # Column styles for nonexistent sides
         old_col_style = self._style("nonexistent") if old_action == "" else ""
         new_col_style = self._style("nonexistent") if new_action == "" else ""
-        table = self._make_table(old_col_style, new_col_style)
 
         old_bg = self._diff_bg(old_action)
         new_bg = self._diff_bg(new_action)
@@ -528,13 +573,14 @@ class DiffView(Widget):
         else:
             new_content_text = Text()
 
-        table.add_row(
+        return (
             old_ln_text,
             old_content_text,
             new_ln_text,
             new_content_text,
+            old_col_style,
+            new_col_style,
         )
-        return Static(table, classes="diff-line")
 
     def _build_line_content(self, action, content, lexer):
         """Build a Rich Text for one side of a diff line.
@@ -596,8 +642,7 @@ class DiffView(Widget):
         """Build a context collapse indicator."""
         text = Text()
         text.append(
-            "  ... %d lines of context ..." % count,
-            style=self._style("context-button"),
+            "  ... %d lines of context ..." % count, style=self._style("context-button")
         )
         return Static(text, classes="diff-context-btn")
 
