@@ -359,15 +359,16 @@ class DiffView(Widget):
                 # File-level comments
                 widgets.extend(self._pop_comments(comment_lists, diff, None, None))
 
-                # Chunks
+                # Chunks -- one batch spans across chunk boundaries
+                # within a file; only flushed for context indicators,
+                # inline comments, or at the end of the file.
+                batch = []
                 for chunk in diff.chunks:
-                    if chunk.context:
-                        first_lines = chunk.lines[:10]
-                        last_lines = chunk.lines[-10:]
-                        middle_count = len(chunk.lines) - len(first_lines)
-                        if len(chunk.lines) <= 20:
-                            batch = []
-                            for line in chunk.lines:
+                    if chunk.context and len(chunk.lines) > 20:
+                        # Large context: show first/last 10 lines
+                        # with a collapse indicator in between.
+                        if not chunk.first:
+                            for line in chunk.lines[:10]:
                                 with self._perf_counters.count("_build_diff_line"):
                                     row = self._build_diff_line_data(diff, line, lexer)
                                     line_count += 1
@@ -382,57 +383,35 @@ class DiffView(Widget):
                                     self._flush_batch(batch, widgets)
                                     batch = []
                                     widgets.extend(comments)
-                            self._flush_batch(batch, widgets)
-                        else:
-                            if not chunk.first:
-                                batch = []
-                                for line in first_lines:
-                                    with self._perf_counters.count("_build_diff_line"):
-                                        row = self._build_diff_line_data(
-                                            diff, line, lexer
-                                        )
-                                        line_count += 1
-                                    batch.append(row)
-                                    comments = self._pop_comments(
-                                        comment_lists,
-                                        diff,
-                                        line[gitrepo.OLD][gitrepo.LINENO],
-                                        line[gitrepo.NEW][gitrepo.LINENO],
-                                    )
-                                    if comments:
-                                        self._flush_batch(batch, widgets)
-                                        batch = []
-                                        widgets.extend(comments)
-                                self._flush_batch(batch, widgets)
-                            # Context collapse indicator
-                            if middle_count > 0:
-                                widgets.append(
-                                    self._build_context_indicator(middle_count)
-                                )
-                            if not chunk.last:
-                                batch = []
-                                for line in last_lines:
-                                    with self._perf_counters.count("_build_diff_line"):
-                                        row = self._build_diff_line_data(
-                                            diff, line, lexer
-                                        )
-                                        line_count += 1
-                                    batch.append(row)
-                                    comments = self._pop_comments(
-                                        comment_lists,
-                                        diff,
-                                        line[gitrepo.OLD][gitrepo.LINENO],
-                                        line[gitrepo.NEW][gitrepo.LINENO],
-                                    )
-                                    if comments:
-                                        self._flush_batch(batch, widgets)
-                                        batch = []
-                                        widgets.extend(comments)
-                                self._flush_batch(batch, widgets)
-                    else:
-                        # Changed chunk -- batch lines, flushing on
-                        # column style changes (e.g. +/- transitions)
+                        # Flush before context indicator
+                        self._flush_batch(batch, widgets)
                         batch = []
+                        middle_count = len(chunk.lines) - 10
+                        if chunk.first:
+                            middle_count = len(chunk.lines)
+                        if not chunk.last:
+                            middle_count -= 10
+                        if middle_count > 0:
+                            widgets.append(self._build_context_indicator(middle_count))
+                        if not chunk.last:
+                            for line in chunk.lines[-10:]:
+                                with self._perf_counters.count("_build_diff_line"):
+                                    row = self._build_diff_line_data(diff, line, lexer)
+                                    line_count += 1
+                                batch.append(row)
+                                comments = self._pop_comments(
+                                    comment_lists,
+                                    diff,
+                                    line[gitrepo.OLD][gitrepo.LINENO],
+                                    line[gitrepo.NEW][gitrepo.LINENO],
+                                )
+                                if comments:
+                                    self._flush_batch(batch, widgets)
+                                    batch = []
+                                    widgets.extend(comments)
+                    else:
+                        # Small context (<=20 lines) or changed chunk:
+                        # append all lines to the current batch.
                         for line in chunk.lines:
                             with self._perf_counters.count("_build_diff_line"):
                                 row = self._build_diff_line_data(diff, line, lexer)
@@ -448,7 +427,8 @@ class DiffView(Widget):
                                 self._flush_batch(batch, widgets)
                                 batch = []
                                 widgets.extend(comments)
-                        self._flush_batch(batch, widgets)
+                # Flush remaining rows for this file
+                self._flush_batch(batch, widgets)
 
             self.logger.info(
                 "[perf] DiffView._build_diff_widgets: "
