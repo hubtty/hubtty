@@ -24,6 +24,7 @@ from textual.widgets import Footer, Static
 
 from hubtty.base_app import BaseApp
 from hubtty import keymap
+from hubtty.perf import perf_log
 import hubtty.version
 
 
@@ -474,7 +475,8 @@ class TextualApp(App, BaseApp):
         """Refresh the current view when the terminal is resized."""
         view = getattr(self, "_current_view", None)
         if view and view.is_mounted and hasattr(view, "refresh_data"):
-            view.refresh_data()
+            with perf_log("TextualApp.on_resize.refresh_data"):
+                view.refresh_data()
 
     # ---- Key handling ----
 
@@ -661,7 +663,8 @@ class TextualApp(App, BaseApp):
         if needs_refresh:
             view = self._current_view
             if view and hasattr(view, "refresh_data"):
-                view.refresh_data()
+                with perf_log("TextualApp._poll_sync_results.refresh_data"):
+                    view.refresh_data()
         if invalidate:
             self.updateStatusQueries()
         # Update sync queue count
@@ -708,7 +711,8 @@ class TextualApp(App, BaseApp):
         self._current_view = view
         # Refresh the restored view so it picks up any changes
         if hasattr(view, "refresh_data"):
-            view.refresh_data()
+            with perf_log("TextualApp.backScreen.refresh_data"):
+                view.refresh_data()
         self.screen.focus_next()
 
     def registerPaletteEntry(self, label_id, label_color):

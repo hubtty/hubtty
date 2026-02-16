@@ -25,6 +25,7 @@ from textual.containers import Vertical, VerticalScroll
 
 from hubtty import keymap
 from hubtty import sync
+from hubtty.perf import perf_log, PerfCounters
 
 
 class PullRequestView(Widget):
@@ -79,6 +80,7 @@ class PullRequestView(Widget):
         self.logger = logging.getLogger("hubtty.textual_view.pull_request")
         self.pr_key = pr_key
         self.title = "Pull request"
+        self._inline_counters = PerfCounters()
 
     def _style(self, name):
         """Look up a palette entry name and return a Rich style string."""
@@ -111,32 +113,36 @@ class PullRequestView(Widget):
 
     def refresh_data(self):
         """Rebuild the PR detail view from the database."""
-        with self.app.db.getSession() as session:
-            pr = session.getPullRequest(self.pr_key, lazy=False)
-            if pr is None:
-                return
+        with perf_log("PullRequestView.refresh_data"):
+            with perf_log("PullRequestView.refresh_data.db_session"):
+                with self.app.db.getSession() as session:
+                    pr = session.getPullRequest(self.pr_key, lazy=False)
+                    if pr is None:
+                        return
 
-            # Update last_seen
-            if pr.last_seen is None:
-                pr.last_seen = datetime.datetime.utcnow()
+                    # Update last_seen
+                    if pr.last_seen is None:
+                        pr.last_seen = datetime.datetime.utcnow()
 
-            # Build the view title
-            self._update_title(pr)
+                    # Build the view title
+                    self._update_title(pr)
 
-            # Metadata section
-            self._update_metadata(pr)
+                    # Metadata section
+                    self._update_metadata(pr)
 
-            # PR description (markdown)
-            self._update_description(pr)
+                    # PR description (markdown)
+                    with perf_log("PullRequestView._update_description"):
+                        self._update_description(pr)
 
-            # Approvals table
-            self._update_approvals(pr)
+                    # Approvals table
+                    self._update_approvals(pr)
 
-            # Commits section
-            self._update_commits(pr)
+                    # Commits section
+                    with perf_log("PullRequestView._update_commits"):
+                        self._update_commits(pr)
 
-            # Messages section
-            self._update_messages(pr)
+                    # Messages section
+                    self._update_messages(pr)
 
     def _update_title(self, pr):
         """Set the view title based on PR state."""
@@ -339,75 +345,99 @@ class PullRequestView(Widget):
 
     def _update_messages(self, pr):
         """Build the messages section with markdown-rendered bodies."""
-        container = self.query_one("#pr-messages-container", Vertical)
-        container.remove_children()
+        with perf_log("PullRequestView._update_messages"):
+            container = self.query_one("#pr-messages-container", Vertical)
+            with perf_log("PullRequestView._update_messages.remove_children"):
+                container.remove_children()
 
-        if not pr.messages:
-            container.mount(Static("No messages", classes="pr-messages-header"))
-            return
+            if not pr.messages:
+                container.mount(Static("No messages", classes="pr-messages-header"))
+                return
 
-        # Filter hidden comments if configured
-        hide_comments = getattr(self.app.config, "hide_comments", [])
+            # Filter hidden comments if configured
+            hide_comments = getattr(self.app.config, "hide_comments", [])
 
-        widgets = []
-        header = Text()
-        header.append("Messages", style=self._style("table-header"))
-        widgets.append(Static(header, classes="pr-messages-header"))
+            counters = PerfCounters()
+            self._inline_counters.reset()
+            widgets = []
+            msg_count = 0
+            inline_count = 0
+            header = Text()
+            header.append("Messages", style=self._style("table-header"))
+            widgets.append(Static(header, classes="pr-messages-header"))
 
-        first = True
-        for message in pr.messages:
-            # Skip hidden comments
-            if hide_comments and message.author:
-                username = message.author.username or ""
-                skip = False
-                for pattern in hide_comments:
-                    if re.match(pattern, username):
-                        skip = True
-                        break
-                if skip:
-                    continue
+            first = True
+            for message in pr.messages:
+                # Skip hidden comments
+                if hide_comments and message.author:
+                    username = message.author.username or ""
+                    skip = False
+                    for pattern in hide_comments:
+                        if re.match(pattern, username):
+                            skip = True
+                            break
+                    if skip:
+                        continue
 
-            if not first:
-                widgets.append(Rule())
-            first = False
+                if not first:
+                    widgets.append(Rule())
+                first = False
+                msg_count += 1
 
-            # Author and timestamp header
-            hdr = Text()
-            author_name = "Unknown"
-            is_own = False
-            if message.author:
-                author_name = (
-                    message.author.name
-                    or message.author.username
-                    or message.author.email
-                    or "Unknown"
+                # Author and timestamp header
+                hdr = Text()
+                author_name = "Unknown"
+                is_own = False
+                if message.author:
+                    author_name = (
+                        message.author.name
+                        or message.author.username
+                        or message.author.email
+                        or "Unknown"
+                    )
+                    is_own = self.app.isOwnAccount(message.author)
+
+                name_style = self._style(
+                    "pr-message-own-name" if is_own else "pr-message-name"
                 )
-                is_own = self.app.isOwnAccount(message.author)
+                header_style = self._style(
+                    "pr-message-own-header" if is_own else "pr-message-header"
+                )
 
-            name_style = self._style(
-                "pr-message-own-name" if is_own else "pr-message-name"
+                hdr.append(author_name, style=name_style)
+                if message.created:
+                    time_str = self._format_time(message.created)
+                    hdr.append(" (%s)" % time_str, style=header_style)
+                if message.draft and not message.pending:
+                    hdr.append(" (draft)", style=self._style("pr-message-draft"))
+
+                widgets.append(Static(hdr, classes="pr-message-header"))
+
+                # Message body (rendered as markdown)
+                if message.message:
+                    with counters.count("Markdown_message"):
+                        widgets.append(
+                            Markdown(message.message, classes="pr-message-body")
+                        )
+
+                # Inline comments
+                with counters.count("_build_inline_comment_widgets"):
+                    inline_widgets = self._build_inline_comment_widgets(message)
+                    inline_count += len(inline_widgets)
+                    widgets.extend(inline_widgets)
+
+            self.logger.info(
+                "[perf] PullRequestView._update_messages: "
+                "%d messages, %d inline widgets, %d total widgets",
+                msg_count,
+                inline_count,
+                len(widgets),
             )
-            header_style = self._style(
-                "pr-message-own-header" if is_own else "pr-message-header"
-            )
+            counters.log_summary("PullRequestView._update_messages")
+            self._inline_counters.log_summary("PullRequestView._update_messages")
 
-            hdr.append(author_name, style=name_style)
-            if message.created:
-                time_str = self._format_time(message.created)
-                hdr.append(" (%s)" % time_str, style=header_style)
-            if message.draft and not message.pending:
-                hdr.append(" (draft)", style=self._style("pr-message-draft"))
-
-            widgets.append(Static(hdr, classes="pr-message-header"))
-
-            # Message body (rendered as markdown)
-            if message.message:
-                widgets.append(Markdown(message.message, classes="pr-message-body"))
-
-            # Inline comments
-            widgets.extend(self._build_inline_comment_widgets(message))
-
-        container.mount_all(widgets)
+            with perf_log("PullRequestView._update_messages.mount_all"):
+                container.mount_all(widgets)
 
     def _build_inline_comment_widgets(self, message):
         """Build widgets for inline comments on a message.
@@ -443,7 +473,8 @@ class PullRequestView(Widget):
                 body = comment.message
                 if prefix:
                     body = "**%s**\n%s" % (prefix, body)
-                widgets.append(Markdown(body, classes="pr-inline-comment"))
+                with self._inline_counters.count("Markdown_inline_comment"):
+                    widgets.append(Markdown(body, classes="pr-inline-comment"))
 
         return widgets
 

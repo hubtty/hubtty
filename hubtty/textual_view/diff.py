@@ -30,6 +30,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from hubtty import gitrepo
 from hubtty import keymap
 from hubtty import sync
+from hubtty.perf import perf_log, PerfCounters
 
 LN_COL_WIDTH = 5
 
@@ -119,6 +120,8 @@ class DiffView(Widget):
         self.title = "Diff"
         self._file_header_indices = []
         self._lexer_cache = {}
+        self._perf_counters = PerfCounters()
+        self._scroll_perf_counters = PerfCounters()
 
     def _style(self, name):
         """Look up a palette entry name and return a Rich style string."""
@@ -145,9 +148,9 @@ class DiffView(Widget):
         tab-stop padding spaces from gitrepo.expand_tabs are preserved).
         """
         if isinstance(content, str):
-            return content.replace("»", " ")
+            return content.replace("\u00bb", " ")
         if isinstance(content, tuple):
-            return content[1].replace("»", " ")
+            return content[1].replace("\u00bb", " ")
         if isinstance(content, list):
             parts = []
             for item in content:
@@ -157,21 +160,22 @@ class DiffView(Widget):
                     for sub in item:
                         if isinstance(sub, tuple):
                             parts.append(sub[1])
-            return "".join(parts).replace("»", " ")
+            return "".join(parts).replace("\u00bb", " ")
         return str(content)
 
     def _syntax_highlight(self, raw_text, lexer):
         """Tokenize raw_text with Pygments and return a Rich Text with
         syntax foreground colors (no background)."""
-        text = Text()
-        text.append_tokens(
-            (token_text, _SYNTAX_THEME.get_style_for_token(token_type))
-            for token_type, token_text in lexer.get_tokens(raw_text)
-        )
-        # Strip trailing newline that Pygments may add
-        if text.plain.endswith("\n") and not raw_text.endswith("\n"):
-            text.right_crop(1)
-        return text
+        with self._perf_counters.count("_syntax_highlight"):
+            text = Text()
+            text.append_tokens(
+                (token_text, _SYNTAX_THEME.get_style_for_token(token_type))
+                for token_type, token_text in lexer.get_tokens(raw_text)
+            )
+            # Strip trailing newline that Pygments may add
+            if text.plain.endswith("\n") and not raw_text.endswith("\n"):
+                text.right_crop(1)
+            return text
 
     def _make_table(self, old_col_style="", new_col_style=""):
         """Create a 4-column Rich Table for side-by-side layout.
@@ -220,88 +224,95 @@ class DiffView(Widget):
 
     def refresh_data(self):
         """Load diff data and build the view."""
-        with self.app.db.getSession() as session:
-            new_commit = session.getCommit(self.commit_key)
-            if new_commit is None:
+        with perf_log("DiffView.refresh_data"):
+            with perf_log("DiffView.refresh_data.db_session"):
+                with self.app.db.getSession() as session:
+                    new_commit = session.getCommit(self.commit_key)
+                    if new_commit is None:
+                        return
+
+                    pr = new_commit.pull_request
+                    self.pr_key = pr.key
+                    repository_name = pr.repository.name
+                    base_sha = new_commit.parent
+                    sha = new_commit.sha
+
+                    self.title = "Diff of %s from %s to %s" % (
+                        repository_name,
+                        base_sha[:7],
+                        sha[:7],
+                    )
+                    if hasattr(self.app, "hubtty_header"):
+                        self.app.hubtty_header.set_title(self.title)
+
+                    # Build file key mappings
+                    old_file_keys = {}
+                    new_file_keys = {}
+                    for f in new_commit.files:
+                        if f.old_path:
+                            old_file_keys[f.old_path] = f.key
+                        else:
+                            old_file_keys[f.path] = f.key
+                        new_file_keys[f.path] = f.key
+
+                    # Collect comments
+                    comment_lists = {}
+                    comment_filenames = set()
+                    for f in new_commit.files:
+                        for comment in f.current_comments:
+                            path = comment.file.path
+                            if comment.parent:
+                                key = "old"
+                                if comment.file.old_path:
+                                    path = comment.file.old_path
+                            else:
+                                key = "new"
+                            if comment.draft:
+                                key += "draft"
+                            key += "-" + str(comment.line)
+                            key += "-" + path
+                            comment_list = comment_lists.get(key, [])
+                            if comment.draft:
+                                message = comment.message
+                            else:
+                                author = (
+                                    comment.author.name
+                                    or comment.author.username
+                                    or "Unknown"
+                                )
+                                message = (author, comment.message)
+                            comment_list.append((comment.key, message))
+                            comment_lists[key] = comment_list
+                            comment_filenames.add(path)
+
+            # Get diff from git repo (outside DB session)
+            try:
+                repo = gitrepo.get_repo(repository_name, self.app.config)
+                with perf_log("DiffView.refresh_data.repo_diff"):
+                    diffs = repo.diff(base_sha, sha)
+            except Exception as e:
+                self.logger.error("Error loading diff: %s", e)
+                self._show_error("Error loading diff: %s" % e)
                 return
 
-            pr = new_commit.pull_request
-            self.pr_key = pr.key
-            repository_name = pr.repository.name
-            base_sha = new_commit.parent
-            sha = new_commit.sha
+            # Remove files that are already in the diff from comment_filenames
+            for diff in diffs:
+                comment_filenames.discard(diff.oldname)
+                comment_filenames.discard(diff.newname)
 
-            self.title = "Diff of %s from %s to %s" % (
-                repository_name,
-                base_sha[:7],
-                sha[:7],
-            )
-            if hasattr(self.app, "hubtty_header"):
-                self.app.hubtty_header.set_title(self.title)
+            # Create fake diffs for files with comments but no diff
+            for filename in comment_filenames:
+                try:
+                    diff = repo.getFile(base_sha, sha, filename)
+                    if diff:
+                        diffs.append(diff)
+                except Exception:
+                    self.logger.debug(
+                        "Unable to find file %s in commit %s", filename, sha
+                    )
 
-            # Build file key mappings
-            old_file_keys = {}
-            new_file_keys = {}
-            for f in new_commit.files:
-                if f.old_path:
-                    old_file_keys[f.old_path] = f.key
-                else:
-                    old_file_keys[f.path] = f.key
-                new_file_keys[f.path] = f.key
-
-            # Collect comments
-            comment_lists = {}
-            comment_filenames = set()
-            for f in new_commit.files:
-                for comment in f.current_comments:
-                    path = comment.file.path
-                    if comment.parent:
-                        key = "old"
-                        if comment.file.old_path:
-                            path = comment.file.old_path
-                    else:
-                        key = "new"
-                    if comment.draft:
-                        key += "draft"
-                    key += "-" + str(comment.line)
-                    key += "-" + path
-                    comment_list = comment_lists.get(key, [])
-                    if comment.draft:
-                        message = comment.message
-                    else:
-                        author = (
-                            comment.author.name or comment.author.username or "Unknown"
-                        )
-                        message = (author, comment.message)
-                    comment_list.append((comment.key, message))
-                    comment_lists[key] = comment_list
-                    comment_filenames.add(path)
-
-        # Get diff from git repo (outside DB session)
-        try:
-            repo = gitrepo.get_repo(repository_name, self.app.config)
-            diffs = repo.diff(base_sha, sha)
-        except Exception as e:
-            self.logger.error("Error loading diff: %s", e)
-            self._show_error("Error loading diff: %s" % e)
-            return
-
-        # Remove files that are already in the diff from comment_filenames
-        for diff in diffs:
-            comment_filenames.discard(diff.oldname)
-            comment_filenames.discard(diff.newname)
-
-        # Create fake diffs for files with comments but no diff
-        for filename in comment_filenames:
-            try:
-                diff = repo.getFile(base_sha, sha, filename)
-                if diff:
-                    diffs.append(diff)
-            except Exception:
-                self.logger.debug("Unable to find file %s in commit %s", filename, sha)
-
-        # Build widgets
-        self._build_diff_widgets(diffs, comment_lists, old_file_keys, new_file_keys)
+            # Build widgets
+            self._build_diff_widgets(diffs, comment_lists, old_file_keys, new_file_keys)
 
     def _show_error(self, message):
         """Display an error in the diff content area."""
@@ -311,54 +322,115 @@ class DiffView(Widget):
 
     def _build_diff_widgets(self, diffs, comment_lists, old_file_keys, new_file_keys):
         """Build all diff widgets and mount them."""
-        container = self.query_one("#diff-content", Vertical)
-        container.remove_children()
+        with perf_log("DiffView._build_diff_widgets"):
+            container = self.query_one("#diff-content", Vertical)
+            with perf_log("DiffView._build_diff_widgets.remove_children"):
+                container.remove_children()
 
-        widgets = []
-        self._file_header_indices = []
+            self._perf_counters.reset()
+            widgets = []
+            self._file_header_indices = []
 
-        for i, diff in enumerate(diffs):
-            if i > 0:
-                widgets.append(Rule())
+            for i, diff in enumerate(diffs):
+                if i > 0:
+                    widgets.append(Rule())
 
-            # Track file header position
-            self._file_header_indices.append((len(widgets), diff.oldname, diff.newname))
-
-            # Determine file keys for this diff
-            old_key = None
-            new_key = None
-            if not diff.old_empty:
-                old_key = old_file_keys.get(diff.oldname) or old_file_keys.get(
-                    diff.newname
+                # Track file header position
+                self._file_header_indices.append(
+                    (len(widgets), diff.oldname, diff.newname)
                 )
-            if not diff.new_empty:
-                new_key = new_file_keys.get(diff.newname)
 
-            # Resolve syntax highlighting lexer for this file
-            lexer = self._get_lexer(diff.newname or diff.oldname)
+                # Determine file keys for this diff
+                old_key = None
+                new_key = None
+                if not diff.old_empty:
+                    old_key = old_file_keys.get(diff.oldname) or old_file_keys.get(
+                        diff.newname
+                    )
+                if not diff.new_empty:
+                    new_key = new_file_keys.get(diff.newname)
 
-            # File header
-            widgets.append(self._build_file_header(diff))
+                # Resolve syntax highlighting lexer for this file
+                lexer = self._get_lexer(diff.newname or diff.oldname)
 
-            # File-level comments
-            widgets.extend(self._pop_comments(comment_lists, diff, None, None))
+                # File header
+                widgets.append(self._build_file_header(diff))
 
-            # Chunks
-            for chunk in diff.chunks:
-                if chunk.context:
-                    # Show first 10 and last 10 context lines
-                    # with an expand indicator in between
-                    first_lines = chunk.lines[:10]
-                    last_lines = chunk.lines[-10:]
-                    middle_count = len(chunk.lines) - len(first_lines)
-                    if len(chunk.lines) <= 20:
-                        # Small enough to show all
-                        for line in chunk.lines:
-                            widgets.append(
-                                self._build_diff_line(
-                                    diff, line, old_key, new_key, lexer
+                # File-level comments
+                widgets.extend(self._pop_comments(comment_lists, diff, None, None))
+
+                # Chunks
+                for chunk in diff.chunks:
+                    if chunk.context:
+                        # Show first 10 and last 10 context lines
+                        # with an expand indicator in between
+                        first_lines = chunk.lines[:10]
+                        last_lines = chunk.lines[-10:]
+                        middle_count = len(chunk.lines) - len(first_lines)
+                        if len(chunk.lines) <= 20:
+                            # Small enough to show all
+                            for line in chunk.lines:
+                                with self._perf_counters.count("_build_diff_line"):
+                                    widgets.append(
+                                        self._build_diff_line(
+                                            diff, line, old_key, new_key, lexer
+                                        )
+                                    )
+                                widgets.extend(
+                                    self._pop_comments(
+                                        comment_lists,
+                                        diff,
+                                        line[gitrepo.OLD][gitrepo.LINENO],
+                                        line[gitrepo.NEW][gitrepo.LINENO],
+                                    )
                                 )
-                            )
+                        else:
+                            if not chunk.first:
+                                for line in first_lines:
+                                    with self._perf_counters.count("_build_diff_line"):
+                                        widgets.append(
+                                            self._build_diff_line(
+                                                diff, line, old_key, new_key, lexer
+                                            )
+                                        )
+                                    widgets.extend(
+                                        self._pop_comments(
+                                            comment_lists,
+                                            diff,
+                                            line[gitrepo.OLD][gitrepo.LINENO],
+                                            line[gitrepo.NEW][gitrepo.LINENO],
+                                        )
+                                    )
+                            # Context collapse indicator
+                            if middle_count > 0:
+                                widgets.append(
+                                    self._build_context_indicator(middle_count)
+                                )
+                            if not chunk.last:
+                                for line in last_lines:
+                                    with self._perf_counters.count("_build_diff_line"):
+                                        widgets.append(
+                                            self._build_diff_line(
+                                                diff, line, old_key, new_key, lexer
+                                            )
+                                        )
+                                    widgets.extend(
+                                        self._pop_comments(
+                                            comment_lists,
+                                            diff,
+                                            line[gitrepo.OLD][gitrepo.LINENO],
+                                            line[gitrepo.NEW][gitrepo.LINENO],
+                                        )
+                                    )
+                    else:
+                        # Changed chunk -- show all lines
+                        for line in chunk.lines:
+                            with self._perf_counters.count("_build_diff_line"):
+                                widgets.append(
+                                    self._build_diff_line(
+                                        diff, line, old_key, new_key, lexer
+                                    )
+                                )
                             widgets.extend(
                                 self._pop_comments(
                                     comment_lists,
@@ -367,68 +439,27 @@ class DiffView(Widget):
                                     line[gitrepo.NEW][gitrepo.LINENO],
                                 )
                             )
-                    else:
-                        if not chunk.first:
-                            for line in first_lines:
-                                widgets.append(
-                                    self._build_diff_line(
-                                        diff, line, old_key, new_key, lexer
-                                    )
-                                )
-                                widgets.extend(
-                                    self._pop_comments(
-                                        comment_lists,
-                                        diff,
-                                        line[gitrepo.OLD][gitrepo.LINENO],
-                                        line[gitrepo.NEW][gitrepo.LINENO],
-                                    )
-                                )
-                        # Context collapse indicator
-                        if middle_count > 0:
-                            widgets.append(self._build_context_indicator(middle_count))
-                        if not chunk.last:
-                            for line in last_lines:
-                                widgets.append(
-                                    self._build_diff_line(
-                                        diff, line, old_key, new_key, lexer
-                                    )
-                                )
-                                widgets.extend(
-                                    self._pop_comments(
-                                        comment_lists,
-                                        diff,
-                                        line[gitrepo.OLD][gitrepo.LINENO],
-                                        line[gitrepo.NEW][gitrepo.LINENO],
-                                    )
-                                )
-                else:
-                    # Changed chunk -- show all lines
-                    for line in chunk.lines:
-                        widgets.append(
-                            self._build_diff_line(diff, line, old_key, new_key, lexer)
-                        )
-                        widgets.extend(
-                            self._pop_comments(
-                                comment_lists,
-                                diff,
-                                line[gitrepo.OLD][gitrepo.LINENO],
-                                line[gitrepo.NEW][gitrepo.LINENO],
-                            )
-                        )
 
-        if widgets:
-            container.mount_all(widgets)
-        else:
-            container.mount(Static("No diff available"))
+            self.logger.info(
+                "[perf] DiffView._build_diff_widgets: %d widgets built",
+                len(widgets),
+            )
+            self._perf_counters.log_summary("DiffView._build_diff_widgets")
 
-        # Clear the file reminder initially -- the in-content file
-        # header is visible at the top, so no need to duplicate it.
-        reminder = self.query_one("#diff-file-reminder", Static)
-        reminder.update("")
+            if widgets:
+                with perf_log("DiffView._build_diff_widgets.mount_all"):
+                    container.mount_all(widgets)
+            else:
+                container.mount(Static("No diff available"))
 
-        # Scroll to top (important when navigating between commits)
-        scroll = self.query_one("#diff-scroll", VerticalScroll)
-        scroll.scroll_home(animate=False)
+            # Clear the file reminder initially -- the in-content file
+            # header is visible at the top, so no need to duplicate it.
+            reminder = self.query_one("#diff-file-reminder", Static)
+            reminder.update("")
+
+            # Scroll to top (important when navigating between commits)
+            scroll = self.query_one("#diff-scroll", VerticalScroll)
+            scroll.scroll_home(animate=False)
 
     def _build_file_header(self, diff):
         """Build a file header widget with side-by-side table layout."""
@@ -565,7 +596,8 @@ class DiffView(Widget):
         """Build a context collapse indicator."""
         text = Text()
         text.append(
-            "  ... %d lines of context ..." % count, style=self._style("context-button")
+            "  ... %d lines of context ..." % count,
+            style=self._style("context-button"),
         )
         return Static(text, classes="diff-context-btn")
 
@@ -656,34 +688,35 @@ class DiffView(Widget):
         header has scrolled above the viewport (strict < check).
         This avoids duplicating the filename when the header is visible.
         """
-        if not self._file_header_indices:
-            return
-        scroll = self.query_one("#diff-scroll", VerticalScroll)
-        scroll_y = scroll.scroll_y
+        with self._scroll_perf_counters.count("_update_file_reminder_from_scroll"):
+            if not self._file_header_indices:
+                return
+            scroll = self.query_one("#diff-scroll", VerticalScroll)
+            scroll_y = scroll.scroll_y
 
-        container = self.query_one("#diff-content", Vertical)
-        children = list(container.children)
-        if not children:
-            return
+            container = self.query_one("#diff-content", Vertical)
+            children = list(container.children)
+            if not children:
+                return
 
-        best_old = None
-        best_new = None
-        for idx, old_name, new_name in self._file_header_indices:
-            if idx < len(children):
-                child = children[idx]
-                # virtual_region is in content-space coordinates
-                # (same as scroll_y), unlike region which is screen coords
-                vr = child.virtual_region
-                if vr.height > 0 and vr.y + vr.height <= scroll_y:
-                    best_old = old_name
-                    best_new = new_name
+            best_old = None
+            best_new = None
+            for idx, old_name, new_name in self._file_header_indices:
+                if idx < len(children):
+                    child = children[idx]
+                    # virtual_region is in content-space coordinates
+                    # (same as scroll_y), unlike region which is screen coords
+                    vr = child.virtual_region
+                    if vr.height > 0 and vr.y + vr.height <= scroll_y:
+                        best_old = old_name
+                        best_new = new_name
 
-        reminder = self.query_one("#diff-file-reminder", Static)
-        if best_old is not None:
-            self._update_file_reminder(best_old, best_new)
-        else:
-            # No file header has scrolled past -- clear the reminder
-            reminder.update("")
+            reminder = self.query_one("#diff-file-reminder", Static)
+            if best_old is not None:
+                self._update_file_reminder(best_old, best_new)
+            else:
+                # No file header has scrolled past -- clear the reminder
+                reminder.update("")
 
     # ---- Commit navigation ----
 
@@ -725,12 +758,18 @@ class DiffView(Widget):
             self.refresh_data()
             return True
         if command == keymap.SEARCH_RESULTS:
+            self._log_scroll_perf()
             self.app.backScreen()
             return True
         if command == keymap.PREV_SCREEN:
+            self._log_scroll_perf()
             self.app.backScreen()
             return True
         return False
+
+    def _log_scroll_perf(self):
+        """Log accumulated scroll performance counters before leaving."""
+        self._scroll_perf_counters.log_summary("DiffView.scroll")
 
     def _pr_id(self):
         """Get the pr_id string for sync tasks."""
