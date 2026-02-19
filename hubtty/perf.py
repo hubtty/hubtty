@@ -19,7 +19,7 @@ Usage::
     from hubtty.perf import perf_log, PerfCounters
 
     # Time a block and log the result immediately:
-    with perf_log("DiffView.refresh_data"):
+    with perf_log("DiffView._load_diff_data"):
         do_expensive_work()
 
     # Accumulate timings for repeated calls, then log a summary:
@@ -27,7 +27,7 @@ Usage::
     for line in lines:
         with counters.count("_build_diff_line"):
             build_widget(line)
-    counters.log_summary("DiffView._build_diff_widgets")
+    counters.log_summary("DiffView._build_instructions")
 
 All output goes to the ``hubtty.perf`` logger at INFO level so it
 can be independently enabled/disabled via logging configuration.
@@ -46,7 +46,7 @@ def perf_log(name):
 
     Example output::
 
-        [perf] DiffView.refresh_data: 1.234s
+        [perf] DiffView._load_diff_data: 1.234s
     """
     start = time.perf_counter()
     yield

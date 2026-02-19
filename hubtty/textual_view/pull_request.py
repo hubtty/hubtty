@@ -25,7 +25,7 @@ from textual.containers import Vertical, VerticalScroll
 
 from hubtty import keymap
 from hubtty import sync
-from hubtty.perf import perf_log, PerfCounters
+from hubtty.perf import perf_log, PerfCounters, LOG as PERF_LOG
 
 
 class PullRequestView(Widget):
@@ -426,7 +426,7 @@ class PullRequestView(Widget):
                     inline_count += len(inline_widgets)
                     widgets.extend(inline_widgets)
 
-            self.logger.info(
+            PERF_LOG.info(
                 "[perf] PullRequestView._update_messages: "
                 "%d messages, %d inline widgets, %d total widgets",
                 msg_count,

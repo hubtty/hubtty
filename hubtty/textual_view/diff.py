@@ -31,7 +31,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from hubtty import gitrepo
 from hubtty import keymap
 from hubtty import sync
-from hubtty.perf import perf_log, PerfCounters
+from hubtty.perf import perf_log, PerfCounters, LOG as PERF_LOG
 
 LN_COL_WIDTH = 5
 
@@ -178,7 +178,7 @@ class DiffView(Widget):
                 text.right_crop(1)
             return text
 
-    def _make_table(self, old_col_style="", new_col_style=""):
+    def _make_table(self):
         """Create a 4-column Rich Table for side-by-side layout.
 
         Columns: old_ln (fixed) | old_content (1fr) |
@@ -194,9 +194,9 @@ class DiffView(Widget):
             show_edge=False,
         )
         table.add_column(width=LN_COL_WIDTH, no_wrap=True)
-        table.add_column(ratio=1, style=old_col_style)
+        table.add_column(ratio=1)
         table.add_column(width=LN_COL_WIDTH, no_wrap=True)
-        table.add_column(ratio=1, style=new_col_style)
+        table.add_column(ratio=1)
         return table
 
     def compose(self):
@@ -427,7 +427,7 @@ class DiffView(Widget):
             if batch:
                 instructions.append((self._INST_BATCH, batch))
 
-        self.logger.info(
+        PERF_LOG.info(
             "[perf] DiffView._build_instructions: %d instructions (%d diff lines)",
             len(instructions),
             line_count,
@@ -463,9 +463,8 @@ class DiffView(Widget):
     def _pop_comment_data(self, comment_lists, diff, old_ln, new_ln):
         """Pop comment data for a given line and return instruction tuples.
 
-        Unlike _pop_comments() this does not create Textual widgets --
-        it returns lightweight instruction tuples that _mount_diff()
-        will turn into widgets on the main thread.
+        Returns lightweight instruction tuples (not Textual widgets)
+        that _mount_diff() converts into widgets on the main thread.
         """
         result = []
         for side, ln, name in (
@@ -665,12 +664,11 @@ class DiffView(Widget):
         """Overlay brighter backgrounds on word-emphasis segments."""
         if action == "+":
             word_bg = _ADDED_WORD_BG
-            word_suffix = "-word"
         elif action == "-":
             word_bg = _REMOVED_WORD_BG
-            word_suffix = "-word"
         else:
             return
+        word_suffix = "-word"
 
         # Flatten content into (style_name, text) pairs with offsets
         segments = []
