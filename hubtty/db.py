@@ -990,7 +990,7 @@ class DatabaseSession:
             account = self.createAccount(id)
             if username:
                 self.database.app.sync.submitTask(
-                    sync.SyncAccountTask(username, sync.NORMAL_PRIORITY))
+                    sync.SyncAccountTask(username, priority=sync.NORMAL_PRIORITY))
         if name is not None and account.name != name:
             account.name = name
         if username is not None and account.username != username:

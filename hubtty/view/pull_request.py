@@ -1095,7 +1095,7 @@ class PullRequestView(urwid.WidgetWrap):
             pr.pending_edit_message = dialog.entry.edit_text
             pr_key = pr.key
         self.app.sync.submitTask(
-            sync.EditPullRequestTask(pr_key, sync.HIGH_PRIORITY))
+            sync.EditPullRequestTask(pr_key, priority=sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
@@ -1120,7 +1120,7 @@ class PullRequestView(urwid.WidgetWrap):
             pr.pending_edit = True
             pr_key = pr.key
         self.app.sync.submitTask(
-            sync.EditPullRequestTask(pr_key, sync.HIGH_PRIORITY))
+            sync.EditPullRequestTask(pr_key, priority=sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
@@ -1138,7 +1138,7 @@ class PullRequestView(urwid.WidgetWrap):
             pr.pending_rebase = True
             pr_key = pr.key
         self.app.sync.submitTask(
-            sync.RebasePullRequestTask(pr_key, sync.HIGH_PRIORITY))
+            sync.RebasePullRequestTask(pr_key, priority=sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
@@ -1175,7 +1175,7 @@ class PullRequestView(urwid.WidgetWrap):
 
         if pending_merge:
             self.app.sync.submitTask(
-                    sync.SendMergeTask(pending_merge.key, sync.HIGH_PRIORITY))
+                    sync.SendMergeTask(pending_merge.key, priority=sync.HIGH_PRIORITY))
 
         self.app.backScreen()
         self.refresh()
@@ -1204,7 +1204,7 @@ class PullRequestView(urwid.WidgetWrap):
                 pr.pending_labels = True
                 pr_key = pr.key
             self.app.sync.submitTask(
-                sync.SetLabelsTask(pr_key, sync.HIGH_PRIORITY))
+                sync.SetLabelsTask(pr_key, priority=sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
@@ -1237,7 +1237,7 @@ class PullRequestView(urwid.WidgetWrap):
         if upload:
             for message_key in message_keys:
                 self.app.sync.submitTask(
-                    sync.UploadReviewTask(message_key, sync.HIGH_PRIORITY))
+                    sync.UploadReviewTask(message_key, priority=sync.HIGH_PRIORITY))
         self.refresh()
         if self.app.config.close_pr_on_review:
             self.app.backScreen()

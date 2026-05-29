@@ -564,7 +564,7 @@ class App:
             restids = [pr.pr_id for pr in pull_requests if pr]
         if restids:
             for restid in restids:
-                task = sync.SyncPullRequestTask(restid, sync.HIGH_PRIORITY)
+                task = sync.SyncPullRequestTask(restid, priority=sync.HIGH_PRIORITY)
                 self.sync.submitTask(task)
         if not pr_keys:
             raise Exception('Pull request is not in local database.')
@@ -765,7 +765,7 @@ class App:
                     for m in pr.messages:
                         if m.pending:
                             self.sync.submitTask(
-                                sync.UploadReviewTask(m.key, sync.HIGH_PRIORITY))
+                                sync.UploadReviewTask(m.key, priority=sync.HIGH_PRIORITY))
         self.updateStatusQueries()
         return ret
 
@@ -837,7 +837,7 @@ class App:
             sha = pr.commits[-1].sha
             pending_merge = pr.createPendingMerge(sha,'merge')
             self.sync.submitTask(
-                    sync.SendMergeTask(pending_merge.key, sync.HIGH_PRIORITY))
+                    sync.SendMergeTask(pending_merge.key, priority=sync.HIGH_PRIORITY))
         return message_key
 
 
