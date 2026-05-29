@@ -90,6 +90,7 @@ class TestCheckResponse:
         response = Mock()
         response.status_code = 403
         response.text = "the `myorg` organization has enabled OAuth App access restrictions"
+        response.headers = {'X-RateLimit-Remaining': '100'}  # Not rate limited
 
         with pytest.raises(RestrictedError) as exc_info:
             http_client.checkResponse(response)
@@ -100,6 +101,7 @@ class TestCheckResponse:
         response = Mock()
         response.status_code = 403
         response.text = "the `testorg` organization has enabled OAuth App access restrictions"
+        response.headers = {'X-RateLimit-Remaining': '100'}  # Not rate limited
 
         with pytest.raises(RestrictedError):
             http_client.checkResponse(response)
@@ -113,6 +115,7 @@ class TestCheckResponse:
         response = Mock()
         response.status_code = 403
         response.text = "Forbidden"
+        response.headers = {'X-RateLimit-Remaining': '100'}  # Not rate limited
 
         with pytest.raises(Exception) as exc_info:
             http_client.checkResponse(response)
@@ -232,17 +235,218 @@ class TestHTTPGet:
 
         mock_sleep.assert_called_once()
 
-    def test_get_rate_limit_no_reset_raises(self, http_client):
-        """GET raises RateLimitError when rate limited without reset."""
-        response = Mock()
-        response.status_code = 200
-        response.text = '{"id": 1}'
-        response.headers = {'X-RateLimit-Remaining': '0'}
-        response.links = {}
+    def test_get_rate_limit_no_reset_waits_60s(self, http_client):
+        """GET waits 60s when rate limited without reset time (secondary rate limit fallback)."""
+        # First response: rate limited with no reset time
+        r1 = Mock()
+        r1.status_code = 200
+        r1.text = '{"id": 1}'
+        r1.headers = {'X-RateLimit-Remaining': '0'}
+        r1.links = {}
 
-        with patch.object(http_client.session, 'get', return_value=response):
-            with pytest.raises(RateLimitError):
+        # Second response: success after waiting
+        r2 = Mock()
+        r2.status_code = 200
+        r2.text = '{"id": 1}'
+        r2.headers = {'X-RateLimit-Remaining': '100'}
+        r2.links = {}
+
+        with patch.object(http_client.session, 'get', side_effect=[r1, r2]):
+            with patch('hubtty.sync.http.time.sleep') as mock_sleep:
                 http_client.get('repos/test')
+
+        # Should sleep for 60 seconds (GitHub's recommended minimum)
+        mock_sleep.assert_called_once_with(60)
+
+    def test_get_handles_429_with_retry_after(self, http_client):
+        """GET handles 429 with Retry-After header."""
+        # First response: 429 with retry-after
+        r1 = Mock()
+        r1.status_code = 429
+        r1.text = '{"message": "API rate limit exceeded"}'
+        r1.headers = {'Retry-After': '30', 'X-RateLimit-Remaining': '0'}
+        r1.links = {}
+        r1.url = 'https://api.github.com/repos/test'
+
+        # Second response: success
+        r2 = Mock()
+        r2.status_code = 200
+        r2.text = '{"id": 1}'
+        r2.headers = {'X-RateLimit-Remaining': '100'}
+        r2.links = {}
+
+        with patch.object(http_client.session, 'get', side_effect=[r1, r2]):
+            with patch('hubtty.sync.http.time.sleep') as mock_sleep:
+                result = http_client.get('repos/test')
+
+        # Should use retry-after value
+        mock_sleep.assert_called_once_with(30)
+        assert result == {"id": 1}
+
+    def test_get_handles_429_with_reset_time(self, http_client):
+        """GET handles 429 with X-RateLimit-Reset header."""
+        import time
+
+        reset_time = int(time.time()) + 45
+
+        # First response: 429 with reset time
+        r1 = Mock()
+        r1.status_code = 429
+        r1.text = '{"message": "API rate limit exceeded"}'
+        r1.headers = {
+            'X-RateLimit-Reset': str(reset_time),
+            'X-RateLimit-Remaining': '0',
+        }
+        r1.links = {}
+        r1.url = 'https://api.github.com/repos/test'
+
+        # Second response: success
+        r2 = Mock()
+        r2.status_code = 200
+        r2.text = '{"id": 1}'
+        r2.headers = {'X-RateLimit-Remaining': '100'}
+        r2.links = {}
+
+        with patch.object(http_client.session, 'get', side_effect=[r1, r2]):
+            with patch('hubtty.sync.http.time.sleep') as mock_sleep:
+                with patch('hubtty.sync.http.time.time', return_value=time.time()):
+                    result = http_client.get('repos/test')
+
+        # Should sleep until reset time (at least 1 second due to max())
+        assert mock_sleep.called
+        sleep_duration = mock_sleep.call_args[0][0]
+        assert sleep_duration >= 1
+        assert result == {"id": 1}
+
+    def test_get_handles_403_rate_limit(self, http_client):
+        """GET handles 403 with X-RateLimit-Remaining: 0 as rate limit."""
+        import time
+
+        reset_time = int(time.time()) + 30
+
+        # First response: 403 with rate limit headers
+        r1 = Mock()
+        r1.status_code = 403
+        r1.text = '{"message": "API rate limit exceeded"}'
+        r1.headers = {
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': str(reset_time),
+        }
+        r1.links = {}
+        r1.url = 'https://api.github.com/repos/test'
+
+        # Second response: success
+        r2 = Mock()
+        r2.status_code = 200
+        r2.text = '{"id": 1}'
+        r2.headers = {'X-RateLimit-Remaining': '100'}
+        r2.links = {}
+
+        with patch.object(http_client.session, 'get', side_effect=[r1, r2]):
+            with patch('hubtty.sync.http.time.sleep') as mock_sleep:
+                result = http_client.get('repos/test')
+
+        # Should handle as rate limit, not OAuth restriction
+        assert mock_sleep.called
+        assert result == {"id": 1}
+
+    def test_get_secondary_rate_limit_without_headers(self, http_client):
+        """GET handles secondary rate limit with no timing headers."""
+        # First response: 429 with no timing headers
+        r1 = Mock()
+        r1.status_code = 429
+        r1.text = '{"message": "You have exceeded a secondary rate limit"}'
+        r1.headers = {}
+        r1.links = {}
+        r1.url = 'https://api.github.com/repos/test'
+
+        # Second response: success
+        r2 = Mock()
+        r2.status_code = 200
+        r2.text = '{"id": 1}'
+        r2.headers = {'X-RateLimit-Remaining': '100'}
+        r2.links = {}
+
+        with patch.object(http_client.session, 'get', side_effect=[r1, r2]):
+            with patch('hubtty.sync.http.time.sleep') as mock_sleep:
+                result = http_client.get('repos/test')
+
+        # Should wait 60 seconds (GitHub's minimum for secondary limits)
+        mock_sleep.assert_called_once_with(60)
+        assert result == {"id": 1}
+
+    def test_checkResponse_handles_429(self, http_client):
+        """checkResponse raises RateLimitError with attributes for 429."""
+        response = Mock()
+        response.status_code = 429
+        response.text = '{"message": "API rate limit exceeded"}'
+        response.headers = {
+            'Retry-After': '45',
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': '1234567890',
+        }
+        response.url = 'https://api.github.com/repos/test'
+
+        with pytest.raises(RateLimitError) as exc_info:
+            http_client.checkResponse(response)
+
+        error = exc_info.value
+        assert error.retry_after == 45
+        assert error.reset_time == 1234567890
+        assert error.remaining == 0
+        assert error.url == 'https://api.github.com/repos/test'
+        assert error.is_secondary  # Has retry-after, so it's secondary
+
+    def test_rate_limit_error_attributes(self):
+        """RateLimitError stores all context correctly."""
+        error = RateLimitError(
+            'Test rate limit',
+            reset_time=1234567890,
+            retry_after=60,
+            remaining=0,
+            is_secondary=True,
+            url='https://api.github.com/test',
+        )
+
+        assert str(error) == 'Test rate limit'
+        assert error.reset_time == 1234567890
+        assert error.retry_after == 60
+        assert error.remaining == 0
+        assert error.is_secondary is True
+        assert error.url == 'https://api.github.com/test'
+
+    def test_negative_sleep_prevention(self, http_client):
+        """GET prevents negative sleep from clock skew."""
+        import time
+
+        # Reset time in the past (clock skew scenario)
+        reset_time = int(time.time()) - 10
+
+        # First response: rate limited with reset time in past
+        r1 = Mock()
+        r1.status_code = 200
+        r1.text = '{"id": 1}'
+        r1.headers = {
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': str(reset_time),
+        }
+        r1.links = {}
+
+        # Second response: success
+        r2 = Mock()
+        r2.status_code = 200
+        r2.text = '{"id": 1}'
+        r2.headers = {'X-RateLimit-Remaining': '100'}
+        r2.links = {}
+
+        with patch.object(http_client.session, 'get', side_effect=[r1, r2]):
+            with patch('hubtty.sync.http.time.sleep') as mock_sleep:
+                http_client.get('repos/test')
+
+        # Should sleep for at least 1 second (not negative)
+        assert mock_sleep.called
+        sleep_duration = mock_sleep.call_args[0][0]
+        assert sleep_duration >= 1
 
 
 class TestHTTPPost:
@@ -285,6 +489,54 @@ class TestHTTPPost:
 
         assert result is None
 
+    def test_post_handles_rate_limit_with_retry(self, http_client):
+        """POST retries when rate limited."""
+        import time
+
+        reset_time = int(time.time()) + 30
+
+        # First response: rate limited
+        r1 = Mock()
+        r1.status_code = 429
+        r1.text = '{"message": "API rate limit exceeded"}'
+        r1.headers = {
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': str(reset_time),
+        }
+        r1.url = 'https://api.github.com/repos/test'
+
+        # Second response: success
+        r2 = Mock()
+        r2.status_code = 201
+        r2.text = '{"id": 123}'
+        r2.headers = {'X-RateLimit-Remaining': '100'}
+
+        with patch.object(http_client.session, 'post', side_effect=[r1, r2]):
+            with patch('hubtty.sync.http.time.sleep') as mock_sleep:
+                result = http_client.post('repos/test', {'key': 'value'})
+
+        # Should have slept and retried
+        assert mock_sleep.called
+        assert result == {"id": 123}
+
+    def test_post_rate_limit_max_retries(self, http_client):
+        """POST gives up after max retries on rate limit."""
+        import time
+
+        reset_time = int(time.time()) + 30
+
+        # All responses: rate limited
+        r = Mock()
+        r.status_code = 429
+        r.text = '{"message": "API rate limit exceeded"}'
+        r.headers = {'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': str(reset_time)}
+        r.url = 'https://api.github.com/repos/test'
+
+        with patch.object(http_client.session, 'post', return_value=r):
+            with patch('hubtty.sync.http.time.sleep'):
+                with pytest.raises(RateLimitError):
+                    http_client.post('repos/test', {'key': 'value'})
+
 
 class TestHTTPPut:
     """Tests for PUT requests."""
@@ -294,6 +546,7 @@ class TestHTTPPut:
         response = Mock()
         response.status_code = 200
         response.text = ''
+        response.headers = {'X-RateLimit-Remaining': '100'}
 
         with patch.object(http_client.session, 'put', return_value=response) as mock_put:
             http_client.put('repos/test', {'key': 'value'})
@@ -307,6 +560,7 @@ class TestHTTPPut:
         response = Mock()
         response.status_code = 200
         response.text = '{"ignored": true}'
+        response.headers = {'X-RateLimit-Remaining': '100'}
 
         with patch.object(http_client.session, 'put', return_value=response):
             result = http_client.put('repos/test', {})
@@ -322,6 +576,7 @@ class TestHTTPPatch:
         response = Mock()
         response.status_code = 200
         response.text = ''
+        response.headers = {'X-RateLimit-Remaining': '100'}
 
         with patch.object(http_client.session, 'patch', return_value=response) as mock_patch:
             http_client.patch('repos/test', {'key': 'value'})
@@ -339,6 +594,7 @@ class TestHTTPDelete:
         response = Mock()
         response.status_code = 200
         response.text = ''
+        response.headers = {'X-RateLimit-Remaining': '100'}
 
         with patch.object(http_client.session, 'delete', return_value=response) as mock_delete:
             http_client.delete('repos/test', {'key': 'value'})

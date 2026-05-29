@@ -79,12 +79,27 @@ class HTTPClient:
         Raises:
             OfflineError: If the server returned 503.
             RestrictedError: If OAuth app restrictions block access.
+            RateLimitError: If rate limit is exceeded.
             Exception: For other 4xx/5xx status codes.
         """
         self.log.debug('HTTP status code: %d', response.status_code)
+
+        # Handle 429 (rate limit exceeded)
+        if response.status_code == 429:
+            self._handle_rate_limit_response(response)
+
+        # Handle 503 (service unavailable)
         if response.status_code == 503:
             raise OfflineError("Received 503 status code")
+
+        # Handle 403 (forbidden)
         elif response.status_code == 403:
+            # Check if it's a rate limit 403 first
+            remaining = response.headers.get('X-RateLimit-Remaining')
+            if remaining and int(remaining) == 0:
+                self._handle_rate_limit_response(response)
+
+            # Check for OAuth restriction
             result = re.search(
                 r"the `([\w-]+)` organization has enabled OAuth App access restrictions",
                 response.text
@@ -107,10 +122,134 @@ class HTTPClient:
                 raise Exception(
                     f"Received {response.status_code} status code: {response.text}"
                 )
+
+        # Other error codes
         elif response.status_code >= 400:
             raise Exception(
                 f"Received {response.status_code} status code: {response.text}"
             )
+
+    def _handle_rate_limit_response(self, response: requests.Response) -> None:
+        """Extract rate limit info and raise RateLimitError.
+
+        Args:
+            response: HTTP response with rate limit error.
+
+        Raises:
+            RateLimitError: Always raised with extracted rate limit context.
+        """
+        retry_after = response.headers.get('Retry-After')
+        reset_time = response.headers.get('X-RateLimit-Reset')
+        remaining = response.headers.get('X-RateLimit-Remaining')
+
+        # Convert to integers if present
+        retry_after_int = int(retry_after) if retry_after else None
+        reset_time_int = int(reset_time) if reset_time else None
+        remaining_int = int(remaining) if remaining else None
+
+        # Determine if this is a secondary rate limit
+        # Secondary: Has retry-after OR (remaining != 0)
+        is_secondary = bool(retry_after) or (
+            remaining_int is not None and remaining_int != 0
+        )
+
+        # Build informative error message
+        parts = [f"Rate limit exceeded (HTTP {response.status_code})"]
+        if retry_after_int:
+            parts.append(f"retry-after: {retry_after_int}s")
+        if reset_time_int:
+            parts.append(f"reset: {reset_time_int}")
+        if remaining_int is not None:
+            parts.append(f"remaining: {remaining_int}")
+
+        message = ", ".join(parts)
+
+        raise RateLimitError(
+            message,
+            reset_time=reset_time_int,
+            retry_after=retry_after_int,
+            remaining=remaining_int,
+            is_secondary=is_secondary,
+            url=response.url,
+        )
+
+    def _should_handle_rate_limit(self, response: requests.Response) -> bool:
+        """Check if response indicates rate limiting that should be handled.
+
+        Args:
+            response: HTTP response to check.
+
+        Returns:
+            True if we should wait and retry due to rate limiting.
+        """
+        # Case 1: Explicit rate limit response (429 or 403 with remaining=0)
+        if response.status_code in [403, 429]:
+            remaining_str = response.headers.get('X-RateLimit-Remaining')
+            if remaining_str and int(remaining_str) == 0:
+                return True
+            if response.status_code == 429:
+                return True
+
+        # Case 2: Proactive rate limit (success but no quota left)
+        if response.status_code == 200:
+            remaining_str = response.headers.get('X-RateLimit-Remaining', '1')
+            remaining = int(remaining_str)
+            if remaining < 1:
+                return True
+
+        return False
+
+    def _wait_for_rate_limit(self, response: requests.Response, url: str) -> None:
+        """Wait for rate limit to reset before retrying.
+
+        Follows GitHub's documented strategy:
+        1. Use retry-after header if present (secondary rate limits)
+        2. Use x-ratelimit-reset if present (primary rate limits)
+        3. Otherwise wait 60 seconds (secondary rate limit fallback)
+
+        Args:
+            response: HTTP response with rate limit information.
+            url: The URL being requested (for logging).
+        """
+        retry_after = response.headers.get('Retry-After')
+        reset_time = response.headers.get('X-RateLimit-Reset')
+        remaining = response.headers.get('X-RateLimit-Remaining', '?')
+
+        # Strategy 1: Use retry-after header (secondary rate limits)
+        if retry_after:
+            sleep_time = int(retry_after)
+            self.log.info(
+                'Hit secondary rate limit on %s, retry-after: %d seconds (remaining: %s)',
+                url,
+                sleep_time,
+                remaining,
+            )
+            time.sleep(sleep_time)
+            return
+
+        # Strategy 2: Use x-ratelimit-reset (primary rate limits)
+        if reset_time:
+            # Prevent negative sleep due to clock skew
+            sleep_time = max(1, int(reset_time) - int(time.time()))
+            self.log.info(
+                'Hit primary rate limit on %s, reset in: %d seconds (remaining: %s)',
+                url,
+                sleep_time,
+                remaining,
+            )
+            time.sleep(sleep_time)
+            return
+
+        # Strategy 3: Fallback for secondary rate limits without headers
+        # Per GitHub docs: "wait for at least one minute before retrying"
+        sleep_time = 60
+        self.log.info(
+            'Hit rate limit on %s with no timing headers, waiting %d seconds (remaining: %s)',
+            url,
+            sleep_time,
+            remaining,
+        )
+        time.sleep(sleep_time)
 
     def get(
         self,
@@ -149,17 +288,17 @@ class HTTPClient:
                 timeout=TIMEOUT,
                 headers={**default_headers, **(headers or {})}
             )
+
+            # CRITICAL: Check rate limits BEFORE calling response_callback
+            # This allows us to handle rate limit responses before they become exceptions
+            if self._should_handle_rate_limit(r):
+                self._wait_for_rate_limit(r, url)
+                continue  # Retry the request
+
+            # Now validate response (will raise exceptions for non-rate-limit errors)
             response_callback(r)
 
-            if int(r.headers.get('X-RateLimit-Remaining', 1)) < 1:
-                if r.headers.get('X-RateLimit-Reset'):
-                    sleep = int(r.headers.get('X-RateLimit-Reset')) - int(time.time())
-                    self.log.debug('Hit rate limit, retrying in %d seconds', sleep)
-                    time.sleep(sleep)
-                    continue
-                else:
-                    raise RateLimitError("Hitting RateLimit")
-
+            # Process successful response
             if r.status_code == 200:
                 result = json.loads(r.text)
                 # Search queries store results under the 'items' key
@@ -174,6 +313,7 @@ class HTTPClient:
                 else:
                     self.log.debug('200 OK, No body.')
 
+            # Check for pagination
             if 'next' in r.links.keys():
                 url = r.links['next']['url']
             else:
@@ -217,25 +357,42 @@ class HTTPClient:
         self.log.debug('%s: %s', method.upper(), url)
         self.log.debug('data: %s', data)
 
-        request_method = getattr(self.session, method)
-        r = request_method(
-            url,
-            data=json.dumps(data).encode('utf8'),
-            timeout=TIMEOUT,
-            headers={**default_headers, **(headers or {})}
-        )
-        response_callback(r)
-        self.log.debug('Received: %s', r.text)
+        # Retry loop for rate limiting (max 3 attempts)
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            request_method = getattr(self.session, method)
+            r = request_method(
+                url,
+                data=json.dumps(data).encode('utf8'),
+                timeout=TIMEOUT,
+                headers={**default_headers, **(headers or {})}
+            )
 
-        # Only POST returns parsed response
-        if method == 'post' and r.text and len(r.text) > 0:
-            try:
-                return json.loads(r.text)
-            except Exception:
-                self.log.exception(
-                    "Unable to parse result %s from post to %s", r.text, url
-                )
-                raise
+            # Check rate limits before validation
+            if self._should_handle_rate_limit(r):
+                if attempt < max_attempts - 1:
+                    self._wait_for_rate_limit(r, url)
+                    continue  # Retry
+                else:
+                    # Last attempt, let it raise
+                    response_callback(r)
+
+            # Validate response
+            response_callback(r)
+            self.log.debug('Received: %s', r.text)
+
+            # Only POST returns parsed response
+            if method == 'post' and r.text and len(r.text) > 0:
+                try:
+                    return json.loads(r.text)
+                except Exception:
+                    self.log.exception(
+                        "Unable to parse result %s from post to %s", r.text, url
+                    )
+                    raise
+            return None
+
+        # Should never reach here
         return None
 
     def post(
