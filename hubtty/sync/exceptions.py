@@ -15,6 +15,8 @@
 
 """Exceptions for the sync module."""
 
+from typing import Optional
+
 
 class OfflineError(Exception):
     """Raised when the GitHub API is unreachable (e.g., 503 status)."""
@@ -27,5 +29,38 @@ class RestrictedError(Exception):
 
 
 class RateLimitError(Exception):
-    """Raised when GitHub API rate limit is hit."""
-    pass
+    """Raised when GitHub API rate limit is hit.
+
+    Attributes:
+        reset_time: Unix timestamp when the rate limit resets.
+        retry_after: Seconds to wait before retrying (from Retry-After header).
+        remaining: Number of requests remaining in the current quota.
+        is_secondary: Whether this is a secondary rate limit.
+        url: The URL that was rate limited.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        reset_time: Optional[int] = None,
+        retry_after: Optional[int] = None,
+        remaining: Optional[int] = None,
+        is_secondary: bool = False,
+        url: Optional[str] = None,
+    ):
+        """Initialize a RateLimitError.
+
+        Args:
+            message: Error message describing the rate limit.
+            reset_time: Unix timestamp when rate limit resets.
+            retry_after: Seconds to wait (from Retry-After header).
+            remaining: Requests remaining in current quota.
+            is_secondary: True if this is a secondary rate limit.
+            url: The URL that triggered the rate limit.
+        """
+        super().__init__(message)
+        self.reset_time = reset_time
+        self.retry_after = retry_after
+        self.remaining = remaining
+        self.is_secondary = is_secondary
+        self.url = url

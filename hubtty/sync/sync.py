@@ -72,6 +72,7 @@ class Sync(HTTPClient):
         super().__init__(app, user_agent, github_api_version)
 
         self.offline = False
+        self.consecutive_rate_limit_errors = 0
         self.account_id: Optional[int] = None
         self.queue = MultiQueue([HIGH_PRIORITY, NORMAL_PRIORITY, LOW_PRIORITY])
         self.result_queue: queue.Queue = queue.Queue()
@@ -164,12 +165,19 @@ class Sync(HTTPClient):
             requests.exceptions.ReadTimeout,
         ) as e:
             self.log.warning("Offline due to: %s", e)
+
+            # Calculate backoff time
+            if isinstance(e, RateLimitError):
+                backoff = self._calculate_rate_limit_backoff(e)
+            else:
+                backoff = 30  # Fixed backoff for non-rate-limit errors
+
             if not self.offline:
                 self.submitTask(UploadReviewsTask(priority=HIGH_PRIORITY))
             self.offline = True
             self.app.status.update(offline=True, refresh=False)
             os.write(pipe, b'refresh\n')
-            time.sleep(30)
+            time.sleep(backoff)
             return task
         except RestrictedError as e:
             task.complete(False)
@@ -182,11 +190,75 @@ class Sync(HTTPClient):
             self.log.exception('Exception running task %s', task)
             self.app.status.update(error=True, refresh=False)
         self.offline = False
+        self.consecutive_rate_limit_errors = 0
         self.app.status.update(offline=False, refresh=False)
         for r in task.results:
             self.result_queue.put(r)
         os.write(pipe, b'refresh\n')
         return None
+
+    def _calculate_rate_limit_backoff(self, error: RateLimitError) -> int:
+        """Calculate backoff time for rate limit errors.
+
+        For primary rate limits: Use the timing from the error
+        For secondary rate limits: Use exponential backoff
+
+        Per GitHub docs:
+        - If retry-after present: use it
+        - If x-ratelimit-reset present: use it
+        - Otherwise: wait 1 min, then exponentially increase
+
+        Args:
+            error: RateLimitError with timing information.
+
+        Returns:
+            Number of seconds to wait before retrying.
+
+        Raises:
+            RateLimitError: If max retries (5) exceeded for secondary rate limits.
+        """
+        # Primary rate limits: Use exact timing from headers
+        if not error.is_secondary:
+            if error.retry_after:
+                return error.retry_after
+            if error.reset_time:
+                return max(1, error.reset_time - int(time.time()))
+            # Shouldn't happen for primary, but fallback to 60s
+            return 60
+
+        # Secondary rate limits: Exponential backoff
+        self.consecutive_rate_limit_errors += 1
+
+        # If we have timing info from headers, use it for first attempt
+        if self.consecutive_rate_limit_errors == 1:
+            if error.retry_after:
+                self.log.info(
+                    'Secondary rate limit (attempt 1), using retry-after: %ds',
+                    error.retry_after,
+                )
+                return error.retry_after
+            # GitHub says "wait at least one minute"
+            self.log.info('Secondary rate limit (attempt 1), waiting 60s')
+            return 60
+
+        # Subsequent attempts: Exponential backoff
+        # 60s, 120s, 240s, 480s, max 600s (10 min)
+        backoff = min(60 * (2 ** (self.consecutive_rate_limit_errors - 1)), 600)
+
+        self.log.info(
+            'Secondary rate limit (attempt %d), exponential backoff: %ds',
+            self.consecutive_rate_limit_errors,
+            backoff,
+        )
+
+        # Give up after 5 attempts
+        if self.consecutive_rate_limit_errors >= 5:
+            self.log.error('Hit secondary rate limit 5 times, giving up on task')
+            # Reset counter and raise to fail the task
+            self.consecutive_rate_limit_errors = 0
+            raise error
+
+        return backoff
 
     def syncSubscribedRepositories(self) -> None:
         """Sync all subscribed repositories and wait for completion."""
