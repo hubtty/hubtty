@@ -56,7 +56,11 @@ from .tasks.repository import (
 )
 
 # Pull request tasks
-from .tasks.pull_request import SyncPullRequestTask, SyncOutdatedPullRequestsTask
+from .tasks.pull_request import (
+    SyncPullRequestTask,
+    SyncPullRequestChecksTask,
+    SyncOutdatedPullRequestsTask,
+)
 
 # Upload tasks
 from .tasks.upload import (
@@ -111,6 +115,7 @@ __all__ = [
     'SetRepositoryUpdatedTask',
     # Pull request tasks
     'SyncPullRequestTask',
+    'SyncPullRequestChecksTask',
     'SyncOutdatedPullRequestsTask',
     # Upload tasks
     'UploadReviewsTask',

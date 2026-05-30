@@ -22,6 +22,7 @@ generates __eq__ and __repr__ methods for subclasses, reducing boilerplate.
 from dataclasses import dataclass, field
 from typing import Any, List, Optional, TYPE_CHECKING
 import logging
+import time
 import threading
 
 from .constants import NORMAL_PRIORITY
@@ -57,6 +58,7 @@ class Task:
     # Priority is keyword-only with a default, so subclasses can have
     # positional fields without defaults
     priority: int = field(default=NORMAL_PRIORITY, compare=False, repr=False)
+    delay: float = field(default=0, compare=False, repr=False)
 
     # Runtime state - not part of task identity
     succeeded: Optional[bool] = field(default=None, init=False, compare=False, repr=False)
@@ -70,6 +72,11 @@ class Task:
         """Initialize the logger after dataclass initialization."""
         # Use object.__setattr__ in case the dataclass is frozen
         object.__setattr__(self, 'log', logging.getLogger('hubtty.sync'))
+        # Compute the earliest time this task may run
+        object.__setattr__(
+            self, 'earliest_run',
+            time.time() + self.delay if self.delay > 0 else 0
+        )
 
     @property
     def log(self) -> logging.Logger:

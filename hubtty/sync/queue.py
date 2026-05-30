@@ -15,6 +15,8 @@
 
 """Thread-safe multi-priority queue for sync tasks."""
 
+import time
+
 from collections import OrderedDict, deque
 from threading import Condition
 from typing import Any, List, Type, TypeVar
@@ -67,21 +69,36 @@ class MultiQueue:
     def get(self) -> T:
         """Remove and return the highest-priority item.
 
-        Blocks until an item is available.
+        Blocks until an item is available.  Items whose ``earliest_run``
+        attribute is in the future are skipped so that they do not block
+        higher-priority work.
 
         Returns:
             The highest-priority item from the queue.
         """
         with self.condition:
             while True:
+                soonest = None
                 for q in self.queues.values():
-                    try:
-                        ret = q.popleft()
-                        self.incomplete.append(ret)
-                        return ret
-                    except IndexError:
-                        pass
-                self.condition.wait()
+                    for i, item in enumerate(q):
+                        ready_at = getattr(item, 'earliest_run', 0) or 0
+                        if ready_at > time.time():
+                            # Track the earliest delayed item so we
+                            # can sleep only until it becomes ready.
+                            if soonest is None or ready_at < soonest:
+                                soonest = ready_at
+                            continue
+                        # Found a ready item – remove it from the deque.
+                        del q[i]
+                        self.incomplete.append(item)
+                        return item
+                # Nothing ready right now – wait until the earliest
+                # delayed item matures or a new item arrives.
+                if soonest is not None:
+                    wait_time = max(0, soonest - time.time())
+                    self.condition.wait(timeout=wait_time)
+                else:
+                    self.condition.wait()
 
     def find(self, klass: Type[T], priority: int) -> List[T]:
         """Find all items of a given class at a specific priority level.

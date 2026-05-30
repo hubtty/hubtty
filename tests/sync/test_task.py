@@ -200,3 +200,27 @@ class TestTaskRun:
         t = NoRunTask()
         with pytest.raises(NotImplementedError):
             t.run(None)
+
+
+class TestTaskDelay:
+    """Tests for Task delay / earliest_run."""
+
+    def test_default_delay_zero(self):
+        """Tasks default to delay=0 with earliest_run=0."""
+        t = SimpleTask(name="test")
+        assert t.delay == 0
+        assert t.earliest_run == 0
+
+    def test_delay_sets_earliest_run(self):
+        """A positive delay sets earliest_run in the future."""
+        before = time.time()
+        t = SimpleTask(name="test", delay=10)
+        after = time.time()
+        assert t.delay == 10
+        assert before + 10 <= t.earliest_run <= after + 10
+
+    def test_delay_excluded_from_equality(self):
+        """Delay does not affect equality."""
+        t1 = SimpleTask(name="test", delay=0)
+        t2 = SimpleTask(name="test", delay=30)
+        assert t1 == t2

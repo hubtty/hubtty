@@ -17,6 +17,7 @@
 
 import threading
 import time
+from types import SimpleNamespace
 
 from hubtty.sync.queue import MultiQueue
 from hubtty.sync.constants import HIGH_PRIORITY, NORMAL_PRIORITY, LOW_PRIORITY
@@ -223,3 +224,60 @@ class TestMultiQueueThreadSafety:
 
         assert result == ["delayed"]
         assert elapsed >= 0.04  # Should have waited
+
+
+def _make_item(value, earliest_run=0):
+    """Create a simple object with earliest_run for delay testing."""
+    obj = SimpleNamespace(value=value, earliest_run=earliest_run)
+    # __eq__ and __hash__ based on value so duplicate detection works
+    obj.__eq__ = lambda self, other: getattr(other, 'value', None) == self.value
+    obj.__hash__ = lambda self: hash(self.value)
+    return obj
+
+
+class TestMultiQueueDelayed:
+    """Tests for delayed (earliest_run) items."""
+
+    def test_delayed_item_skipped_for_ready_item(self):
+        """A delayed item is skipped in favour of a later ready item."""
+        q = MultiQueue([NORMAL_PRIORITY, LOW_PRIORITY])
+        delayed = _make_item("delayed", earliest_run=time.time() + 60)
+        ready = _make_item("ready", earliest_run=0)
+
+        q.put(delayed, NORMAL_PRIORITY)
+        q.put(ready, LOW_PRIORITY)
+
+        item = q.get()
+        assert item.value == "ready"
+
+    def test_delayed_item_returned_when_ready(self):
+        """A delayed item is returned once its earliest_run has passed."""
+        q = MultiQueue([NORMAL_PRIORITY])
+        soon = _make_item("soon", earliest_run=time.time() + 0.05)
+        q.put(soon, NORMAL_PRIORITY)
+
+        start = time.time()
+        item = q.get()
+        elapsed = time.time() - start
+
+        assert item.value == "soon"
+        assert elapsed >= 0.04  # Had to wait for the delay
+
+    def test_delayed_does_not_block_higher_priority(self):
+        """Higher-priority items run while delayed low-priority waits."""
+        q = MultiQueue([HIGH_PRIORITY, LOW_PRIORITY])
+        delayed = _make_item("delayed", earliest_run=time.time() + 60)
+        urgent = _make_item("urgent", earliest_run=0)
+
+        q.put(delayed, LOW_PRIORITY)
+        q.put(urgent, HIGH_PRIORITY)
+
+        item = q.get()
+        assert item.value == "urgent"
+
+    def test_no_earliest_run_attribute_treated_as_ready(self):
+        """Items without earliest_run are treated as immediately ready."""
+        q = MultiQueue([NORMAL_PRIORITY])
+        q.put("plain-string", NORMAL_PRIORITY)
+        item = q.get()
+        assert item == "plain-string"
