@@ -425,7 +425,9 @@ class SyncPullRequestTask(Task):
             # re-check so we pick up completed CI results without
             # waiting for another full PR sync.
             if (len(remote_commits) > 0
-                    and has_pending_checks(last_commit.get('_hubtty_checks', []))):
+                    and has_pending_checks(
+                        last_commit.get('_hubtty_checks', []),
+                        frozenset(sync.app.config.ignore_pending_checks))):
                 self.log.info(
                     "Pull request %s has pending checks, scheduling re-check",
                     self.pr_id
@@ -500,7 +502,8 @@ class SyncPullRequestChecksTask(Task):
         self.results.append(PullRequestUpdatedEvent(repository_key, pr_key))
 
         # Re-submit if checks are still pending
-        if has_pending_checks(checks_data):
+        if has_pending_checks(checks_data,
+                               frozenset(sync.app.config.ignore_pending_checks)):
             if self.attempt + 1 < MAX_CHECK_RETRIES:
                 delay = self._BACKOFF[min(self.attempt, len(self._BACKOFF) - 1)]
                 self.log.info(

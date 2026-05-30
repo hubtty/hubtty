@@ -163,13 +163,18 @@ def fetch_checks(sync: 'Sync', repository_name: str,
     return checks
 
 
-def has_pending_checks(checks_data: List[Dict[str, Any]]) -> bool:
+def has_pending_checks(checks_data: List[Dict[str, Any]],
+                       ignore_names: frozenset = frozenset()) -> bool:
     """Check if any checks are still in pending state.
 
     Args:
         checks_data: List of normalized check data dictionaries.
+        ignore_names: Set of check names whose pending state should
+            be ignored (e.g. merge-gate contexts like ``tide`` that
+            stay pending until labels are applied).
 
     Returns:
-        True if any check has state 'pending'.
+        True if any check has state 'pending' and is not ignored.
     """
-    return any(c['state'] == 'pending' for c in checks_data)
+    return any(c['state'] == 'pending' and c['name'] not in ignore_names
+               for c in checks_data)

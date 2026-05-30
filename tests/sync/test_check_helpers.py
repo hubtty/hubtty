@@ -239,6 +239,36 @@ class TestHasPendingChecks:
         ]
         assert has_pending_checks(checks) is False
 
+    def test_ignored_pending_not_counted(self):
+        """A pending check in the ignore set is not counted."""
+        checks = [
+            {'state': 'success', 'name': 'ci/build'},
+            {'state': 'pending', 'name': 'tide'},
+        ]
+        assert has_pending_checks(checks, frozenset(['tide'])) is False
+
+    def test_ignored_plus_real_pending(self):
+        """Ignored pending + non-ignored pending returns True."""
+        checks = [
+            {'state': 'pending', 'name': 'tide'},
+            {'state': 'pending', 'name': 'ci/build'},
+        ]
+        assert has_pending_checks(checks, frozenset(['tide'])) is True
+
+    def test_ignored_name_not_in_list(self):
+        """Pending check not in ignore set is still counted."""
+        checks = [
+            {'state': 'pending', 'name': 'ci/build'},
+        ]
+        assert has_pending_checks(checks, frozenset(['tide'])) is True
+
+    def test_empty_ignore_set_default_behavior(self):
+        """Default empty frozenset preserves original behavior."""
+        checks = [
+            {'state': 'pending', 'name': 'tide'},
+        ]
+        assert has_pending_checks(checks) is True
+
 
 class TestFetchChecks:
     """Tests for fetch_checks."""

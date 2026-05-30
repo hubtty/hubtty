@@ -210,6 +210,13 @@ commentlinks:
 hide-comments:
   - author: "^.*openshift.*$"
 
+# Check context names whose "pending" state should be ignored when
+# deciding whether to keep polling for CI results.  "tide" is a
+# merge-gate status that stays pending until required labels are
+# applied -- it is not a CI job that will eventually complete.
+ignore-pending-checks:
+  - tide
+
 # This section defines customized dashboards.  You can supply any
 # Hubtty search string and bind them to any key.  They will appear in
 # the global help text, and pressing the key anywhere in Hubtty will
