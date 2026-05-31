@@ -52,19 +52,39 @@ class MultiQueue:
     def put(self, item: T, priority: int) -> bool:
         """Add an item to the queue at the given priority.
 
+        Deduplication checks all priority levels and the incomplete
+        (currently running) list.  If the item already exists at a
+        lower-importance priority (higher numeric value), it is promoted
+        to the requested priority.
+
         Args:
             item: The item to add.
             priority: The priority level for this item.
 
         Returns:
-            True if the item was added, False if it was already in the queue.
+            True if the item was added (or promoted), False if it was
+            already present at the same or higher priority, or is
+            currently running.
         """
         with self.condition:
-            if item not in self.queues[priority]:
-                self.queues[priority].append(item)
-                self.condition.notify()
-                return True
-            return False
+            # Already running — nothing to do
+            if item in self.incomplete:
+                return False
+            # Check all priority levels
+            for pri, q in self.queues.items():
+                if item in q:
+                    if pri > priority:
+                        # Existing copy at lower importance — promote
+                        q.remove(item)
+                        self.queues[priority].append(item)
+                        self.condition.notify()
+                        return True
+                    # Same or higher importance already queued
+                    return False
+            # Not found anywhere — add it
+            self.queues[priority].append(item)
+            self.condition.notify()
+            return True
 
     def get(self) -> T:
         """Remove and return the highest-priority item.
