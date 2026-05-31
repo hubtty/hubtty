@@ -30,6 +30,8 @@ GLOBAL_HELP = (
      "Search for pull requests"),
     (keymap.LIST_HELD,
      "List held pull requests"),
+    (keymap.SYNC_TASKS,
+     "Show sync task queue"),
     (keymap.KILL,
      "Kill to end of line (editing)"),
     (keymap.YANK,

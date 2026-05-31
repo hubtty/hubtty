@@ -685,6 +685,8 @@ class App:
             self.searchDialog('')
         elif keymap.LIST_HELD in commands:
             self.doSearch("is:held")
+        elif keymap.SYNC_TASKS in commands:
+            self.showSyncTasks()
         elif key in self.config.dashboards:
             d = self.config.dashboards[key]
             view = view_pr_list.PullRequestListView(self, d['query'], d['name'],
@@ -708,6 +710,35 @@ class App:
             self.status.update(message=msg)
             return
         self.clearInputBuffer()
+
+    def showSyncTasks(self):
+        PRIORITY_LABELS = {0: 'high', 1: 'normal', 2: 'low'}
+        running, queued = self.sync.queue.snapshot()
+        total = len(running) + sum(len(tasks) for tasks in queued.values())
+        lines = []
+        lines.append('Total tasks: %d' % total)
+        lines.append('')
+        if running:
+            lines.append('\N{BLACK RIGHT-POINTING POINTER} Running:')
+            for task in running:
+                lines.append('  %s' % repr(task))
+        else:
+            lines.append('\N{BLACK RIGHT-POINTING POINTER} Running: (none)')
+        for pri in sorted(queued.keys()):
+            tasks = queued[pri]
+            label = PRIORITY_LABELS.get(pri, str(pri))
+            lines.append('')
+            if tasks:
+                lines.append('Queued (%s):' % label)
+                for task in tasks:
+                    lines.append('  %s' % repr(task))
+            else:
+                lines.append('Queued (%s): (none)' % label)
+        text = '\n'.join(lines)
+        dialog = mywid.MessageDialog('Sync Tasks', text)
+        urwid.connect_signal(dialog, 'close',
+            lambda button: self.backScreen())
+        self.popup(dialog, min_width=76, min_height=min(len(lines) + 4, 40))
 
     def openURL(self, url):
         self.log.debug("Open URL %s", url)
