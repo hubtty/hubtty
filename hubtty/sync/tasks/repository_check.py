@@ -15,7 +15,7 @@
 
 """Repository checking tasks for startup validation."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from hubtty import gitrepo
@@ -68,7 +68,7 @@ class CheckCommitsTask(Task):
     """Check commits in a repository for missing refs."""
 
     repository_key: int
-    force_fetch: bool = False
+    force_fetch: bool = field(default=False, compare=False)
 
     def run(self, sync: 'Sync') -> None:
         """Check for missing commits and submit sync tasks.

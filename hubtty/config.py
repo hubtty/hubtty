@@ -126,6 +126,7 @@ class ConfigSchema:
                            'close-pr-on-review': bool,
                            'pr-list-options': self.pr_list_options,
                            'expire-age': str,
+                           'ignore-pending-checks': [str],
                            'size-column': self.size_column,
                            })
         return schema
@@ -229,6 +230,8 @@ class Config:
             'reverse': pr_list_options.get('reverse', False)}
 
         self.expire_age = self.config.get('expire-age', '2 months')
+
+        self.ignore_pending_checks = self.config.get('ignore-pending-checks', [])
 
         self.size_column = self.config.get('size-column', {})
         self.size_column['type'] = self.size_column.get('type', 'graph')

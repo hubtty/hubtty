@@ -17,17 +17,25 @@
 
 import time
 from collections import defaultdict
-from dataclasses import dataclass
-from typing import Any, Dict, List, TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import dateutil.parser
 
 from hubtty import gitrepo
 from ..task import Task
+from ..constants import LOW_PRIORITY
 from ..events import RepositoryAddedEvent, PullRequestAddedEvent, PullRequestUpdatedEvent
+from .check_helpers import (
+    fetch_checks,
+    has_pending_checks,
+    update_checks,
+)
 
 if TYPE_CHECKING:
     from ..sync import Sync
+
+MAX_CHECK_RETRIES = 20
 
 
 @dataclass
@@ -51,105 +59,7 @@ class SyncPullRequestTask(Task):
     """Sync a specific pull request from GitHub."""
 
     pr_id: str
-    force_fetch: bool = False
-
-    def _checkResultFromCheck(self, remote_check: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert a GitHub check run to internal format.
-
-        Args:
-            remote_check: Check run data from GitHub API.
-
-        Returns:
-            Normalized check data dictionary.
-        """
-        check = {}
-        check['name'] = remote_check['name']
-        check['url'] = remote_check.get('html_url', '')
-        if remote_check['status'] == 'completed':
-            check['state'] = remote_check['conclusion']
-        else:
-            check['state'] = 'pending'
-        # Set message according to status
-        if check['state'] == 'success':
-            check['message'] = 'Job succeeded'
-        elif check['state'] == 'failure':
-            check['message'] = 'Job failed'
-        else:
-            check['message'] = 'Job triggered'
-
-        started = remote_check.get('started_at')
-        if started:
-            check['started'] = started
-            check['created'] = started
-            check['updated'] = started
-        finished = remote_check.get('completed_at')
-        if finished:
-            check['finished'] = finished
-            check['updated'] = finished
-
-        return check
-
-    def _checkResultFromStatus(self, remote_check: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert a GitHub commit status to internal format.
-
-        Args:
-            remote_check: Commit status data from GitHub API.
-
-        Returns:
-            Normalized check data dictionary.
-        """
-        check = {}
-        check['name'] = remote_check['context']
-        check['url'] = remote_check.get('target_url', '')
-        check['state'] = remote_check['state']
-        check['message'] = remote_check.get('description', '')
-
-        check['created'] = remote_check['created_at']
-        check['updated'] = remote_check['updated_at']
-
-        return check
-
-    def _updateChecks(
-        self, session, commit, remote_checks_data: List[Dict[str, Any]]
-    ) -> None:
-        """Update checks for a commit.
-
-        Args:
-            session: Database session.
-            commit: The commit to update checks for.
-            remote_checks_data: List of check data from GitHub.
-        """
-        # Delete outdated checks
-        remote_check_names = [c['name'] for c in remote_checks_data]
-        for check in commit.checks:
-            if check.name not in remote_check_names:
-                self.log.info("Deleted check %s", check.key)
-                session.delete(check)
-
-        local_checks = {c.name: c for c in commit.checks}
-        for check_data in remote_checks_data:
-            check = local_checks.get(check_data['name'])
-            if check is None:
-                created = dateutil.parser.parse(check_data['created'])
-                self.log.info(
-                    "Creating check %s on commit %s",
-                    check_data['name'], commit.key
-                )
-                check = commit.createCheck(
-                    check_data['name'],
-                    check_data['state'], created, created
-                )
-            check.updated = dateutil.parser.parse(check_data['updated'])
-            check.state = check_data['state']
-            check.url = check_data['url']
-            check.message = check_data['message']
-
-            started = check_data.get('started')
-            if started:
-                check.started = dateutil.parser.parse(check_data['started'])
-            finished = check_data.get('finished')
-            if finished:
-                check.finished = dateutil.parser.parse(check_data['finished'])
+    force_fetch: bool = field(default=False, compare=False)
 
     def run(self, sync: 'Sync') -> None:
         """Sync the pull request from GitHub.
@@ -217,21 +127,9 @@ class SyncPullRequestTask(Task):
         # PR might have been rebased and no longer contain commits
         if len(remote_commits) > 0:
             last_commit = remote_commits[-1]
-            last_commit['_hubtty_checks'] = []
-            remote_commit_status = sync.get(
-                f'repos/{repository_name}/commits/{last_commit["sha"]}/status'
+            last_commit['_hubtty_checks'] = fetch_checks(
+                sync, repository_name, last_commit['sha']
             )
-            for check in remote_commit_status['statuses']:
-                last_commit['_hubtty_checks'].append(
-                    self._checkResultFromStatus(check)
-                )
-            remote_commit_check_runs = sync.get(
-                f'repos/{repository_name}/commits/{last_commit["sha"]}/check-runs'
-            )
-            for check in remote_commit_check_runs['check_runs']:
-                last_commit['_hubtty_checks'].append(
-                    self._checkResultFromCheck(check)
-                )
 
         fetches = defaultdict(list)
         with app.db.getSession() as session:
@@ -361,7 +259,7 @@ class SyncPullRequestTask(Task):
 
                 # Commit checks
                 if remote_commit.get('_hubtty_checks'):
-                    self._updateChecks(
+                    update_checks(
                         session, commit, remote_commit['_hubtty_checks']
                     )
 
@@ -522,6 +420,111 @@ class SyncPullRequestTask(Task):
                     session.delete(commit)
 
             pr.outdated = False
+
+            # If any checks are still pending, schedule a lightweight
+            # re-check so we pick up completed CI results without
+            # waiting for another full PR sync.
+            if (len(remote_commits) > 0
+                    and has_pending_checks(
+                        last_commit.get('_hubtty_checks', []),
+                        frozenset(sync.app.config.ignore_pending_checks))):
+                self.log.info(
+                    "Pull request %s has pending checks, scheduling re-check",
+                    self.pr_id
+                )
+                sync.submitTask(SyncPullRequestChecksTask(
+                    pr.pr_id,
+                    pr.repository.name,
+                    priority=LOW_PRIORITY,
+                ))
+
         for url, refs in fetches.items():
             self.log.debug("Fetching from %s with refs %s", url, refs)
             repo.fetch(url, refs)
+
+
+@dataclass
+class SyncPullRequestChecksTask(Task):
+    """Lightweight task to re-fetch only CI checks for a PR's last commit.
+
+    This avoids a full PR sync when the only thing that may have changed
+    is the CI status.  The task re-submits itself (with back-off) while
+    checks remain in *pending* state, up to MAX_CHECK_RETRIES attempts.
+    """
+
+    pr_id: str
+    repository_name: str
+    attempt: int = field(default=0, compare=False)
+
+    # Back-off schedule (seconds) indexed by attempt number.
+    # After the list is exhausted the last value is reused.
+    _BACKOFF = [30, 60, 60, 120, 120, 120, 300, 300, 300, 300]
+
+    def run(self, sync: 'Sync') -> None:
+        """Fetch checks for the last commit and update the local DB.
+
+        If checks are still pending and we have not exceeded
+        MAX_CHECK_RETRIES, sleep for a back-off interval and
+        re-submit ourselves.
+
+        Args:
+            sync: The Sync instance to use for API calls.
+        """
+        app = sync.app
+
+        with app.db.getSession() as session:
+            pr = session.getPullRequestByPullRequestID(self.pr_id)
+            if pr is None:
+                self.log.warning(
+                    "PR %s no longer exists locally, skipping check sync",
+                    self.pr_id,
+                )
+                return
+            if not pr.commits:
+                return
+            last_commit = pr.commits[-1]
+            commit_sha = last_commit.sha
+            pr_key = pr.key
+            repository_key = pr.repository.key
+
+        # Fetch checks from GitHub (outside the DB session)
+        checks_data = fetch_checks(sync, self.repository_name, commit_sha)
+
+        # Write back into the DB
+        with app.db.getSession() as session:
+            pr = session.getPullRequestByPullRequestID(self.pr_id)
+            if pr is None or not pr.commits:
+                return
+            last_commit = pr.commits[-1]
+            update_checks(session, last_commit, checks_data)
+
+        # Notify the UI
+        self.results.append(PullRequestUpdatedEvent(repository_key, pr_key))
+
+        # Re-submit if checks are still pending
+        if has_pending_checks(checks_data,
+                               frozenset(sync.app.config.ignore_pending_checks)):
+            if self.attempt + 1 < MAX_CHECK_RETRIES:
+                delay = self._BACKOFF[min(self.attempt, len(self._BACKOFF) - 1)]
+                self.log.info(
+                    "Checks still pending for %s (attempt %d/%d), "
+                    "retrying in %ds",
+                    self.pr_id, self.attempt + 1, MAX_CHECK_RETRIES, delay,
+                )
+                sync.submitTask(SyncPullRequestChecksTask(
+                    self.pr_id,
+                    self.repository_name,
+                    attempt=self.attempt + 1,
+                    priority=self.priority,
+                    delay=delay,
+                ))
+            else:
+                self.log.warning(
+                    "Giving up on pending checks for %s after %d attempts",
+                    self.pr_id, MAX_CHECK_RETRIES,
+                )
+        else:
+            self.log.info(
+                "All checks completed for %s after %d attempt(s)",
+                self.pr_id, self.attempt + 1,
+            )

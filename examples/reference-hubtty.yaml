@@ -198,6 +198,14 @@ commentlinks:
 # hide-comments:
 #  - author: "^(.*CI|Jenkins)$"
 
+# Hubtty re-polls CI checks while any check is still "pending".
+# Some status contexts (like "tide") remain pending indefinitely
+# because they reflect merge-gate conditions (labels, approvals)
+# rather than CI jobs.  List their names here to exclude them from
+# pending-check polling decisions.
+# ignore-pending-checks:
+#   - tide
+
 # This section defines customized dashboards.  You can supply any
 # Hubtty search string and bind them to any key.  They will appear in
 # the global help text, and pressing the key anywhere in Hubtty will
