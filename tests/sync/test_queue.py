@@ -63,12 +63,49 @@ class TestMultiQueueDuplicates:
         assert q.put("item", HIGH_PRIORITY) is False
         assert q.qsize() == 1
 
-    def test_same_item_different_priority_both_added(self):
-        """Same item at different priorities is allowed."""
+    def test_cross_priority_rejects_lower_priority(self):
+        """Item already at higher priority rejects lower-priority duplicate."""
         q = MultiQueue([HIGH_PRIORITY, NORMAL_PRIORITY])
         assert q.put("item", HIGH_PRIORITY) is True
-        assert q.put("item", NORMAL_PRIORITY) is True
+        assert q.put("item", NORMAL_PRIORITY) is False
+        assert q.qsize() == 1
+
+    def test_cross_priority_promotes_to_higher_priority(self):
+        """Item at lower priority is promoted when submitted at higher priority."""
+        q = MultiQueue([HIGH_PRIORITY, NORMAL_PRIORITY, LOW_PRIORITY])
+        q.put("other", NORMAL_PRIORITY)
+        q.put("item", LOW_PRIORITY)
         assert q.qsize() == 2
+
+        # Promote from LOW to HIGH
+        assert q.put("item", HIGH_PRIORITY) is True
+        assert q.qsize() == 2  # no new entry, just moved
+
+        # Should come out first (HIGH before NORMAL)
+        assert q.get() == "item"
+
+    def test_incomplete_rejects_duplicate(self):
+        """Item currently running (in incomplete) rejects duplicate."""
+        q = MultiQueue([NORMAL_PRIORITY])
+        q.put("item", NORMAL_PRIORITY)
+        q.get()  # moves to incomplete
+        assert q.qsize() == 1  # still in incomplete
+
+        assert q.put("item", NORMAL_PRIORITY) is False
+        assert q.qsize() == 1
+
+    def test_promote_preserves_fifo(self):
+        """Promoted item appends at end of target priority deque."""
+        q = MultiQueue([HIGH_PRIORITY, LOW_PRIORITY])
+        q.put("first", HIGH_PRIORITY)
+        q.put("promoted", LOW_PRIORITY)
+
+        # Promote to HIGH — should go after "first"
+        assert q.put("promoted", HIGH_PRIORITY) is True
+
+        assert q.get() == "first"
+        q.complete("first")
+        assert q.get() == "promoted"
 
 
 class TestMultiQueueSize:
