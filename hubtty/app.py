@@ -63,6 +63,21 @@ Press the F1 key anywhere to get help.  Your terminal emulator may require you t
 
 """ % config.CONFIG_PATH
 
+
+class ClickableText(urwid.WidgetWrap):
+    """A text widget that triggers a callback on mouse click."""
+
+    def __init__(self, text_widget, callback):
+        super().__init__(text_widget)
+        self.callback = callback
+
+    def mouse_event(self, size, event, button, col, row, focus):
+        if event == 'mouse release' and button == 1:
+            self.callback()
+            return True
+        return False
+
+
 class StatusHeader(urwid.WidgetWrap):
     def __init__(self, app):
         super().__init__(urwid.Columns([]))
@@ -70,7 +85,8 @@ class StatusHeader(urwid.WidgetWrap):
         self.title_widget = urwid.Text('Start')
         self.error_widget = urwid.Text('')
         self.offline_widget = urwid.Text('')
-        self.sync_widget = urwid.Text('Sync: 0')
+        self.sync_text = urwid.Text('Sync: 0')
+        self.sync_widget = ClickableText(self.sync_text, lambda: app.showSyncTasks())
         self.held_widget = urwid.Text('')
         self._w.contents.append((self.title_widget, ('pack', None, False)))
         self._w.contents.append((urwid.Text(''), ('weight', 1, False)))
@@ -134,7 +150,7 @@ class StatusHeader(urwid.WidgetWrap):
                 self.offline_widget.set_text('')
         if self._sync != self.sync:
             self._sync = self.sync
-            self.sync_widget.set_text(' Sync: %i' % self._sync)
+            self.sync_text.set_text(' Sync: %i' % self._sync)
 
 
 class BreadCrumbBar(urwid.WidgetWrap):
