@@ -51,6 +51,8 @@ class HTTPClient:
         self.session = requests.Session()
         self.session.headers.update({'Authorization': 'token ' + app.config.token})
         self.log = logging.getLogger('hubtty.sync')
+        # ETag cache: path -> (etag_value, cached_response)
+        self._etag_cache: Dict[str, tuple] = {}
 
     def url(self, path: str) -> str:
         """Convert a path to a full URL.
@@ -256,13 +258,24 @@ class HTTPClient:
         path: str,
         headers: Optional[Dict[str, str]] = None,
         response_callback: Optional[Callable[[requests.Response], None]] = None,
+        use_etag: bool = False,
     ) -> Any:
         """Perform a GET request with automatic pagination.
+
+        When *use_etag* is ``True`` the client will:
+
+        * Send ``If-None-Match`` with the cached ETag (if any) on the
+          first page request.
+        * On ``304 Not Modified`` return the previously-cached full
+          response — this costs **zero** against the GitHub rate limit.
+        * On ``200 OK`` store the new ETag and full (assembled) response
+          in an in-memory cache for subsequent conditional requests.
 
         Args:
             path: API path to request.
             headers: Additional headers to include.
             response_callback: Custom response validator (defaults to checkResponse).
+            use_etag: Enable conditional requests via ETag / If-None-Match.
 
         Returns:
             Parsed JSON response, or list of results if paginated.
@@ -270,6 +283,8 @@ class HTTPClient:
         url = self.url(path)
         ret = None
         done = False
+        is_first_page = True
+        first_page_etag = None
 
         default_headers = {
             **self._base_headers(),
@@ -280,13 +295,21 @@ class HTTPClient:
         if not response_callback:
             response_callback = self.checkResponse
 
+        # Build per-page extra headers.  On the first page we may
+        # include If-None-Match; subsequent pages never do.
+        extra = dict(headers or {})
+        cached_data = None
+        if use_etag and path in self._etag_cache:
+            cached_etag, cached_data = self._etag_cache[path]
+            extra['If-None-Match'] = cached_etag
+
         while not done:
             self.log.debug('GET: %s', url)
 
             r = self.session.get(
                 url,
                 timeout=TIMEOUT,
-                headers={**default_headers, **(headers or {})}
+                headers={**default_headers, **extra},
             )
 
             # CRITICAL: Check rate limits BEFORE calling response_callback
@@ -294,6 +317,12 @@ class HTTPClient:
             if self._should_handle_rate_limit(r):
                 self._wait_for_rate_limit(r, url)
                 continue  # Retry the request
+
+            # Handle 304 Not Modified — return cached data immediately.
+            # 304 responses don't count against the GitHub rate limit.
+            if use_etag and r.status_code == 304 and is_first_page:
+                self.log.debug('304 Not Modified (ETag cache hit): %s', path)
+                return cached_data
 
             # Now validate response (will raise exceptions for non-rate-limit errors)
             response_callback(r)
@@ -313,11 +342,25 @@ class HTTPClient:
                 else:
                     self.log.debug('200 OK, No body.')
 
+                # Capture ETag from first page
+                if use_etag and is_first_page:
+                    first_page_etag = r.headers.get('ETag')
+
+            # After the first page, strip If-None-Match so that
+            # subsequent pages are unconditional fetches.
+            if is_first_page:
+                is_first_page = False
+                extra = dict(headers or {})
+
             # Check for pagination
             if 'next' in r.links.keys():
                 url = r.links['next']['url']
             else:
                 done = True
+
+        # Store the fully-assembled result in the ETag cache.
+        if use_etag and first_page_etag is not None:
+            self._etag_cache[path] = (first_page_etag, ret)
 
         return ret
 

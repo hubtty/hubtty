@@ -191,13 +191,17 @@ class SyncPullRequestTask(Task):
 
         app = sync.app
         remote_pr = sync.get(f'repos/{self.pr_id}')
-        remote_commits = sync.get(f'repos/{self.pr_id}/commits?per_page=100')
+        remote_commits = sync.get(f'repos/{self.pr_id}/commits?per_page=100',
+                                   use_etag=True)
         # Limit to 50, as github seems to struggle sending more comments
         # https://github.com/hubtty/hubtty/issues/59
-        remote_pr_comments = sync.get(f'repos/{self.pr_id}/comments?per_page=50')
-        remote_pr_reviews = sync.get(f'repos/{self.pr_id}/reviews?per_page=100')
+        remote_pr_comments = sync.get(f'repos/{self.pr_id}/comments?per_page=50',
+                                      use_etag=True)
+        remote_pr_reviews = sync.get(f'repos/{self.pr_id}/reviews?per_page=100',
+                                     use_etag=True)
         remote_issue_comments = sync.get(
-            f'repos/{self.pr_id}/comments?per_page=100'.replace('/pulls/', '/issues/')
+            f'repos/{self.pr_id}/comments?per_page=100'.replace('/pulls/', '/issues/'),
+            use_etag=True,
         )
 
         repository_name = remote_pr['base']['repo']['full_name']
@@ -205,7 +209,8 @@ class SyncPullRequestTask(Task):
         # Get commit details
         for commit in remote_commits:
             remote_commit_details = sync.get(
-                f'repos/{repository_name}/commits/{commit["sha"]}'
+                f'repos/{repository_name}/commits/{commit["sha"]}',
+                use_etag=True,
             )
             commit['_hubtty_remote_commit_details'] = remote_commit_details
 

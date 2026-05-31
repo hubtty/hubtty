@@ -115,7 +115,8 @@ class SyncRepositoryBranchesTask(Task):
             sync: The Sync instance to use for API calls.
         """
         app = sync.app
-        remote = sync.get(f'repos/{self.repository_name}/branches?per_page=100')
+        remote = sync.get(f'repos/{self.repository_name}/branches?per_page=100',
+                         use_etag=True)
         remote_branches = set()
         for b in remote:
             remote_branches.add(b['name'])
@@ -171,7 +172,8 @@ class SyncRepositoryLabelsTask(Task):
             sync: The Sync instance to use for API calls.
         """
         app = sync.app
-        remote_labels = sync.get(f'repos/{self.repository_name}/labels')
+        remote_labels = sync.get(f'repos/{self.repository_name}/labels',
+                                   use_etag=True)
         with app.db.getSession() as session:
             repository = session.getRepositoryByName(self.repository_name)
 

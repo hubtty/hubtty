@@ -616,3 +616,249 @@ class TestQuery:
         call_arg = mock_get.call_args[0][0]
         assert 'search/issues' in call_arg
         assert 'type:pr' in call_arg
+
+
+class TestETagSupport:
+    """Tests for ETag / conditional request support."""
+
+    def test_etag_disabled_by_default(self, http_client):
+        """use_etag defaults to False; no If-None-Match header."""
+        response = Mock()
+        response.status_code = 200
+        response.text = '{"id": 1}'
+        response.headers = {'X-RateLimit-Remaining': '100'}
+        response.links = {}
+
+        with patch.object(http_client.session, 'get',
+                          return_value=response) as mock_get:
+            http_client.get('repos/test')
+
+        sent_headers = mock_get.call_args.kwargs['headers']
+        assert 'If-None-Match' not in sent_headers
+
+    def test_etag_first_request_no_cache(self, http_client):
+        """First request with use_etag=True has no If-None-Match."""
+        response = Mock()
+        response.status_code = 200
+        response.text = '{"id": 1}'
+        response.headers = {
+            'X-RateLimit-Remaining': '100',
+            'ETag': '"abc123"',
+        }
+        response.links = {}
+
+        with patch.object(http_client.session, 'get',
+                          return_value=response) as mock_get:
+            result = http_client.get('repos/test', use_etag=True)
+
+        sent_headers = mock_get.call_args.kwargs['headers']
+        assert 'If-None-Match' not in sent_headers
+        assert result == {"id": 1}
+
+    def test_etag_cached_after_first_request(self, http_client):
+        """ETag and response are cached after a 200 with use_etag."""
+        response = Mock()
+        response.status_code = 200
+        response.text = '{"id": 1}'
+        response.headers = {
+            'X-RateLimit-Remaining': '100',
+            'ETag': '"abc123"',
+        }
+        response.links = {}
+
+        with patch.object(http_client.session, 'get',
+                          return_value=response):
+            http_client.get('repos/test', use_etag=True)
+
+        assert 'repos/test' in http_client._etag_cache
+        etag, cached = http_client._etag_cache['repos/test']
+        assert etag == '"abc123"'
+        assert cached == {"id": 1}
+
+    def test_etag_304_returns_cached_data(self, http_client):
+        """304 Not Modified returns previously cached data."""
+        # Seed the cache
+        http_client._etag_cache['repos/test'] = (
+            '"abc123"', {"id": 1, "cached": True}
+        )
+
+        response = Mock()
+        response.status_code = 304
+        response.headers = {'X-RateLimit-Remaining': '100'}
+        response.links = {}
+
+        with patch.object(http_client.session, 'get',
+                          return_value=response) as mock_get:
+            result = http_client.get('repos/test', use_etag=True)
+
+        assert result == {"id": 1, "cached": True}
+        # Verify If-None-Match was sent
+        sent_headers = mock_get.call_args.kwargs['headers']
+        assert sent_headers['If-None-Match'] == '"abc123"'
+
+    def test_etag_200_updates_cache(self, http_client):
+        """200 after a cached ETag updates the cache."""
+        # Seed the cache with old data
+        http_client._etag_cache['repos/test'] = (
+            '"old-etag"', {"id": 1}
+        )
+
+        response = Mock()
+        response.status_code = 200
+        response.text = '{"id": 2, "updated": true}'
+        response.headers = {
+            'X-RateLimit-Remaining': '100',
+            'ETag': '"new-etag"',
+        }
+        response.links = {}
+
+        with patch.object(http_client.session, 'get',
+                          return_value=response):
+            result = http_client.get('repos/test', use_etag=True)
+
+        assert result == {"id": 2, "updated": True}
+        etag, cached = http_client._etag_cache['repos/test']
+        assert etag == '"new-etag"'
+        assert cached == {"id": 2, "updated": True}
+
+    def test_etag_not_sent_when_disabled(self, http_client):
+        """If-None-Match not sent when use_etag=False even with cache."""
+        http_client._etag_cache['repos/test'] = (
+            '"abc123"', {"id": 1}
+        )
+
+        response = Mock()
+        response.status_code = 200
+        response.text = '{"id": 2}'
+        response.headers = {'X-RateLimit-Remaining': '100'}
+        response.links = {}
+
+        with patch.object(http_client.session, 'get',
+                          return_value=response) as mock_get:
+            result = http_client.get('repos/test', use_etag=False)
+
+        sent_headers = mock_get.call_args.kwargs['headers']
+        assert 'If-None-Match' not in sent_headers
+        assert result == {"id": 2}
+
+    def test_etag_pagination_caches_full_result(self, http_client):
+        """ETag from first page caches the full paginated result."""
+        r1 = Mock()
+        r1.status_code = 200
+        r1.text = '[{"id": 1}]'
+        r1.headers = {
+            'X-RateLimit-Remaining': '100',
+            'ETag': '"page1-etag"',
+        }
+        r1.links = {'next': {'url': 'https://api.github.com/page2'}}
+
+        r2 = Mock()
+        r2.status_code = 200
+        r2.text = '[{"id": 2}]'
+        r2.headers = {'X-RateLimit-Remaining': '99'}
+        r2.links = {}
+
+        with patch.object(http_client.session, 'get', side_effect=[r1, r2]):
+            result = http_client.get('repos/test', use_etag=True)
+
+        assert result == [{"id": 1}, {"id": 2}]
+        etag, cached = http_client._etag_cache['repos/test']
+        assert etag == '"page1-etag"'
+        assert cached == [{"id": 1}, {"id": 2}]
+
+    def test_etag_pagination_304_returns_full_cached(self, http_client):
+        """304 on paginated endpoint returns full cached result."""
+        http_client._etag_cache['repos/test'] = (
+            '"page1-etag"', [{"id": 1}, {"id": 2}]
+        )
+
+        response = Mock()
+        response.status_code = 304
+        response.headers = {'X-RateLimit-Remaining': '100'}
+        response.links = {}
+
+        with patch.object(http_client.session, 'get',
+                          return_value=response):
+            result = http_client.get('repos/test', use_etag=True)
+
+        # Returns full cached result (both pages)
+        assert result == [{"id": 1}, {"id": 2}]
+
+    def test_etag_pagination_no_etag_on_subsequent_pages(self, http_client):
+        """If-None-Match is only sent on the first page."""
+        http_client._etag_cache['repos/test'] = (
+            '"old-etag"', [{"id": 0}]
+        )
+
+        r1 = Mock()
+        r1.status_code = 200
+        r1.text = '[{"id": 1}]'
+        r1.headers = {
+            'X-RateLimit-Remaining': '100',
+            'ETag': '"new-etag"',
+        }
+        r1.links = {'next': {'url': 'https://api.github.com/page2'}}
+
+        r2 = Mock()
+        r2.status_code = 200
+        r2.text = '[{"id": 2}]'
+        r2.headers = {'X-RateLimit-Remaining': '99'}
+        r2.links = {}
+
+        with patch.object(http_client.session, 'get',
+                          side_effect=[r1, r2]) as mock_get:
+            http_client.get('repos/test', use_etag=True)
+
+        # First call has If-None-Match
+        first_headers = mock_get.call_args_list[0].kwargs['headers']
+        assert first_headers['If-None-Match'] == '"old-etag"'
+        # Second call does NOT have If-None-Match
+        second_headers = mock_get.call_args_list[1].kwargs['headers']
+        assert 'If-None-Match' not in second_headers
+
+    def test_etag_no_etag_header_in_response(self, http_client):
+        """Response without ETag header does not cache."""
+        response = Mock()
+        response.status_code = 200
+        response.text = '{"id": 1}'
+        response.headers = {'X-RateLimit-Remaining': '100'}
+        response.links = {}
+
+        with patch.object(http_client.session, 'get',
+                          return_value=response):
+            http_client.get('repos/test', use_etag=True)
+
+        assert 'repos/test' not in http_client._etag_cache
+
+    def test_etag_different_paths_independent(self, http_client):
+        """Different paths have independent cache entries."""
+        r1 = Mock()
+        r1.status_code = 200
+        r1.text = '{"branch": "main"}'
+        r1.headers = {
+            'X-RateLimit-Remaining': '100',
+            'ETag': '"etag-branches"',
+        }
+        r1.links = {}
+
+        r2 = Mock()
+        r2.status_code = 200
+        r2.text = '[{"name": "bug"}]'
+        r2.headers = {
+            'X-RateLimit-Remaining': '99',
+            'ETag': '"etag-labels"',
+        }
+        r2.links = {}
+
+        with patch.object(http_client.session, 'get', return_value=r1):
+            http_client.get('repos/test/branches', use_etag=True)
+        with patch.object(http_client.session, 'get', return_value=r2):
+            http_client.get('repos/test/labels', use_etag=True)
+
+        assert len(http_client._etag_cache) == 2
+        assert http_client._etag_cache['repos/test/branches'][0] == '"etag-branches"'
+        assert http_client._etag_cache['repos/test/labels'][0] == '"etag-labels"'
+
+    def test_etag_cache_empty_on_init(self, http_client):
+        """ETag cache starts empty."""
+        assert http_client._etag_cache == {}
