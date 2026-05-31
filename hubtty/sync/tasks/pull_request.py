@@ -17,7 +17,7 @@
 
 import time
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import dateutil.parser
@@ -59,7 +59,7 @@ class SyncPullRequestTask(Task):
     """Sync a specific pull request from GitHub."""
 
     pr_id: str
-    force_fetch: bool = False
+    force_fetch: bool = field(default=False, compare=False)
 
     def run(self, sync: 'Sync') -> None:
         """Sync the pull request from GitHub.
@@ -454,7 +454,7 @@ class SyncPullRequestChecksTask(Task):
 
     pr_id: str
     repository_name: str
-    attempt: int = 0
+    attempt: int = field(default=0, compare=False)
 
     # Back-off schedule (seconds) indexed by attempt number.
     # After the list is exhausted the last value is reused.
