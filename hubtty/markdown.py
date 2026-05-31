@@ -56,6 +56,11 @@ class Renderer:
                         info = ""
                     raw_code = element.get('raw', '')
                     text.append(('md-blockcode', ["```%s\n" % info, raw_code, "```\n"]))
+                case 'inline_html':
+                    raw = element.get('raw', '')
+                    if raw.lower().startswith(('<br', '<br/')):
+                        text.append("\n")
+                    # else: silently drop other inline HTML
                 case 'image' | 'block_html' | 'blank_line':
                     # image, HTML comments, and blank lines - do nothing
                     pass
