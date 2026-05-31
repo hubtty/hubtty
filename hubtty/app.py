@@ -63,6 +63,65 @@ Press the F1 key anywhere to get help.  Your terminal emulator may require you t
 
 """ % config.CONFIG_PATH
 
+
+class SyncTasksDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
+    """Live-updating dialog showing the sync task queue."""
+
+    signals = ['close']
+    PRIORITY_LABELS = {0: 'high', 1: 'normal', 2: 'low'}
+
+    def __init__(self, app):
+        self.app = app
+        self.text_widget = urwid.Text('')
+        ok_button = mywid.FixedButton('OK')
+        urwid.connect_signal(ok_button, 'click',
+                             lambda button: self._emit('close'))
+        rows = [
+            self.text_widget,
+            urwid.Divider(),
+            urwid.Columns([('pack', ok_button)]),
+        ]
+        listbox = urwid.ListBox(rows)
+        super().__init__(urwid.LineBox(listbox, 'Sync Tasks'))
+        self.refresh()
+
+    def refresh(self):
+        running, queued = self.app.sync.queue.snapshot()
+        total = len(running) + sum(len(tasks) for tasks in queued.values())
+        lines = ['Total tasks: %d' % total, '']
+        if running:
+            lines.append('\N{BLACK RIGHT-POINTING POINTER} Running:')
+            for task in running:
+                lines.append('  %s' % repr(task))
+        else:
+            lines.append('\N{BLACK RIGHT-POINTING POINTER} Running: (none)')
+        for pri in sorted(queued.keys()):
+            tasks = queued[pri]
+            label = self.PRIORITY_LABELS.get(pri, str(pri))
+            lines.append('')
+            if tasks:
+                lines.append('Queued (%s):' % label)
+                for task in tasks:
+                    lines.append('  %s' % repr(task))
+            else:
+                lines.append('Queued (%s): (none)' % label)
+        self.text_widget.set_text('\n'.join(lines))
+
+
+class ClickableText(urwid.WidgetWrap):
+    """A text widget that triggers a callback on mouse click."""
+
+    def __init__(self, text_widget, callback):
+        super().__init__(text_widget)
+        self.callback = callback
+
+    def mouse_event(self, size, event, button, col, row, focus):
+        if event == 'mouse release' and button == 1:
+            self.callback()
+            return True
+        return False
+
+
 class StatusHeader(urwid.WidgetWrap):
     def __init__(self, app):
         super().__init__(urwid.Columns([]))
@@ -70,7 +129,8 @@ class StatusHeader(urwid.WidgetWrap):
         self.title_widget = urwid.Text('Start')
         self.error_widget = urwid.Text('')
         self.offline_widget = urwid.Text('')
-        self.sync_widget = urwid.Text('Sync: 0')
+        self.sync_text = urwid.Text('Sync: 0')
+        self.sync_widget = ClickableText(self.sync_text, lambda: app.showSyncTasks())
         self.held_widget = urwid.Text('')
         self._w.contents.append((self.title_widget, ('pack', None, False)))
         self._w.contents.append((urwid.Text(''), ('weight', 1, False)))
@@ -134,7 +194,7 @@ class StatusHeader(urwid.WidgetWrap):
                 self.offline_widget.set_text('')
         if self._sync != self.sync:
             self._sync = self.sync
-            self.sync_widget.set_text(' Sync: %i' % self._sync)
+            self.sync_text.set_text(' Sync: %i' % self._sync)
 
 
 class BreadCrumbBar(urwid.WidgetWrap):
@@ -476,6 +536,12 @@ class App:
         if invalidate:
             self.updateStatusQueries()
         self.status.refresh()
+        # Refresh live popups (e.g. sync task viewer)
+        body = self.frame.body
+        if isinstance(body, urwid.Overlay):
+            top = body.contents[1][0]
+            if hasattr(top, 'refresh'):
+                top.refresh()
 
     def updateStatusQueries(self):
         with self.db.getSession() as session:
@@ -685,6 +751,8 @@ class App:
             self.searchDialog('')
         elif keymap.LIST_HELD in commands:
             self.doSearch("is:held")
+        elif keymap.SYNC_TASKS in commands:
+            self.showSyncTasks()
         elif key in self.config.dashboards:
             d = self.config.dashboards[key]
             view = view_pr_list.PullRequestListView(self, d['query'], d['name'],
@@ -708,6 +776,12 @@ class App:
             self.status.update(message=msg)
             return
         self.clearInputBuffer()
+
+    def showSyncTasks(self):
+        dialog = SyncTasksDialog(self)
+        urwid.connect_signal(dialog, 'close',
+            lambda button: self.backScreen())
+        self.popup(dialog, min_width=76, min_height=40)
 
     def openURL(self, url):
         self.log.debug("Open URL %s", url)

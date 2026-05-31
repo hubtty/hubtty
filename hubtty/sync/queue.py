@@ -137,6 +137,19 @@ class MultiQueue:
                     results.append(item)
         return results
 
+    def snapshot(self):
+        """Return a snapshot of running and queued tasks, grouped by priority.
+
+        Returns:
+            A tuple of (running, queued) where running is a list of
+            currently executing tasks and queued is a dict mapping
+            priority level to a list of waiting tasks.
+        """
+        with self.condition:
+            running = list(self.incomplete)
+            queued = {pri: list(q) for pri, q in self.queues.items()}
+        return running, queued
+
     def complete(self, item: T) -> None:
         """Mark an item as complete, removing it from the incomplete list.
 

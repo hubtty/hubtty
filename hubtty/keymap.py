@@ -39,6 +39,7 @@ QUIT = 'quit'
 PR_SEARCH = 'pull request search'
 REFINE_PR_SEARCH = 'refine pull request search'
 LIST_HELD = 'list held pull requests'
+SYNC_TASKS = 'sync tasks'
 # Pull requests screen:
 TOGGLE_REVIEWED = 'toggle reviewed'
 TOGGLE_HIDDEN = 'toggle hidden'
@@ -106,6 +107,7 @@ DEFAULT_KEYMAP = {
     PR_SEARCH: 'ctrl o',
     REFINE_PR_SEARCH: 'meta o',
     LIST_HELD: 'f12',
+    SYNC_TASKS: 'ctrl t',
 
     TOGGLE_REVIEWED: 'v',
     TOGGLE_HIDDEN: 'k',
