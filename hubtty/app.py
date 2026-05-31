@@ -64,6 +64,50 @@ Press the F1 key anywhere to get help.  Your terminal emulator may require you t
 """ % config.CONFIG_PATH
 
 
+class SyncTasksDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
+    """Live-updating dialog showing the sync task queue."""
+
+    signals = ['close']
+    PRIORITY_LABELS = {0: 'high', 1: 'normal', 2: 'low'}
+
+    def __init__(self, app):
+        self.app = app
+        self.text_widget = urwid.Text('')
+        ok_button = mywid.FixedButton('OK')
+        urwid.connect_signal(ok_button, 'click',
+                             lambda button: self._emit('close'))
+        rows = [
+            self.text_widget,
+            urwid.Divider(),
+            urwid.Columns([('pack', ok_button)]),
+        ]
+        listbox = urwid.ListBox(rows)
+        super().__init__(urwid.LineBox(listbox, 'Sync Tasks'))
+        self.refresh()
+
+    def refresh(self):
+        running, queued = self.app.sync.queue.snapshot()
+        total = len(running) + sum(len(tasks) for tasks in queued.values())
+        lines = ['Total tasks: %d' % total, '']
+        if running:
+            lines.append('\N{BLACK RIGHT-POINTING POINTER} Running:')
+            for task in running:
+                lines.append('  %s' % repr(task))
+        else:
+            lines.append('\N{BLACK RIGHT-POINTING POINTER} Running: (none)')
+        for pri in sorted(queued.keys()):
+            tasks = queued[pri]
+            label = self.PRIORITY_LABELS.get(pri, str(pri))
+            lines.append('')
+            if tasks:
+                lines.append('Queued (%s):' % label)
+                for task in tasks:
+                    lines.append('  %s' % repr(task))
+            else:
+                lines.append('Queued (%s): (none)' % label)
+        self.text_widget.set_text('\n'.join(lines))
+
+
 class ClickableText(urwid.WidgetWrap):
     """A text widget that triggers a callback on mouse click."""
 
@@ -492,6 +536,12 @@ class App:
         if invalidate:
             self.updateStatusQueries()
         self.status.refresh()
+        # Refresh live popups (e.g. sync task viewer)
+        body = self.frame.body
+        if isinstance(body, urwid.Overlay):
+            top = body.contents[1][0]
+            if hasattr(top, 'refresh'):
+                top.refresh()
 
     def updateStatusQueries(self):
         with self.db.getSession() as session:
@@ -728,33 +778,10 @@ class App:
         self.clearInputBuffer()
 
     def showSyncTasks(self):
-        PRIORITY_LABELS = {0: 'high', 1: 'normal', 2: 'low'}
-        running, queued = self.sync.queue.snapshot()
-        total = len(running) + sum(len(tasks) for tasks in queued.values())
-        lines = []
-        lines.append('Total tasks: %d' % total)
-        lines.append('')
-        if running:
-            lines.append('\N{BLACK RIGHT-POINTING POINTER} Running:')
-            for task in running:
-                lines.append('  %s' % repr(task))
-        else:
-            lines.append('\N{BLACK RIGHT-POINTING POINTER} Running: (none)')
-        for pri in sorted(queued.keys()):
-            tasks = queued[pri]
-            label = PRIORITY_LABELS.get(pri, str(pri))
-            lines.append('')
-            if tasks:
-                lines.append('Queued (%s):' % label)
-                for task in tasks:
-                    lines.append('  %s' % repr(task))
-            else:
-                lines.append('Queued (%s): (none)' % label)
-        text = '\n'.join(lines)
-        dialog = mywid.MessageDialog('Sync Tasks', text)
+        dialog = SyncTasksDialog(self)
         urwid.connect_signal(dialog, 'close',
             lambda button: self.backScreen())
-        self.popup(dialog, min_width=76, min_height=min(len(lines) + 4, 40))
+        self.popup(dialog, min_width=76, min_height=40)
 
     def openURL(self, url):
         self.log.debug("Open URL %s", url)
