@@ -116,8 +116,21 @@ class SyncPullRequestTask(Task):
 
         repository_name = remote_pr['base']['repo']['full_name']
 
-        # Get commit details
+        # Collect SHAs of commits already known locally with file
+        # info.  Git commits are immutable so once we have the file
+        # list for a SHA we never need to re-fetch it.
+        known_commit_shas = set()
+        with app.db.getSession() as session:
+            pr_local = session.getPullRequestByPullRequestID(self.pr_id)
+            if pr_local:
+                for c in pr_local.commits:
+                    if c.files:
+                        known_commit_shas.add(c.sha)
+
+        # Get commit details (skip commits we already have files for)
         for commit in remote_commits:
+            if commit['sha'] in known_commit_shas:
+                continue
             remote_commit_details = sync.get(
                 f'repos/{repository_name}/commits/{commit["sha"]}',
                 use_etag=True,
