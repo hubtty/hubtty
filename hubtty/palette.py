@@ -77,6 +77,8 @@ DEFAULT_PALETTE={
     'check-success': ['light green', ''],
     'check-failure': ['light red', ''],
     'check-pending': ['dark magenta', ''],
+    'check-skipped': ['dark gray', ''],
+    'check-cancelled': ['dark gray', ''],
     'state-draft': ['yellow', ''],
     # repository list
     'unreviewed-repository': ['white', ''],

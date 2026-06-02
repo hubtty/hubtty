@@ -47,18 +47,24 @@ def check_result_from_check_run(remote_check: Dict[str, Any]) -> Dict[str, Any]:
         check['message'] = 'Job succeeded'
     elif check['state'] == 'failure':
         check['message'] = 'Job failed'
+    elif check['state'] == 'skipped':
+        check['message'] = 'Job skipped'
+    elif check['state'] == 'cancelled':
+        check['message'] = 'Job cancelled'
     else:
         check['message'] = 'Job triggered'
 
     started = remote_check.get('started_at')
     if started:
-        check['started'] = started
         check['created'] = started
         check['updated'] = started
+        if check['state'] not in ('skipped', 'cancelled'):
+            check['started'] = started
     finished = remote_check.get('completed_at')
     if finished:
-        check['finished'] = finished
         check['updated'] = finished
+        if check['state'] not in ('skipped', 'cancelled'):
+            check['finished'] = finished
 
     return check
 

@@ -116,6 +116,42 @@ class TestCheckResultFromCheckRun:
         assert result['created'] == '2024-06-01T12:00:00Z'
         assert result['updated'] == '2024-06-01T12:00:00Z'
 
+    def test_completed_skipped(self):
+        """Completed check run with skipped conclusion."""
+        remote = {
+            'name': 'semver-label',
+            'html_url': 'https://example.com/run/3',
+            'status': 'completed',
+            'conclusion': 'skipped',
+            'started_at': '2024-01-01T10:00:00Z',
+            'completed_at': '2024-01-01T10:00:01Z',
+        }
+        result = check_result_from_check_run(remote)
+        assert result['state'] == 'skipped'
+        assert result['message'] == 'Job skipped'
+        assert 'started' not in result
+        assert 'finished' not in result
+        assert result['created'] == '2024-01-01T10:00:00Z'
+        assert result['updated'] == '2024-01-01T10:00:01Z'
+
+    def test_completed_cancelled(self):
+        """Completed check run with cancelled conclusion."""
+        remote = {
+            'name': 'ci/deploy',
+            'html_url': 'https://example.com/run/4',
+            'status': 'completed',
+            'conclusion': 'cancelled',
+            'started_at': '2024-01-01T10:00:00Z',
+            'completed_at': '2024-01-01T10:02:00Z',
+        }
+        result = check_result_from_check_run(remote)
+        assert result['state'] == 'cancelled'
+        assert result['message'] == 'Job cancelled'
+        assert 'started' not in result
+        assert 'finished' not in result
+        assert result['created'] == '2024-01-01T10:00:00Z'
+        assert result['updated'] == '2024-01-01T10:02:00Z'
+
     def test_completed_at_overrides_updated(self):
         """completed_at overrides updated field set by started_at."""
         remote = {
