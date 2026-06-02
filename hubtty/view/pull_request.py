@@ -878,7 +878,7 @@ class PullRequestView(urwid.WidgetWrap):
             color = 'check-%s' % check.state
             result = (color, check.message[:39] + (check.message[39:] and '…'))
             line = [self._add_link(check.name, check.url), result]
-            if check.finished and check.started:
+            if check.finished and check.started and check.state not in ('skipped', 'cancelled'):
                 line.append(' in %s' % (check.finished-check.started))
             line.append('\n')
             text.append(line)
