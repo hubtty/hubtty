@@ -16,6 +16,7 @@
 import logging
 import urwid
 
+import hubtty.search
 from hubtty import keymap
 from hubtty import mywid
 from hubtty import sync
@@ -360,10 +361,13 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
 
     def onSelect(self, button, data):
         repository_key, repository_name = data
-        self.app.changeScreen(view_pr_list.PullRequestListView(
-                self.app,
-                f"_repository_key:{repository_key} {self.app.config.repository_pr_list_query}",
-                repository_name, repository_key=repository_key, unreviewed=True))
+        try:
+            self.app.changeScreen(view_pr_list.PullRequestListView(
+                    self.app,
+                    f"_repository_key:{repository_key} {self.app.config.repository_pr_list_query}",
+                    repository_name, repository_key=repository_key, unreviewed=True))
+        except hubtty.search.SearchSyntaxError as e:
+            self.app.error(e.message)
 
     def onSelectTopic(self, button, data):
         topic_key = data[0]

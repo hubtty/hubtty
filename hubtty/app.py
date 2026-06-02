@@ -755,10 +755,13 @@ class App:
             self.showSyncTasks()
         elif key in self.config.dashboards:
             d = self.config.dashboards[key]
-            view = view_pr_list.PullRequestListView(self, d['query'], d['name'],
-                                                    sort_by=d.get('sort-by'),
-                                                    reverse=d.get('reverse'))
-            self.changeScreen(view)
+            try:
+                view = view_pr_list.PullRequestListView(self, d['query'], d['name'],
+                                                        sort_by=d.get('sort-by'),
+                                                        reverse=d.get('reverse'))
+                self.changeScreen(view)
+            except hubtty.search.SearchSyntaxError as e:
+                self.error(e.message)
         elif keymap.FURTHER_INPUT in commands:
             self.input_buffer.append(key)
             msg = ''.join(self.input_buffer)
