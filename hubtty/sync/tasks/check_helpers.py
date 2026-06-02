@@ -159,11 +159,11 @@ def fetch_checks(sync: 'Sync', repository_name: str,
             checks.append(check_result_from_status(check))
 
     remote_commit_check_runs = sync.get(
-        f'repos/{repository_name}/commits/{commit_sha}/check-runs',
+        f'repos/{repository_name}/commits/{commit_sha}/check-runs?per_page=100',
         use_etag=use_etag,
     )
     if remote_commit_check_runs is not None:
-        for check in remote_commit_check_runs['check_runs']:
+        for check in remote_commit_check_runs:
             checks.append(check_result_from_check_run(check))
 
     return checks
