@@ -320,13 +320,13 @@ class TestFetchChecks:
                  'created_at': '2024-01-01T10:00:00Z',
                  'updated_at': '2024-01-01T10:05:00Z'},
             ]},
-            # check runs response
-            {'check_runs': [
+            # check runs response (unwrapped by get())
+            [
                 {'name': 'ci/check', 'html_url': 'http://y',
                  'status': 'completed', 'conclusion': 'failure',
                  'started_at': '2024-01-01T10:00:00Z',
                  'completed_at': '2024-01-01T10:03:00Z'},
-            ]},
+            ],
         ]
         result = fetch_checks(sync, 'owner/repo', 'abc123')
         assert len(result) == 2
@@ -340,14 +340,15 @@ class TestFetchChecks:
         sync.get.assert_any_call(
             'repos/owner/repo/commits/abc123/status', use_etag=True)
         sync.get.assert_any_call(
-            'repos/owner/repo/commits/abc123/check-runs', use_etag=True)
+            'repos/owner/repo/commits/abc123/check-runs?per_page=100',
+            use_etag=True)
 
     def test_empty_statuses_and_check_runs(self):
         """Returns empty list when no checks exist."""
         sync = Mock()
         sync.get.side_effect = [
             {'statuses': []},
-            {'check_runs': []},
+            [],  # check runs (unwrapped by get())
         ]
         result = fetch_checks(sync, 'owner/repo', 'abc123')
         assert result == []
@@ -362,7 +363,7 @@ class TestFetchChecks:
                  'created_at': '2024-01-01T10:00:00Z',
                  'updated_at': '2024-01-01T10:00:00Z'},
             ]},
-            {'check_runs': []},
+            [],  # check runs (unwrapped by get())
         ]
         result = fetch_checks(sync, 'owner/repo', 'abc123')
         assert len(result) == 1

@@ -113,7 +113,7 @@ def _setup_sync(mock_sync, remote_pr, remote_commits, commit_details,
         if '/status' in path:
             return {'statuses': []}
         if '/check-runs' in path:
-            return {'check_runs': []}
+            return []  # check runs (unwrapped by get())
         return {}
 
     mock_sync.get = Mock(side_effect=get_side_effect)

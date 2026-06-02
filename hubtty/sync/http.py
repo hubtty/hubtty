@@ -330,9 +330,13 @@ class HTTPClient:
             # Process successful response
             if r.status_code == 200:
                 result = json.loads(r.text)
-                # Search queries store results under the 'items' key
+                # Unwrap dict-wrapped paginated responses so that
+                # results from multiple pages are correctly merged
+                # into a single flat list.
                 if isinstance(result, dict) and 'items' in result:
                     result = result.get('items', [])
+                elif isinstance(result, dict) and 'check_runs' in result:
+                    result = result.get('check_runs', [])
                 if isinstance(ret, list):
                     ret.extend(result)
                 else:
