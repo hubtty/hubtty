@@ -34,15 +34,15 @@ DEFAULT_PALETTE={
     # Diff
     'context-button': ['dark magenta', ''],
     'focused-context-button': ['light magenta', ''],
-    'removed-line': ['dark red', ''],
-    'removed-word': ['light red', ''],
-    'added-line': ['dark green', ''],
-    'added-word': ['light green', ''],
+    'removed-line': ['default', 'dark red', '', 'default', '#402020'],
+    'removed-word': ['white,bold', 'dark red', '', 'white,bold', '#742a2a'],
+    'added-line': ['default', 'dark green', '', 'default', '#204020'],
+    'added-word': ['white,bold', 'dark green', '', 'white,bold', '#2a742a'],
     'nonexistent': ['default', ''],
-    'focused-removed-line': ['dark red,standout', ''],
-    'focused-removed-word': ['light red,standout', ''],
-    'focused-added-line': ['dark green,standout', ''],
-    'focused-added-word': ['light green,standout', ''],
+    'focused-removed-line': ['default,standout', 'dark red', '', 'default,standout', '#402020'],
+    'focused-removed-word': ['white,bold,standout', 'dark red', '', 'white,bold,standout', '#742a2a'],
+    'focused-added-line': ['default,standout', 'dark green', '', 'default,standout', '#204020'],
+    'focused-added-word': ['white,bold,standout', 'dark green', '', 'white,bold,standout', '#2a742a'],
     'focused-nonexistent': ['default,standout', ''],
     'draft-comment': ['default', 'dark gray'],
     'comment': ['light gray', 'dark gray'],
@@ -135,6 +135,15 @@ DEFAULT_PALETTE={
 # A delta from the default palette
 LIGHT_PALETTE = {
     'table-header': ['black,bold', ''],
+    # Diff
+    'removed-line': ['default', 'light red', '', 'default', '#e6c8c8'],
+    'removed-word': ['black,bold', 'light red', '', 'black,bold', '#d0a0a0'],
+    'added-line': ['default', 'light green', '', 'default', '#c8e6c8'],
+    'added-word': ['black,bold', 'light green', '', 'black,bold', '#a0d0a0'],
+    'focused-removed-line': ['default,standout', 'light red', '', 'default,standout', '#e6c8c8'],
+    'focused-removed-word': ['black,bold,standout', 'light red', '', 'black,bold,standout', '#d0a0a0'],
+    'focused-added-line': ['default,standout', 'light green', '', 'default,standout', '#c8e6c8'],
+    'focused-added-word': ['black,bold,standout', 'light green', '', 'black,bold,standout', '#a0d0a0'],
     'unreviewed-repository': ['black', ''],
     'subscribed-repository': ['dark gray', ''],
     'unsubscribed-repository': ['dark gray', ''],
@@ -159,9 +168,19 @@ LIGHT_PALETTE = {
     }
 
 class Palette:
-    def __init__(self, config):
+    def __init__(self, config, light=False):
         self.palette = {}
         self.palette.update(DEFAULT_PALETTE)
+        # Syntax highlighting palette entries are generated from
+        # hubtty.syntax so that colour definitions live in one place.
+        # Imported here (rather than at module level) to avoid a
+        # circular import and to ensure every Palette instance —
+        # including light and custom palettes — gets the entries.
+        from hubtty.syntax import build_syntax_palette, build_light_syntax_palette
+        if light:
+            self.palette.update(build_light_syntax_palette())
+        else:
+            self.palette.update(build_syntax_palette())
         self.update(config)
 
     def update(self, config):

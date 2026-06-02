@@ -229,7 +229,9 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         self.file_diffs = [{}, {}]  # Mapping of fn -> DiffFile object (old, new)
         # this is a list of files:
         diffs = repo.diff(self.base_sha, self.sha,
-                          show_old_commit=show_old_commit)
+                          show_old_commit=show_old_commit,
+                          syntax_highlighting=self.app.config.syntax_highlighting,
+                          max_highlight_size=self.app.config.max_highlight_size)
         for diff in diffs:
             comment_filenames.discard(diff.oldname)
             comment_filenames.discard(diff.newname)
@@ -237,7 +239,9 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         # appear in the diff so we should create fake diff objects
         # that contain the full text.
         for filename in comment_filenames:
-            diff = repo.getFile(self.base_sha, self.sha, filename)
+            diff = repo.getFile(self.base_sha, self.sha, filename,
+                                syntax_highlighting=self.app.config.syntax_highlighting,
+                                max_highlight_size=self.app.config.max_highlight_size)
             if diff:
                 diffs.append(diff)
             else:

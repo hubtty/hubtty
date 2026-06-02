@@ -187,6 +187,15 @@ commentlinks:
 # of the default side-by-side:
 # diff-view: unified
 
+# Syntax highlighting is enabled by default in diff views.
+# To disable it, uncomment the following line:
+# syntax-highlighting: false
+
+# Maximum file size (in bytes) for syntax highlighting.
+# Files larger than this are shown without highlighting.
+# Default is 524288 (512 KiB).
+# max-highlight-size: 524288
+
 # Times are displayed in the local timezone by default.  To display
 # them in UTC instead, uncomment the following line:
 # display-times-in-utc: true
