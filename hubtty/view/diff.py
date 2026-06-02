@@ -107,6 +107,8 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
              "Diff the previous commit"),
             (keymap.INTERACTIVE_SEARCH,
              "Interactive search"),
+            (keymap.TOGGLE_DIFF_VIEW,
+             "Toggle between unified and side-by-side diff"),
             ]
 
     def help(self):
@@ -420,6 +422,9 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         if keymap.INTERACTIVE_SEARCH in commands:
             self.searchStart()
             return None
+        if keymap.TOGGLE_DIFF_VIEW in commands:
+            self.toggleDiffView()
+            return None
         if key in self.app.config.reviewkeys:
             self.reviewKey(self.app.config.reviewkeys[key])
             return None
@@ -487,6 +492,18 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         if pr_view:
             pr_view.reviewKey(reviewkey)
         self.app.backScreen()
+
+    def toggleDiffView(self):
+        config = self.app.config
+        if config.diff_view == 'unified':
+            config.diff_view = 'side-by-side'
+            from hubtty.view.side_diff import SideDiffView
+            new_screen = SideDiffView(self.app, self.new_commit_key)
+        else:
+            config.diff_view = 'unified'
+            from hubtty.view.unified_diff import UnifiedDiffView
+            new_screen = UnifiedDiffView(self.app, self.new_commit_key)
+        self.app.changeScreen(new_screen, push=False)
 
     def moveCommit(self, offset):
         commits = []
