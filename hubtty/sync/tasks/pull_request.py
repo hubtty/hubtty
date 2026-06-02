@@ -524,13 +524,13 @@ class SyncPullRequestChecksTask(Task):
                     "retrying in %ds",
                     self.pr_id, self.attempt + 1, MAX_CHECK_RETRIES, delay,
                 )
-                sync.submitTask(SyncPullRequestChecksTask(
+                self.followup = SyncPullRequestChecksTask(
                     self.pr_id,
                     self.repository_name,
                     attempt=self.attempt + 1,
                     priority=self.priority,
                     delay=delay,
-                ))
+                )
             else:
                 self.log.warning(
                     "Giving up on pending checks for %s after %d attempts",
