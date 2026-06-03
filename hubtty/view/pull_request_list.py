@@ -341,6 +341,23 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
         commands = self.getCommands()
         return [(c[0], key(c[0]), c[1]) for c in commands]
 
+    def getCustomCommandContext(self):
+        if not self.listbox.body:
+            return None
+        pos = self.listbox.focus_position
+        row = self.listbox.body[pos]
+        if not isinstance(row, PullRequestRow):
+            return None
+        with self.app.db.getSession() as session:
+            pr = session.getPullRequest(row.pr_key)
+            return {
+                'repository': pr.repository.name,
+                'number': str(pr.number),
+                'branch': pr.branch or '',
+                'author': pr.author_name or '',
+                'sha': row.commit_sha,
+            }
+
     def __init__(self, app, query, query_desc=None, repository_key=None,
                  unreviewed=False, sort_by=None, reverse=None):
         super().__init__(urwid.Pile([]))

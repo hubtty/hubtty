@@ -90,6 +90,15 @@ class ConfigSchema:
 
     reviewkeys = [reviewkey]
 
+    custom_command = {v.Required('key'): str,
+                      v.Required('command'): str,
+                      v.Optional('description'): str,
+                      v.Optional('context'): [v.Any(
+                          'repository-list', 'pull-request-list',
+                          'pull-request', 'diff')]}
+
+    custom_commands = [custom_command]
+
     hide_comment = {v.Required('author'): str}
 
     hide_comments = [hide_comment]
@@ -116,6 +125,7 @@ class ConfigSchema:
                            'commentlinks': self.commentlinks,
                            'dashboards': self.dashboards,
                            'reviewkeys': self.reviewkeys,
+                           'custom-commands': self.custom_commands,
                            'pr-list-query': str,
                            'diff-view': str,
                            'hide-comments': self.hide_comments,
@@ -213,6 +223,10 @@ class Config:
         self.reviewkeys = collections.OrderedDict()
         for k in self.config.get('reviewkeys', []):
             self.reviewkeys[k['key']] = k
+
+        self.custom_commands = collections.OrderedDict()
+        for c in self.config.get('custom-commands', []):
+            self.custom_commands[c['key']] = c
 
         self.hide_comments = []
         for h in self.config.get('hide-comments', []):

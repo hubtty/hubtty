@@ -22,6 +22,7 @@ import functools
 import logging
 import os
 import re
+import shlex
 import socket
 import subprocess
 import sys
@@ -47,8 +48,18 @@ from hubtty import requestsexceptions
 from hubtty.view import pull_request_list as view_pr_list
 from hubtty.view import repository_list as view_repository_list
 from hubtty.view import pull_request as view_pr
+from hubtty.view import side_diff as view_side_diff
+from hubtty.view import unified_diff as view_unified_diff
 import hubtty.view
 import hubtty.version
+
+SCREEN_CONTEXT_NAMES = {
+    view_repository_list.RepositoryListView: 'repository-list',
+    view_pr_list.PullRequestListView: 'pull-request-list',
+    view_pr.PullRequestView: 'pull-request',
+    view_side_diff.SideDiffView: 'diff',
+    view_unified_diff.UnifiedDiffView: 'diff',
+}
 
 WELCOME_TEXT = """\
 Welcome to Hubtty!
@@ -425,6 +436,50 @@ class App:
     def isOwnAccount(self, account):
         return account.id == self.own_account_id
 
+    def _getCurrentScreen(self):
+        widget = self.frame.body
+        while isinstance(widget, urwid.Overlay):
+            widget = widget.contents[0][0]
+        return widget
+
+    def runCustomCommand(self, cmd_config):
+        widget = self._getCurrentScreen()
+        # Check context
+        context_name = None
+        for cls, name in SCREEN_CONTEXT_NAMES.items():
+            if isinstance(widget, cls):
+                context_name = name
+                break
+        allowed = cmd_config.get('context')
+        if allowed is not None and context_name not in allowed:
+            return
+        # Get context variables
+        context_vars = {}
+        if hasattr(widget, 'getCustomCommandContext'):
+            context_vars = widget.getCustomCommandContext()
+            if context_vars is None:
+                return
+        # Interpolate (shell-quote values to prevent injection)
+        safe_vars = {k: shlex.quote(v) for k, v in context_vars.items()}
+        try:
+            command = cmd_config['command'].format_map(safe_vars)
+        except KeyError as e:
+            self.error('Variable %s not available on this screen' % e)
+            return
+        # Run
+        self.log.debug("Running custom command: %s", command)
+        inout = open(os.devnull, "r+")
+        try:
+            setsid = getattr(os, 'setsid', None)
+            if not setsid:
+                setsid = getattr(os, 'setpgrp', None)
+            subprocess.Popen(command, shell=True, close_fds=True,
+                             stdin=inout, stdout=inout, stderr=inout,
+                             preexec_fn=setsid)
+            self.loop.screen.clear()
+        except OSError as e:
+            self.error('Failed to run command: %s' % str(e))
+
     def run(self):
         try:
             self.loop.run()
@@ -574,6 +629,9 @@ class App:
         keys =  [(k, self.config.keymap.formatKeys(k), t) for (k, t) in self.getGlobalCommands()]
         for d in self.config.dashboards.values():
             keys.append(('', d['key'], d['name']))
+        for c in self.config.custom_commands.values():
+            desc = c.get('description', c['command'])
+            keys.append(('', c['key'], desc))
         return keys
 
     def help(self):
@@ -762,6 +820,8 @@ class App:
                 self.changeScreen(view)
             except hubtty.search.SearchSyntaxError as e:
                 self.error(e.message)
+        elif key in self.config.custom_commands:
+            self.runCustomCommand(self.config.custom_commands[key])
         elif keymap.FURTHER_INPUT in commands:
             self.input_buffer.append(key)
             msg = ''.join(self.input_buffer)

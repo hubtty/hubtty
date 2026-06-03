@@ -236,6 +236,15 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
         commands = self.getCommands()
         return [(c[0], key(c[0]), c[1]) for c in commands]
 
+    def getCustomCommandContext(self):
+        if not self.listbox.body:
+            return None
+        pos = self.listbox.focus_position
+        row = self.listbox.body[pos]
+        if not isinstance(row, RepositoryRow):
+            return None
+        return {'repository': row.repository_name}
+
     def __init__(self, app):
         super().__init__(urwid.Pile([]))
         self.log = logging.getLogger('hubtty.view.repository_list')

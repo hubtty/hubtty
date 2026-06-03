@@ -583,6 +583,17 @@ class PullRequestView(urwid.WidgetWrap):
             ret.append(('', keymap.formatKey(k['key']), action))
         return ret
 
+    def getCustomCommandContext(self):
+        return {
+            'repository': self.repository_name,
+            'number': str(self.pr_number),
+            'branch': self.pr_branch or '',
+            'author': self.pr_author or '',
+            'sha': self.pr_sha or '',
+            'title': self.pr_title or '',
+            'url': self.pr_url or '',
+        }
+
     def __init__(self, app, pr_key):
         super().__init__(urwid.Pile([]))
         self.log = logging.getLogger('hubtty.view.pull_request')
@@ -711,6 +722,12 @@ class PullRequestView(urwid.WidgetWrap):
             self.repository_key = pr.repository.key
             self.repository_name = pr.repository.name
             self.pr_rest_id = pr.pr_id
+            self.pr_number = pr.number
+            self.pr_branch = pr.branch
+            self.pr_author = pr.author_name
+            self.pr_title = pr.title
+            self.pr_url = str(pr.html_url)
+            self.pr_sha = pr.commits[-1].sha
             if pr.author:
                 self.author_login = pr.author.username
             else:
