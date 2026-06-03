@@ -200,6 +200,22 @@ class Config:
                         dict(link=dict(
                                 text="{url}",
                                 url="{url}"))])))
+        # Cross-repo issue/PR reference: owner/repo#1234
+        self.commentlinks.append(
+            hubtty.commentlink.CommentLink(dict(
+                    match=r"(?<!\w)(?P<cross_repo>[A-Za-z0-9_][A-Za-z0-9_.-]*/[A-Za-z0-9_][A-Za-z0-9_.-]*)#(?P<number>\d+)",
+                    replacements=[
+                        dict(link=dict(
+                                text="{cross_repo}#{number}",
+                                url=self.url + "{cross_repo}/issues/{number}"))])))
+        # Same-repo issue/PR reference: #1234 (uses {repository} from context)
+        self.commentlinks.append(
+            hubtty.commentlink.CommentLink(dict(
+                    match=r"(?<![/\w])#(?P<number>\d+)\b",
+                    replacements=[
+                        dict(link=dict(
+                                text="#{number}",
+                                url=self.url + "{repository}/issues/{number}"))])))
 
         self.repository_pr_list_query = self.config.get('pr-list-query', 'state:open')
 

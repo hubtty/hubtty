@@ -475,8 +475,9 @@ class PullRequestMessageBox(mywid.HyperText):
                 comment_text = ["\n"] + comment_text
             else:
                 comment_text[0] = "\n%s" % comment_text[0]
+        context = {'repository': self.pr_view.repository_name} if hasattr(self.pr_view, 'repository_name') else None
         for commentlink in self.app.config.commentlinks:
-            comment_text = commentlink.run(self.app, comment_text)
+            comment_text = commentlink.run(self.app, comment_text, context)
 
         inline_comments = {}
         for comment in message.comments:
@@ -507,22 +508,24 @@ class PullRequestMessageBox(mywid.HyperText):
                 # location_str
                 rendered_comment = self.md.render(comment)
                 for commentlink in self.app.config.commentlinks:
-                    rendered_comment = commentlink.run(self.app, rendered_comment)
+                    rendered_comment = commentlink.run(self.app, rendered_comment, context)
                 comment_text.extend(rendered_comment)
                 comment_text.append('\n')
 
         self.set_text(text+comment_text)
 
 class PrDescriptionBox(mywid.HyperText):
-    def __init__(self, app, message):
+    def __init__(self, app, message, repository_name=None):
         self.app = app
+        self.repository_name = repository_name
         super().__init__(message)
 
     def set_text(self, text):
         if len(text) == 0:
             text = [text]
+        context = {'repository': self.repository_name} if self.repository_name else None
         for commentlink in self.app.config.commentlinks:
-            text = commentlink.run(self.app, text)
+            text = commentlink.run(self.app, text, context)
         super().set_text(text)
 
 @mouse_scroll_decorator.ScrollByWheel
@@ -741,6 +744,7 @@ class PullRequestView(urwid.WidgetWrap):
             self.status_label.set_text(('pr-data', stat))
             self.permalink_url = str(pr.html_url)
             self.permalink_label.text.set_text(('pr-data', self.permalink_url))
+            self.pr_description.repository_name = self.repository_name
             self.pr_description.set_text(["%s\n\n" % pr.title] + self.md.render(pr.body))
 
             review_states = ['Changes Requested', 'Comment', 'Approved']
@@ -820,7 +824,8 @@ class PullRequestView(urwid.WidgetWrap):
                 if (message.commit == pr.commits[-1] and
                     message.author and message.author.name):
                     for commentlink in self.app.config.commentlinks:
-                        results = commentlink.getTestResults(self.app, message.message)
+                        results = commentlink.getTestResults(self.app, message.message,
+                                                            context={'repository': self.repository_name})
                         if results:
                             result_system = result_systems.get(message.author.name,
                                                                collections.OrderedDict())

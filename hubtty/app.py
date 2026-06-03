@@ -689,9 +689,18 @@ class App:
         pr = patchset = filename = None
         path = [x for x in result.path.split('/') if x]
         if path:
-            pr = path[0]
+            # Recognise /owner/repo/pull/N paths; anything else
+            # (including /owner/repo/issues/N) is not a local PR
+            # and should be opened in the browser instead.
+            if (len(path) >= 4 and path[2] == 'pull'
+                    and path[3].isdigit()):
+                pr = path[3]
+            else:
+                return None
         else:
             path = [x for x in result.fragment.split('/') if x]
+            if not path:
+                return None
             if path[0] == 'c':
                 path.pop(0)
             while path:
