@@ -246,6 +246,20 @@ class UploadReviewTask(Task):
                 if comments:
                     data['comments'] = comments
                 if comments or commit == last_commit:
+                    # GitHub requires a non-empty body for COMMENT and
+                    # REQUEST_CHANGES events.  Skip posting when the
+                    # review carries no body text and no inline
+                    # comments -- it would be a no-op that the API
+                    # rejects with 422.
+                    if (not (data.get('body') or '').strip()
+                            and not comments
+                            and event in ('COMMENT', 'REQUEST_CHANGES')):
+                        self.log.debug(
+                            "Skipping empty %s review for %s",
+                            event, pr_id)
+                        if commit == last_commit:
+                            break
+                        continue
                     # Inside db session for rollback
                     sync.post(f'repos/{pr_id}/reviews', data)
                 if commit == last_commit:
