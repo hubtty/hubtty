@@ -123,8 +123,7 @@ def SearchParser():
         delta = p[2]
         unit = p[3]
         delta = age_to_delta(delta, unit)
-        s = select([func.datetime(func.max(hubtty.db.pull_request_table.c.last_seen), '-%s seconds' % delta)],
-                   correlate=False)
+        s = select(func.datetime(func.max(hubtty.db.pull_request_table.c.last_seen), '-%s seconds' % delta)).correlate(None)
         p[0] = hubtty.db.pull_request_table.c.last_seen >= s
 
     def p_pr_term(p):
@@ -170,7 +169,7 @@ def SearchParser():
             filters.append(or_(hubtty.db.account_table.c.username == p[2],
                                hubtty.db.account_table.c.email == p[2],
                                hubtty.db.account_table.c.name == p[2]))
-        s = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+        s = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
         p[0] = hubtty.db.pull_request_table.c.key.in_(s)
 
     def p_commenter_term(p):
@@ -193,7 +192,7 @@ def SearchParser():
             filters.append(or_(hubtty.db.account_table.c.username == p[2],
                                hubtty.db.account_table.c.email == p[2],
                                hubtty.db.account_table.c.name == p[2]))
-        s = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+        s = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
         p[0] = hubtty.db.pull_request_table.c.key.in_(s)
 
     def p_mentions_term(p):
@@ -203,13 +202,13 @@ def SearchParser():
         filters = []
         filters.append(hubtty.db.message_table.c.pr_key == hubtty.db.pull_request_table.c.key)
         filters.append(hubtty.db.message_table.c.message.like('%%@%s%%' % p[2]))
-        message_select = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+        message_select = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
 
         filters = []
         filters.append(hubtty.db.message_table.c.pr_key == hubtty.db.pull_request_table.c.key)
         filters.append(hubtty.db.comment_table.c.message_key == hubtty.db.message_table.c.key)
         filters.append(hubtty.db.comment_table.c.message.like('%%@%s%%' % p[2]))
-        comment_select = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+        comment_select = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
 
         p[0] = or_(hubtty.db.pull_request_table.c.key.in_(message_select),
                    hubtty.db.pull_request_table.c.key.in_(comment_select))
@@ -224,26 +223,26 @@ def SearchParser():
         filters.append(hubtty.db.approval_table.c.pr_key == hubtty.db.pull_request_table.c.key)
         filters.append(hubtty.db.approval_table.c.account_key == hubtty.db.account_table.c.key)
         filters.append(hubtty.db.account_table.c.username == p[2])
-        reviewer_select = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+        reviewer_select = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
 
         # TODO(mandre) might want to extend to commit messages and PR bodies as well
         filters = []
         filters.append(hubtty.db.message_table.c.pr_key == hubtty.db.pull_request_table.c.key)
         filters.append(hubtty.db.message_table.c.message.like('%%@%s%%' % p[2]))
-        mentions_message_select = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+        mentions_message_select = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
 
         filters = []
         filters.append(hubtty.db.message_table.c.pr_key == hubtty.db.pull_request_table.c.key)
         filters.append(hubtty.db.comment_table.c.message_key == hubtty.db.message_table.c.key)
         filters.append(hubtty.db.comment_table.c.message.like('%%@%s%%' % p[2]))
-        mentions_comment_select = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+        mentions_comment_select = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
 
         filters = []
         filters.append(and_(hubtty.db.message_table.c.pr_key == hubtty.db.pull_request_table.c.key,
                             hubtty.db.message_table.c.commit_key == None))
         filters.append(hubtty.db.message_table.c.account_key == hubtty.db.account_table.c.key)
         filters.append(hubtty.db.account_table.c.username == p[2])
-        commenter_select = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+        commenter_select = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
 
         p[0] = or_(hubtty.db.account_table.c.username == p[2],
                    hubtty.db.pull_request_table.c.key.in_(reviewer_select),
@@ -256,21 +255,21 @@ def SearchParser():
         if p[2] == 'none':
             filters = []
             filters.append(~ exists().where(hubtty.db.approval_table.c.pr_key == hubtty.db.pull_request_table.c.key))
-            s = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+            s = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
             p[0] = hubtty.db.pull_request_table.c.key.in_(s)
         elif p[2] == 'approved':
             filters = []
             # TODO(mandre) Also need to look for approval with state APPROVE
             filters.append(and_(hubtty.db.approval_table.c.pr_key == hubtty.db.pull_request_table.c.key,
                                 hubtty.db.approval_table.c.state == 'APPROVED'))
-            s = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+            s = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
             p[0] = hubtty.db.pull_request_table.c.key.in_(s)
         elif p[2] == 'changes_requested':
             filters = []
             # TODO(mandre) Also need to look for approval with state REQUEST_CHANGES
             filters.append(and_(hubtty.db.approval_table.c.pr_key == hubtty.db.pull_request_table.c.key,
                                 hubtty.db.approval_table.c.state == 'CHANGES_REQUESTED'))
-            s = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+            s = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
             p[0] = hubtty.db.pull_request_table.c.key.in_(s)
         # elif p[2] == 'required':
         #     # TODO not implemented
@@ -314,7 +313,7 @@ def SearchParser():
         filters = []
         filters.append(hubtty.db.commit_table.c.pr_key == hubtty.db.pull_request_table.c.key)
         filters.append(func.matches(p[2], hubtty.db.commit_table.c.sha))
-        s = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+        s = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
         p[0] = hubtty.db.pull_request_table.c.key.in_(s)
 
     def p_repository_key_term(p):
@@ -337,7 +336,7 @@ def SearchParser():
             filters.append(hubtty.db.commit_table.c.pr_key == hubtty.db.pull_request_table.c.key)
             filters.append(hubtty.db.message_table.c.commit_key == hubtty.db.commit_table.c.key)
             filters.append(hubtty.db.message_table.c.draft == True)
-            s = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+            s = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
             p[0] = hubtty.db.pull_request_table.c.key.in_(s)
         else:
             raise hubtty.search.SearchSyntaxError('Syntax error: has:%s is not supported' % p[2])
@@ -352,13 +351,13 @@ def SearchParser():
             filters = []
             filters.append(hubtty.db.message_table.c.pr_key == hubtty.db.pull_request_table.c.key)
             filters.append(hubtty.db.message_table.c.message.like('%%%s%%' % p[3]))
-            message_select = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+            message_select = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
 
             filters = []
             filters.append(hubtty.db.message_table.c.pr_key == hubtty.db.pull_request_table.c.key)
             filters.append(hubtty.db.comment_table.c.message_key == hubtty.db.message_table.c.key)
             filters.append(hubtty.db.comment_table.c.message.like('%%%s%%' % p[3]))
-            comment_select = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+            comment_select = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
 
             p[0] = or_(hubtty.db.pull_request_table.c.key.in_(message_select),
                     hubtty.db.pull_request_table.c.key.in_(comment_select))
@@ -391,7 +390,7 @@ def SearchParser():
             filters.append(hubtty.db.approval_table.c.pr_key == hubtty.db.pull_request_table.c.key)
             filters.append(hubtty.db.approval_table.c.account_key == hubtty.db.account_table.c.key)
             filters.append(hubtty.db.account_table.c.id == account_id)
-            s = select([hubtty.db.pull_request_table.c.key], correlate=False).where(and_(*filters))
+            s = select(hubtty.db.pull_request_table.c.key).correlate(None).where(and_(*filters))
             p[0] = hubtty.db.pull_request_table.c.key.in_(s)
         elif p[2] == 'watched':
             p[0] = hubtty.db.repository_table.c.subscribed == True
@@ -452,12 +451,12 @@ def SearchParser():
 
     def p_label_term(p):
         '''label_term : OP_LABEL string'''
-        labels_select = select([hubtty.db.label_table.c.key], correlate=False).where(
+        labels_select = select(hubtty.db.label_table.c.key).correlate(None).where(
                 hubtty.db.label_table.c.name == p[2])
 
         filters = []
         filters.append(hubtty.db.pull_request_label_table.c.label_key.in_(labels_select))
-        s = select([hubtty.db.pull_request_label_table.c.pr_key], correlate=False).where(and_(*filters))
+        s = select(hubtty.db.pull_request_label_table.c.pr_key).correlate(None).where(and_(*filters))
         p[0] = hubtty.db.pull_request_table.c.key.in_(s)
 
     def p_op_term(p):
