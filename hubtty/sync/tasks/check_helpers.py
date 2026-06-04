@@ -118,6 +118,7 @@ def update_checks(session, commit, remote_checks_data: List[Dict[str, Any]]) -> 
                 check_data['name'],
                 check_data['state'], created, created
             )
+            local_checks[check_data['name']] = check
         check.updated = dateutil.parser.parse(check_data['updated'])
         check.state = check_data['state']
         check.url = check_data['url']
@@ -149,14 +150,21 @@ def fetch_checks(sync: 'Sync', repository_name: str,
     Returns:
         List of normalized check data dictionaries.
     """
-    checks = []
+    # Collect from both APIs into a dict keyed by name so that
+    # duplicates (same CI job reported via both APIs) are merged.
+    # Check-runs are processed second so they overwrite statuses
+    # when both exist, since check-runs carry richer data
+    # (started/finished timestamps, etc.).
+    checks_by_name: Dict[str, Dict[str, Any]] = {}
+
     remote_commit_status = sync.get(
         f'repos/{repository_name}/commits/{commit_sha}/status',
         use_etag=use_etag,
     )
     if remote_commit_status is not None:
         for check in remote_commit_status['statuses']:
-            checks.append(check_result_from_status(check))
+            result = check_result_from_status(check)
+            checks_by_name[result['name']] = result
 
     remote_commit_check_runs = sync.get(
         f'repos/{repository_name}/commits/{commit_sha}/check-runs?per_page=100',
@@ -164,9 +172,10 @@ def fetch_checks(sync: 'Sync', repository_name: str,
     )
     if remote_commit_check_runs is not None:
         for check in remote_commit_check_runs:
-            checks.append(check_result_from_check_run(check))
+            result = check_result_from_check_run(check)
+            checks_by_name[result['name']] = result
 
-    return checks
+    return list(checks_by_name.values())
 
 
 def has_pending_checks(checks_data: List[Dict[str, Any]],
