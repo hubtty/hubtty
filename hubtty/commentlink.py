@@ -75,19 +75,25 @@ class CommentLink:
             if 'search' in r:
                 self.replacements.append(SearchReplacement(r['search']))
 
-    def getTestResults(self, app, text):
+    def getTestResults(self, app, text, context=None):
         if self.test_result is None:
             return {}
         ret = collections.OrderedDict()
         for line in text.split('\n'):
             m = self.match.search(line)
             if m:
-                repl = [r.replace(app, m.groupdict()) for r in self.replacements]
-                job = self.test_result.format(**m.groupdict())
+                data = m.groupdict()
+                if context:
+                    data.update(context)
+                try:
+                    repl = [r.replace(app, data) for r in self.replacements]
+                    job = self.test_result.format(**data)
+                except KeyError:
+                    continue
                 ret[job] = repl + ['\n']
         return ret
 
-    def run(self, app, chunks):
+    def run(self, app, chunks, context=None):
         ret = []
         for chunk in chunks:
             if not isinstance(chunk, str):
@@ -105,9 +111,22 @@ class CommentLink:
                     break
                 before = chunk[:m.start()]
                 after = chunk[m.end():]
+                data = m.groupdict()
+                if context:
+                    data.update(context)
+                try:
+                    replacements = [r.replace(app, data)
+                                    for r in self.replacements]
+                except KeyError:
+                    # A replacement references a context variable
+                    # (e.g. {repository}) that isn't available;
+                    # skip this match and keep the original text.
+                    ret.append(chunk[:m.end()])
+                    chunk = after
+                    continue
                 if before:
                     ret.append(before)
-                ret += [r.replace(app, m.groupdict()) for r in self.replacements]
+                ret += replacements
                 chunk = after
         return ret
 

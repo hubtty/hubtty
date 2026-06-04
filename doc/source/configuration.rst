@@ -258,6 +258,29 @@ to an internal Hubtty search for pull requests authored by that user.
              text: "{mention_str}"
              query: "author:{username}"
 
+Built-in Issue References
++++++++++++++++++++++++++
+
+Hubtty automatically links GitHub issue and pull request references in
+comments and descriptions.  Two patterns are recognized:
+
+**#N**
+  Links to issue or pull request N in the current repository.  For
+  example, ``#1234`` in a comment on ``myorg/myrepo`` will link to
+  ``https://github.com/myorg/myrepo/issues/1234``.
+
+**owner/repo#N**
+  Links to issue or pull request N in the specified repository.  For
+  example, ``otherorg/otherrepo#42`` will link to
+  ``https://github.com/otherorg/otherrepo/issues/42``.
+
+GitHub automatically redirects ``/issues/N`` to ``/pull/N`` when the
+reference is a pull request, so these links work for both issues and
+pull requests.
+
+These built-in commentlinks are applied after any user-defined
+commentlinks.
+
 Pull Request List Options
 +++++++++++++++++++++++++
 
