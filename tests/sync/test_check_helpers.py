@@ -369,6 +369,70 @@ class TestFetchChecks:
         assert len(result) == 1
         assert result[0]['name'] == 'ci/only'
 
+    def test_duplicate_name_check_run_wins(self):
+        """When both APIs report the same name, check-run overwrites status."""
+        sync = Mock()
+        sync.get.side_effect = [
+            {'statuses': [
+                {'context': 'ci/build', 'target_url': 'http://old',
+                 'state': 'pending', 'description': 'Waiting for status',
+                 'created_at': '2024-01-01T10:00:00Z',
+                 'updated_at': '2024-01-01T10:00:00Z'},
+            ]},
+            [
+                {'name': 'ci/build', 'html_url': 'http://new',
+                 'status': 'completed', 'conclusion': 'success',
+                 'started_at': '2024-01-01T10:00:00Z',
+                 'completed_at': '2024-01-01T10:05:00Z'},
+            ],
+        ]
+        result = fetch_checks(sync, 'owner/repo', 'abc123')
+        assert len(result) == 1
+        assert result[0]['name'] == 'ci/build'
+        assert result[0]['state'] == 'success'
+        assert result[0]['url'] == 'http://new'
+
+    def test_multiple_duplicates_deduplicated(self):
+        """Several overlapping names are all deduplicated."""
+        sync = Mock()
+        sync.get.side_effect = [
+            {'statuses': [
+                {'context': 'ci/a', 'state': 'success', 'description': 'ok',
+                 'created_at': '2024-01-01T10:00:00Z',
+                 'updated_at': '2024-01-01T10:05:00Z'},
+                {'context': 'ci/b', 'state': 'pending', 'description': 'wait',
+                 'created_at': '2024-01-01T10:00:00Z',
+                 'updated_at': '2024-01-01T10:00:00Z'},
+                {'context': 'ci/only-status', 'state': 'success',
+                 'description': 'ok',
+                 'created_at': '2024-01-01T10:00:00Z',
+                 'updated_at': '2024-01-01T10:05:00Z'},
+            ]},
+            [
+                {'name': 'ci/a', 'html_url': 'http://a',
+                 'status': 'completed', 'conclusion': 'failure',
+                 'started_at': '2024-01-01T10:00:00Z',
+                 'completed_at': '2024-01-01T10:03:00Z'},
+                {'name': 'ci/b', 'html_url': 'http://b',
+                 'status': 'completed', 'conclusion': 'success',
+                 'started_at': '2024-01-01T10:00:00Z',
+                 'completed_at': '2024-01-01T10:04:00Z'},
+                {'name': 'ci/only-check', 'html_url': 'http://c',
+                 'status': 'completed', 'conclusion': 'success',
+                 'started_at': '2024-01-01T10:00:00Z',
+                 'completed_at': '2024-01-01T10:02:00Z'},
+            ],
+        ]
+        result = fetch_checks(sync, 'owner/repo', 'abc123')
+        names = [c['name'] for c in result]
+        assert sorted(names) == ['ci/a', 'ci/b', 'ci/only-check',
+                                  'ci/only-status']
+        # check-run values should win for the overlapping names
+        by_name = {c['name']: c for c in result}
+        assert by_name['ci/a']['state'] == 'failure'
+        assert by_name['ci/b']['state'] == 'success'
+        assert by_name['ci/b']['url'] == 'http://b'
+
 
 class TestUpdateChecks:
     """Tests for update_checks."""
@@ -521,3 +585,28 @@ class TestUpdateChecks:
         assert existing.state == 'success'
         # ci/brand-new should be created
         commit.createCheck.assert_called_once()
+
+    def test_duplicate_names_in_input_creates_only_one(self):
+        """Duplicate names in remote data must not create duplicate DB rows."""
+        session = Mock()
+        commit = self._make_commit([])
+        created_check = Mock()
+        commit.createCheck.return_value = created_check
+
+        # Two entries with the same name (simulates pre-dedup data)
+        checks_data = [
+            {'name': 'ci/dup', 'state': 'pending', 'url': 'http://old',
+             'message': 'Job triggered',
+             'created': '2024-01-01T10:00:00Z',
+             'updated': '2024-01-01T10:00:00Z'},
+            {'name': 'ci/dup', 'state': 'success', 'url': 'http://new',
+             'message': 'Job succeeded',
+             'created': '2024-01-01T10:00:00Z',
+             'updated': '2024-01-01T10:05:00Z'},
+        ]
+        update_checks(session, commit, checks_data)
+
+        # Only one check should be created; second entry updates it
+        commit.createCheck.assert_called_once()
+        assert created_check.state == 'success'
+        assert created_check.url == 'http://new'
