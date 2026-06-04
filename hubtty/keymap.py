@@ -82,6 +82,7 @@ PREV_SELECTABLE = 'prev selectable'
 NEXT_COMMIT = 'next commit'
 PREV_COMMIT = 'prev commit'
 INTERACTIVE_SEARCH = 'interactive search'
+TOGGLE_DIFF_VIEW = 'toggle diff view'
 # Special:
 FURTHER_INPUT = 'further input'
 
@@ -150,6 +151,7 @@ DEFAULT_KEYMAP = {
     NEXT_COMMIT: '>',
     PREV_COMMIT: '<',
     INTERACTIVE_SEARCH: 'ctrl s',
+    TOGGLE_DIFF_VIEW: 'f2',
 }
 
 # Hi vi users!  Add more things here!  This overrides the default
@@ -172,6 +174,7 @@ VI_KEYMAP = {
     TOGGLE_HIDDEN: [['t', 'h']],
     TOGGLE_LIST_REVIEWED: [['t', 'R']],
     TOGGLE_LIST_SUBSCRIBED: 'L',
+    TOGGLE_DIFF_VIEW: [['t', 'd']],
 
     EDIT_PULL_REQUEST: 'ctrl e',
 }
