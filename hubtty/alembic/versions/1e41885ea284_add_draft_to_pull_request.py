@@ -13,24 +13,13 @@ down_revision = 'a2af1e2e44ee'
 from alembic import op
 import sqlalchemy as sa
 
-import warnings
-
-from hubtty.dbsupport import sqlite_alter_columns
-
 
 def upgrade():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        op.add_column('pull_request', sa.Column('draft', sa.Boolean()))
-
-    connection = op.get_bind()
-    pr = sa.sql.table('pull_request',
-            sa.sql.column('draft', sa.Boolean()))
-    connection.execute(pr.update().values({'draft':False}))
-
-    sqlite_alter_columns('pull_request', [
-        sa.Column('draft', sa.Boolean(), index=True, nullable=False),
-        ])
+    with op.batch_alter_table('pull_request') as batch_op:
+        batch_op.add_column(
+            sa.Column('draft', sa.Boolean(), nullable=False,
+                      server_default=sa.text('0')))
+        batch_op.create_index(op.f('ix_pull_request_draft'), ['draft'])
 
 
 def downgrade():
