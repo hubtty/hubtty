@@ -67,6 +67,7 @@ class Task:
     )
     tasks: List['Task'] = field(default_factory=list, init=False, compare=False, repr=False)
     results: List[Any] = field(default_factory=list, init=False, compare=False, repr=False)
+    followup: Optional['Task'] = field(default=None, init=False, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         """Initialize the logger after dataclass initialization."""

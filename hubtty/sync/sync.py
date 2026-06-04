@@ -157,6 +157,8 @@ class Sync(HTTPClient):
             task.run(self)
             task.complete(True)
             self.queue.complete(task)
+            if task.followup:
+                self.submitTask(task.followup)
         except (
             requests.ConnectionError,
             OfflineError,
