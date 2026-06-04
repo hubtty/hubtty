@@ -14,6 +14,7 @@
 # under the License.
 
 import uuid
+import warnings
 
 from alembic import op
 import sqlalchemy
@@ -54,19 +55,21 @@ def sqlite_alter_columns(table_name, column_defs):
     old_columns = []
     new_columns = []
     column_names = []
-    for column in meta.tables[table_name].columns:
-        column_names.append(column.name)
-        old_columns.append(column)
-        if column.name in changed_columns.keys():
-            new_columns.append(changed_columns[column.name])
-        else:
-            col_copy = column.copy()
-            new_columns.append(col_copy)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for column in meta.tables[table_name].columns:
+            column_names.append(column.name)
+            old_columns.append(column)
+            if column.name in changed_columns.keys():
+                new_columns.append(changed_columns[column.name])
+            else:
+                col_copy = column.copy()
+                new_columns.append(col_copy)
 
-    for key in meta.tables[table_name].foreign_keys:
-        constraint = key.constraint
-        con_copy = constraint.copy()
-        new_columns.append(con_copy)
+        for key in meta.tables[table_name].foreign_keys:
+            constraint = key.constraint
+            con_copy = constraint.copy()
+            new_columns.append(con_copy)
 
     for index in meta.tables[table_name].indexes:
         # If this is a single column index for a changed column, don't
@@ -124,12 +127,14 @@ def sqlite_drop_columns(table_name, drop_columns):
     new_columns = []
     column_names = []
     indexes = []
-    for column in meta.tables[table_name].columns:
-        if column.name not in drop_columns:
-            old_columns.append(column)
-            column_names.append(column.name)
-            col_copy = column.copy()
-            new_columns.append(col_copy)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for column in meta.tables[table_name].columns:
+            if column.name not in drop_columns:
+                old_columns.append(column)
+                column_names.append(column.name)
+                col_copy = column.copy()
+                new_columns.append(col_copy)
 
     for key in meta.tables[table_name].foreign_keys:
         # If this is a single column constraint for a dropped column,
@@ -149,7 +154,9 @@ def sqlite_drop_columns(table_name, drop_columns):
             continue
         # Otherwise, recreate the constraint.
         constraint = key.constraint
-        con_copy = constraint.copy()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            con_copy = constraint.copy()
         new_columns.append(con_copy)
 
     for index in meta.tables[table_name].indexes:
