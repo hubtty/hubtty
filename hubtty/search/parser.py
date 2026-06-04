@@ -123,7 +123,7 @@ def SearchParser():
         delta = p[2]
         unit = p[3]
         delta = age_to_delta(delta, unit)
-        s = select(func.datetime(func.max(hubtty.db.pull_request_table.c.last_seen), '-%s seconds' % delta)).correlate(None)
+        s = select(func.datetime(func.max(hubtty.db.pull_request_table.c.last_seen), '-%s seconds' % delta)).correlate(None).scalar_subquery()
         p[0] = hubtty.db.pull_request_table.c.last_seen >= s
 
     def p_pr_term(p):
