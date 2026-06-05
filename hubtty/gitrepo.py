@@ -298,6 +298,24 @@ class Repo:
 
     def fetch(self, url, refspec):
         repo = git.Repo(self.path)
+        # If any refspec targets the currently checked-out branch, detach
+        # HEAD first so that git doesn't refuse the fetch.
+        if not repo.head.is_detached:
+            active = repo.active_branch.name
+            specs = [refspec] if isinstance(refspec, str) else refspec
+            for spec in specs:
+                dest = spec.split(':')[-1].removeprefix('+')
+                if dest == active:
+                    self.log.warning(
+                        "Detaching HEAD; branch %s is checked out"
+                        " and would conflict with fetch", active)
+                    try:
+                        repo.git.checkout('--detach')
+                    except git.exc.GitCommandError:
+                        self.log.warning(
+                            "Failed to detach HEAD from branch %s; "
+                            "fetch may fail", active)
+                    break
         try:
             repo.git.fetch(url, refspec)
         except AssertionError:
