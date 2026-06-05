@@ -125,6 +125,12 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             ret.append(('', keymap.formatKey(k['key']), action))
         return ret
 
+    def getCustomCommandContext(self):
+        return {
+            'repository': self.repository_name,
+            'sha': self.sha,
+        }
+
     def __init__(self, app, new_commit_key):
         super().__init__(urwid.Pile([]))
         self.log = logging.getLogger('hubtty.view.diff')
