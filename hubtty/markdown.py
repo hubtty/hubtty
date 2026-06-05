@@ -44,7 +44,7 @@ class Renderer:
                         text.append("\n")
                     text.extend(self.toUrwidMarkup(element['children']))
                     text.append("\n")
-                case 'newline' | 'blank_line' | 'softbreak' | 'linebeak':
+                case 'newline' | 'blank_line' | 'softbreak' | 'linebreak':
                     text.append("\n")
                 case 'thematic_break':
                     text.append(('md-thematicbreak', "\n———————————————\n\n"))
