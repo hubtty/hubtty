@@ -18,6 +18,7 @@
 from unittest.mock import Mock, MagicMock, patch
 
 from hubtty.sync.tasks.pull_request import SyncPullRequestTask
+from hubtty.gitrepo import EMPTY_TREE_SHA
 
 
 # ---------------------------------------------------------------------------
@@ -289,3 +290,50 @@ class TestSyncPullRequestCommitDetailSkip:
             "Known commit SHA_A should not be fetched"
         assert f'repos/{REPO}/commits/{SHA_B}' in detail_urls, \
             "New commit SHA_B should be fetched"
+
+
+class TestSyncPullRequestParentlessCommit:
+    """Verify that commits with no parents use the empty-tree SHA."""
+
+    @patch('hubtty.sync.tasks.pull_request.gitrepo')
+    def test_parentless_commit_uses_empty_tree_sha(
+            self, mock_gitrepo, mock_sync):
+        """A root commit (no parents) stores EMPTY_TREE_SHA as parent."""
+        remote_pr = _make_remote_pr()
+        # Build a single commit with an empty parents list.
+        remote_commits = [{
+            'sha': SHA_A,
+            'commit': {'message': 'initial squashed import'},
+            'parents': [],
+        }]
+        commit_details = {
+            SHA_A: _make_commit_detail(SHA_A),
+        }
+
+        # Supply a local_pr mock so we can inspect createCommit calls
+        # directly on it (no commits yet → getCommitBySha returns None).
+        local_pr = MagicMock()
+        local_pr.pr_id = PR_ID
+        local_pr.number = 1
+        local_pr.state = 'open'
+        local_pr.labels = []
+        local_pr.commits = []
+        local_pr.repository = MagicMock(name=REPO)
+        local_pr.repository.name = REPO
+        local_pr.getCommitBySha = Mock(return_value=None)
+
+        _setup_sync(
+            mock_sync, remote_pr, remote_commits, commit_details,
+            local_pr=local_pr,
+        )
+
+        mock_gitrepo.EMPTY_TREE_SHA = EMPTY_TREE_SHA
+        task = SyncPullRequestTask(PR_ID)
+        task.run(mock_sync)
+
+        # createCommit must have been called with EMPTY_TREE_SHA as parent.
+        local_pr.createCommit.assert_called_once_with(
+            'initial squashed import',
+            SHA_A,
+            EMPTY_TREE_SHA,
+        )
