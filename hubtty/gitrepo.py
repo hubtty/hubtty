@@ -22,6 +22,11 @@ import re
 import git
 import gitdb
 
+# The well-known SHA of git's empty tree object.  Used as the synthetic
+# parent for root commits that have no real parent so that ``git diff
+# <empty-tree> <sha>`` shows the full content as additions.
+EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf899d15006bc06b3'
+
 OLD = 0
 NEW = 1
 START = 0

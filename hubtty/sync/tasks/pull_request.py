@@ -241,7 +241,7 @@ class SyncPullRequestTask(Task):
                     if remote_commit['parents']:
                         parent_sha = remote_commit['parents'][0]['sha']
                     else:
-                        parent_sha = None
+                        parent_sha = gitrepo.EMPTY_TREE_SHA
 
                     commit = pr.createCommit(
                         (remote_commit['commit']['message'] or '').replace('\r', ''),

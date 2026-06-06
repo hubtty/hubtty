@@ -91,7 +91,9 @@ class CheckCommitsTask(Task):
             for pr in repository.open_prs:
                 if repo:
                     for commit in pr.commits:
-                        if repo.checkCommits([commit.parent, commit.sha]):
+                        shas_to_check = [s for s in (commit.parent, commit.sha)
+                                         if s != gitrepo.EMPTY_TREE_SHA]
+                        if shas_to_check and repo.checkCommits(shas_to_check):
                             to_sync.add(pr.pr_id)
                 else:
                     to_sync.add(pr.pr_id)

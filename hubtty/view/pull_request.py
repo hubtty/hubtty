@@ -677,6 +677,7 @@ class PullRequestView(urwid.WidgetWrap):
             for commit in pr.commits:
                 shas.add(commit.parent)
                 shas.add(commit.sha)
+        shas.discard(gitrepo.EMPTY_TREE_SHA)
         repo = gitrepo.get_repo(pr_repository_name, self.app.config)
         missing_commits = repo.checkCommits(shas)
         if missing_commits:
