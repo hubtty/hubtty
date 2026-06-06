@@ -79,6 +79,26 @@ servers:
 #   - name: custom
 #     filename: ['light yellow', '']
 
+# Syntax highlighting in diff views uses additional palette entries
+# for language tokens.  The defaults below are tuned for dark
+# backgrounds.  Override them the same way as any other palette entry.
+#
+# On changed lines (added/removed), syntax colours are combined with
+# the diff background automatically.  The combined attrs follow the
+# naming pattern "syn-*-on-{added,removed}-line" (e.g.
+# "syn-keyword-on-added-line").  These can also be overridden.
+#
+# palettes:
+#   - name: default
+#     syn-keyword:       ['brown', '']
+#     syn-string:        ['dark green', '']
+#     syn-comment:       ['dark gray', '']
+#     syn-name-function: ['light blue', '']
+#     syn-type:          ['dark cyan', '']
+#     syn-number:        ['dark magenta', '']
+#     syn-builtin:       ['dark cyan', '']
+#     syn-decorator:     ['dark magenta', '']
+
 # Palettes may be selected at runtime with the "-p PALETTE" command
 # line option, or you may set the default palette here:
 # palette: light
