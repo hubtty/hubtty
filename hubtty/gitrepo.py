@@ -22,6 +22,9 @@ import re
 import git
 import gitdb
 
+from hubtty.syntax import (DEFAULT_MAX_FILE_SIZE, highlight_file,
+                           merge_syntax_with_diff)
+
 # The well-known SHA of git's empty tree object.  Used as the synthetic
 # parent for root commits that have no real parent so that ``git diff
 # <empty-tree> <sha>`` shows the full content as additions.
@@ -184,6 +187,8 @@ class DiffFile:
         self.old_lineno = 0
         self.new_lineno = 0
         self.offset = 0
+        self.old_syntax = {}
+        self.new_syntax = {}
 
     def finalize(self):
         if not self.current_chunk:
@@ -203,23 +208,36 @@ class DiffFile:
         self.chunks.append(self.current_chunk)
         self.current_chunk = None
 
-    def expand_tabs(self, l, tabstop = 8):
-        offset = { 'start': 0, 'prevstart': 0 }
+    def expand_tabs(self, l, tabstop=8, _offset=None):
+        if _offset is None:
+            _offset = {'start': 0, 'prevstart': 0}
+
         def replace(match):
-            offset['start'] += match.start(0) - offset['prevstart']
-            offset['prevstart'] = match.start(0)
-            cnt = tabstop - offset['start'] % tabstop - 1
-            offset['start'] += cnt
+            _offset['start'] += match.start(0) - _offset['prevstart']
+            _offset['prevstart'] = match.start(0)
+            cnt = tabstop - _offset['start'] % tabstop - 1
+            _offset['start'] += cnt
             return "»" + " " * cnt
 
         try:
             if isinstance(l, str):
-                return re.sub(r'\t', replace, l)
+                result = re.sub(r'\t', replace, l)
+                # Advance column past any characters after the last tab
+                # so the next segment (if any) starts at the right column.
+                _offset['start'] += len(l) - _offset['prevstart']
+                _offset['prevstart'] = 0
+                return result
             elif isinstance(l, list):
-                return [self.expand_tabs(e) for e in l]
+                # Share _offset across all elements so column tracking
+                # persists across markup segments (e.g. syntax-highlighted
+                # tuples).
+                return [self.expand_tabs(e, tabstop, _offset) for e in l]
             else:
                 (a, b) = l
-                return (a, re.sub(r'\t', replace, b))
+                result = (a, re.sub(r'\t', replace, b))
+                _offset['start'] += len(b) - _offset['prevstart']
+                _offset['prevstart'] = 0
+                return result
         except Exception:
             self.log.exception("Error expanding tabs")
             return l
@@ -231,10 +249,16 @@ class DiffFile:
         if not self.current_chunk:
             self.current_chunk = DiffChangedChunk()
         for l in old:
+            if self.old_syntax and self.old_lineno in self.old_syntax:
+                l = merge_syntax_with_diff(
+                    self.old_syntax[self.old_lineno], l)
             self.current_chunk.oldlines.append((self.old_lineno, '-', l))
             self.old_lineno += 1
             self.offset -= 1
         for l in new:
+            if self.new_syntax and self.new_lineno in self.new_syntax:
+                l = merge_syntax_with_diff(
+                    self.new_syntax[self.new_lineno], l)
             self.current_chunk.newlines.append((self.new_lineno, '+', l))
             self.new_lineno += 1
             self.offset += 1
@@ -258,8 +282,10 @@ class DiffFile:
             self.finalize()
         if not self.current_chunk:
             self.current_chunk = DiffContextChunk()
-        self.current_chunk.oldlines.append((self.old_lineno, ' ', line))
-        self.current_chunk.newlines.append((self.new_lineno, ' ', line))
+        old_content = self.old_syntax.get(self.old_lineno, line)
+        new_content = self.new_syntax.get(self.new_lineno, line)
+        self.current_chunk.oldlines.append((self.old_lineno, ' ', old_content))
+        self.current_chunk.newlines.append((self.new_lineno, ' ', new_content))
         self.old_lineno += 1
         self.new_lineno += 1
 
@@ -440,7 +466,29 @@ class Repo:
         return output_old, output_new
 
     header_re = re.compile(r'@@ -(\d+)(,\d+)? \+(\d+)(,\d+)? @@')
-    def diff(self, old, new, context=10000, show_old_commit=False):
+    def _highlight(self, commit, path, max_file_size=None):
+        """Return per-line syntax markup for *path* in *commit*."""
+        if path in ('Empty file', '/COMMIT_MSG'):
+            return {}
+        try:
+            blob = commit.tree[path]
+            limit = max_file_size if max_file_size is not None \
+                else DEFAULT_MAX_FILE_SIZE
+            if blob.size > limit:
+                return {}
+            data = blob.data_stream.read()
+            # Skip binary files (null-byte heuristic).
+            if b'\x00' in data:
+                return {}
+            text = data.decode('utf-8')
+            return highlight_file(path, text, max_file_size=limit)
+        except Exception:
+            self.log.debug("Syntax highlighting failed for %s in %s",
+                           path, commit, exc_info=True)
+            return {}
+
+    def diff(self, old, new, context=10000, show_old_commit=False,
+             syntax_highlighting=True, max_highlight_size=None):
         """Create a diff from old to new.
 
         Note that the commit message is also diffed, and listed as /COMMIT_MSG.
@@ -474,6 +522,13 @@ class Repo:
                 f.oldname = diff_context.rename_from
             if diff_context.rename_to:
                 f.newname = diff_context.rename_to
+            if syntax_highlighting:
+                if not f.old_empty:
+                    f.old_syntax = self._highlight(
+                        oldc, f.oldname, max_file_size=max_highlight_size)
+                if not f.new_empty:
+                    f.new_syntax = self._highlight(
+                        newc, f.newname, max_file_size=max_highlight_size)
             oldchunk = []
             newchunk = []
             prev_key = ''
@@ -571,7 +626,8 @@ class Repo:
             f.finalize()
         return files
 
-    def getFile(self, old, new, path):
+    def getFile(self, old, new, path, syntax_highlighting=True,
+                 max_highlight_size=None):
         f = DiffFile()
         f.oldname = path
         f.newname = path
@@ -583,7 +639,23 @@ class Repo:
             blob = newc.tree[path]
         except KeyError:
             return None
-        for line in blob.data_stream.read().splitlines():
+        data = blob.data_stream.read()
+        if syntax_highlighting:
+            limit = max_highlight_size if max_highlight_size is not None \
+                else DEFAULT_MAX_FILE_SIZE
+            if len(data) > limit:
+                pass  # skip highlighting for large files
+            else:
+                try:
+                    text = data.decode('utf-8')
+                    syntax = highlight_file(path, text,
+                                            max_file_size=limit)
+                    f.old_syntax = syntax
+                    f.new_syntax = syntax
+                except Exception:
+                    self.log.debug("Syntax highlighting failed for %s",
+                                   path, exc_info=True)
+        for line in data.splitlines():
             if isinstance(line, str):
                 f.addContextLine(line)
             else:

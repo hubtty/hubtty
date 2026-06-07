@@ -39,6 +39,7 @@ dependencies = [
     "ply>=3.4",
     "pyxdg",
     "mistune>=3.0",
+    "pygments>=2.0",
 ]
 
 [project.urls]

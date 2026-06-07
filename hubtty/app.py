@@ -400,8 +400,15 @@ class App:
             self.welcome()
 
         self.loop.screen.tty_signal_keys(start='undefined', stop='undefined')
-        if os.environ.get('COLORTERM') == 'truecolor':
+        if os.environ.get('COLORTERM') in ('truecolor', '24bit'):
             self.loop.screen.set_terminal_properties(colors=2**24)
+        elif ('256color' in os.environ.get('TERM', '')
+              or os.environ.get('COLORTERM') == '256color'):
+            # Enable 256-color mode so that highcolor palette values
+            # (#rrggbb) are approximated to the nearest colour-cube
+            # entry by urwid.  True-color is only enabled when
+            # COLORTERM explicitly advertises it.
+            self.loop.screen.set_terminal_properties(colors=256)
         with self.db.getSession() as session:
             for label in session.getLabels():
                 self.registerPaletteEntry(label.id, label.color)

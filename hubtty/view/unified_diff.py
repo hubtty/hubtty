@@ -17,6 +17,7 @@ import urwid
 
 from hubtty import gitrepo
 from hubtty import mywid
+from hubtty.syntax import build_syntax_focus_map
 from hubtty.view.diff import BaseDiffCommentEdit, BaseDiffComment, BaseDiffLine
 from hubtty.view.diff import BaseFileHeader, BaseFileReminder, BaseDiffView
 
@@ -75,8 +76,14 @@ class UnifiedDiffLine(BaseDiffLine):
             columns = [(LN_COL_WIDTH, old_ln_col), (LN_COL_WIDTH, new_ln_col)]
         line_col = mywid.SearchableText(line)
         self.text_widget = line_col
+        # None for context lines: no background override is needed
+        # because syntax attrs are embedded in the text markup
+        # directly.  Only changed lines need a diff-background map.
         if action == '':
             line_col = urwid.AttrMap(line_col, 'nonexistent')
+        elif action in ('-', '+'):
+            diff_attr = 'removed-line' if action == '-' else 'added-line'
+            line_col = urwid.AttrMap(line_col, diff_attr)
         columns += [line_col]
         col = urwid.Columns(columns)
         map = {None: 'focused',
@@ -87,6 +94,7 @@ class UnifiedDiffLine(BaseDiffLine):
                'nonexistent': 'focused-nonexistent',
                'line-number': 'focused-line-number',
                }
+        map.update(build_syntax_focus_map())
         self._w = urwid.AttrMap(col, None, focus_map=map)
 
     def search(self, search, attribute):

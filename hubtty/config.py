@@ -128,6 +128,8 @@ class ConfigSchema:
                            'custom-commands': self.custom_commands,
                            'pr-list-query': str,
                            'diff-view': str,
+                           'syntax-highlighting': bool,
+                           'max-highlight-size': int,
                            'hide-comments': self.hide_comments,
                            # 'thread-prs': bool,
                            'display-times-in-utc': bool,
@@ -183,7 +185,8 @@ class Config:
         self.additional_repositories = server.get('additional-repositories', [])
 
         self.palettes = {'default': hubtty.palette.Palette({}),
-                         'light': hubtty.palette.Palette(hubtty.palette.LIGHT_PALETTE),
+                         'light': hubtty.palette.Palette(
+                             hubtty.palette.LIGHT_PALETTE, light=True),
                          }
         for p in self.config.get('palettes', []):
             if p['name'] not in self.palettes:
@@ -230,6 +233,10 @@ class Config:
         self.repository_pr_list_query = self.config.get('pr-list-query', 'state:open')
 
         self.diff_view = self.config.get('diff-view', 'side-by-side')
+
+        self.syntax_highlighting = self.config.get('syntax-highlighting', True)
+        self.max_highlight_size = self.config.get('max-highlight-size',
+                                                   512 * 1024)
 
         self.dashboards = collections.OrderedDict()
         for d in self.config.get('dashboards', []):

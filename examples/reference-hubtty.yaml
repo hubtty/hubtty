@@ -79,6 +79,26 @@ servers:
 #   - name: custom
 #     filename: ['light yellow', '']
 
+# Syntax highlighting in diff views uses additional palette entries
+# for language tokens.  The defaults below are tuned for dark
+# backgrounds.  Override them the same way as any other palette entry.
+#
+# On changed lines (added/removed), syntax colours are combined with
+# the diff background automatically.  The combined attrs follow the
+# naming pattern "syn-*-on-{added,removed}-line" (e.g.
+# "syn-keyword-on-added-line").  These can also be overridden.
+#
+# palettes:
+#   - name: default
+#     syn-keyword:       ['brown', '']
+#     syn-string:        ['dark green', '']
+#     syn-comment:       ['dark gray', '']
+#     syn-name-function: ['light blue', '']
+#     syn-type:          ['dark cyan', '']
+#     syn-number:        ['dark magenta', '']
+#     syn-builtin:       ['dark cyan', '']
+#     syn-decorator:     ['dark magenta', '']
+
 # Palettes may be selected at runtime with the "-p PALETTE" command
 # line option, or you may set the default palette here:
 # palette: light
@@ -174,6 +194,15 @@ commentlinks:
 # Uncomment the following line to use a unified diff view instead
 # of the default side-by-side:
 # diff-view: unified
+
+# Syntax highlighting is enabled by default in diff views.
+# To disable it, uncomment the following line:
+# syntax-highlighting: false
+
+# Maximum file size (in bytes) for syntax highlighting.
+# Files larger than this are shown without highlighting.
+# Default is 524288 (512 KiB).
+# max-highlight-size: 524288
 
 # Times are displayed in the local timezone by default.  To display
 # them in UTC instead, uncomment the following line:
