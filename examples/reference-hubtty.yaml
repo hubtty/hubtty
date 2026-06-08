@@ -333,9 +333,12 @@ dashboards:
 #     timeout: 60
 #     context:
 #       - pull-request
-#   - key: 'meta 3'
-#     command: 'notify-send Hubtty {repository}'
-#     description: 'Desktop notification for repository'
+#   - key: 'meta r'
+#     command: 'tmux split-window -v "cd {repo_path} && git checkout origin/HEAD && claude \"/review https://github.com/{repository}/pull/{number}\""'
+#     description: 'Review PR with coding agent'
+#     context:
+#       - pull-request
+#       - pull-request-list
 
 # 'size-column' is a set of customize parameters for the 'Size' column
 # on your dashboard.

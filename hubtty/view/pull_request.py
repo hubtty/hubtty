@@ -320,11 +320,7 @@ class CommitRow(urwid.WidgetWrap):
         focus_map={'commit-button': 'focused-commit-button'}
         self.review_button = ReviewButton(self)
         buttons = [mywid.FixedButton(('commit-button', "Diff"),
-                                     on_press=self.diff),
-                   mywid.FixedButton(('commit-button', "Local Checkout"),
-                                     on_press=self.checkout),
-                   mywid.FixedButton(('commit-button', "Local Cherry-Pick"),
-                                     on_press=self.cherryPick)]
+                                     on_press=self.diff)]
 
         buttons = [('pack', urwid.AttrMap(b, None, focus_map=focus_map)) for b in buttons]
         buttons = urwid.Columns(buttons + [urwid.Text('')], dividechars=2)
@@ -363,11 +359,6 @@ class CommitRow(urwid.WidgetWrap):
     def diff(self, button):
         self.pr_view.diff(self.commit_key)
 
-    def checkout(self, button):
-        self.app.localCheckoutCommit(self.repository_name, self.commit_sha)
-
-    def cherryPick(self, button):
-        self.app.localCherryPickCommit(self.repository_name, self.commit_sha)
 
 class PullRequestButton(urwid.Button):
     button_left = urwid.Text(' ')
@@ -532,8 +523,6 @@ class PrDescriptionBox(mywid.HyperText):
 class PullRequestView(urwid.WidgetWrap):
     def getCommands(self):
         return [
-            (keymap.LOCAL_CHECKOUT,
-             "Checkout the pull request into the local repo"),
             (keymap.DIFF,
              "Show the diff of the first commit"),
             (keymap.TOGGLE_HIDDEN,
@@ -554,8 +543,6 @@ class PullRequestView(urwid.WidgetWrap):
              "Toggle the reviewed flag for the current pull request"),
             (keymap.TOGGLE_STARRED,
              "Toggle the starred flag for the current pull request"),
-            (keymap.LOCAL_CHERRY_PICK,
-             "Cherry-pick the most recent commit onto the local repo"),
             (keymap.CLOSE_PR,
              "Close this pull request"),
             (keymap.EDIT_PULL_REQUEST,
@@ -1025,14 +1012,6 @@ class PullRequestView(urwid.WidgetWrap):
         if keymap.DIFF in commands:
             row = self.commit_rows[self.first_commit_key]
             row.diff(None)
-            return None
-        if keymap.LOCAL_CHECKOUT in commands:
-            row = self.commit_rows[self.last_commit_key]
-            row.checkout(None)
-            return None
-        if keymap.LOCAL_CHERRY_PICK in commands:
-            row = self.commit_rows[self.last_commit_key]
-            row.cherryPick(None)
             return None
         if keymap.SEARCH_RESULTS in commands:
             widget = self.app.findPullRequestList()

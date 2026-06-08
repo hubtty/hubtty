@@ -305,8 +305,6 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
         return [
             (keymap.TOGGLE_HELD,
              "Toggle the held flag for the currently selected pull request"),
-            (keymap.LOCAL_CHECKOUT,
-             "Checkout the selected pull request into the local repo"),
             (keymap.TOGGLE_HIDDEN,
              "Toggle the hidden flag for the currently selected PR"),
             (keymap.TOGGLE_LIST_REVIEWED,
@@ -702,13 +700,6 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
                 self.reverse = True
             self.clearPullRequestList()
             self.refresh()
-            return True
-        if keymap.LOCAL_CHECKOUT in commands:
-            if not len(self.listbox.body):
-                return True
-            pos = self.listbox.focus_position
-            row = self.listbox.body[pos]
-            self.app.localCheckoutCommit(row.repository_name, row.commit_sha)
             return True
         if keymap.REFINE_PR_SEARCH in commands:
             default = self.getQueryString()

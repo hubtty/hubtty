@@ -289,11 +289,6 @@ class DiffFile:
         self.old_lineno += 1
         self.new_lineno += 1
 
-class GitCheckoutError(Exception):
-    def __init__(self, msg):
-        super().__init__(msg)
-        self.msg = msg
-
 class GitCloneError(Exception):
     def __init__(self, msg):
         super().__init__(msg)
@@ -355,28 +350,6 @@ class Repo:
         except git.exc.GitCommandError as e:
             self.log.error("Failed to delete ref: %s", e.stderr)
 
-    def checkout(self, ref):
-        repo = git.Repo(self.path)
-        try:
-            repo.git.checkout(ref)
-        except git.exc.GitCommandError as e:
-            raise GitCheckoutError(e.stderr.replace('\t', '    '))
-
-    def cherryPick(self, ref):
-        repo = git.Repo(self.path)
-        try:
-            repo.git.cherry_pick(ref)
-        except git.exc.GitCommandError as e:
-            raise GitCheckoutError(e.stderr.replace('\t', '    '))
-
-    def diffstat(self, old, new):
-        repo = git.Repo(self.path)
-        diff = repo.git.diff('-M', '--color=never', '--numstat', old, new)
-        ret = []
-        for x in diff.split('\n'):
-            # Added, removed, filename
-            ret.append(x.split('\t'))
-        return ret
 
     trailing_ws_re = re.compile(r'\s+$')
     def _emph_trail_ws(self, style, line):

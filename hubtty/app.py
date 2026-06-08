@@ -40,7 +40,6 @@ import urwid
 
 from hubtty import db
 from hubtty import config
-from hubtty import gitrepo
 from hubtty import keymap
 from hubtty import mywid
 from hubtty import palette
@@ -1035,31 +1034,6 @@ class App:
         self.updateStatusQueries()
         return ret
 
-    def localCheckoutCommit(self, repository_name, commit_sha):
-        repo = gitrepo.get_repo(repository_name, self.config)
-        try:
-            repo.checkout(commit_sha)
-            dialog = mywid.MessageDialog('Checkout', 'Pull request checked out in %s' % repo.path)
-            min_height=8
-        except gitrepo.GitCheckoutError as e:
-            dialog = mywid.MessageDialog('Error', e.msg)
-            min_height=12
-        urwid.connect_signal(dialog, 'close',
-            lambda button: self.backScreen())
-        self.popup(dialog, min_height=min_height)
-
-    def localCherryPickCommit(self, repository_name, commit_sha):
-        repo = gitrepo.get_repo(repository_name, self.config)
-        try:
-            repo.cherryPick(commit_sha)
-            dialog = mywid.MessageDialog('Cherry-Pick', 'Pull request cherry-picked in %s' % repo.path)
-            min_height=8
-        except gitrepo.GitCheckoutError as e:
-            dialog = mywid.MessageDialog('Error', e.msg)
-            min_height=12
-        urwid.connect_signal(dialog, 'close',
-            lambda button: self.backScreen())
-        self.popup(dialog, min_height=min_height)
 
     def saveReviews(self, commit_keys, approval, message, upload, merge):
         message_keys = []
