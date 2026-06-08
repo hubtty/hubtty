@@ -148,9 +148,19 @@ class Config:
                  path=None):
         self.path = self.verifyConfigFile(path)
 
-        self.config = yaml.safe_load(open(self.path))
+        try:
+            self.config = yaml.safe_load(open(self.path))
+        except yaml.YAMLError as e:
+            print("error: failed to parse configuration file %s" % self.path)
+            print(e)
+            sys.exit(1)
         schema = ConfigSchema().getSchema(self.config)
-        schema(self.config)
+        try:
+            schema(self.config)
+        except v.MultipleInvalid as e:
+            print("error: configuration file %s is not valid" % self.path)
+            print(e)
+            sys.exit(1)
         server = self.getServer(server)
         self.server = server
         api_url = server.get('api_url', 'https://api.github.com/')
