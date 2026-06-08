@@ -93,6 +93,8 @@ class ConfigSchema:
     custom_command = {v.Required('key'): str,
                       v.Required('command'): str,
                       v.Optional('description'): str,
+                      v.Optional('show-output'): bool,
+                      v.Optional('timeout'): v.All(int, v.Range(min=1)),
                       v.Optional('context'): [v.Any(
                           'repository-list', 'pull-request-list',
                           'pull-request', 'diff')]}

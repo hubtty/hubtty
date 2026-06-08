@@ -292,17 +292,33 @@ dashboards:
 # variable interpolation from the current screen.
 #
 # Available contexts and their variables:
-#   repository-list:   {repository}
-#   pull-request-list: {repository}, {number}, {branch}, {author}, {sha}
-#   pull-request:      {repository}, {number}, {branch}, {author}, {sha},
-#                      {title}, {url}
-#   diff:              {repository}, {sha}
+#   repository-list:   {repository}, {repo_path}
+#   pull-request-list: {repository}, {repo_path}, {number}, {branch},
+#                      {author}, {sha}
+#   pull-request:      {repository}, {repo_path}, {number}, {branch},
+#                      {author}, {sha}, {title}, {url}
+#   diff:              {repository}, {repo_path}, {sha}
+#
+# {repo_path} is constructed as <git-root>/<repository> (see the
+# 'git-root' config option).  It is the local clone path, not the
+# GitHub URL.
 #
 # If 'context' is omitted, the command is available on all screens
 # (but interpolation will fail if a variable is not available).
 #
 # Variable values are automatically shell-quoted for safety.
 # To pass unquoted values, use command wrappers or scripts.
+#
+# Commands run in the directory from which hubtty was launched.
+# Use 'cd {repo_path} &&' or 'git -C {repo_path}' to operate
+# inside a repository checkout.
+#
+# By default commands run in the background (fire-and-forget).
+# Set 'show-output: true' to run synchronously and display the
+# command's stdout/stderr in a dialog when it finishes.
+#
+# The default timeout is 30 seconds; override with 'timeout: <seconds>'.
+#
 # custom-commands:
 #   - key: 'meta 1'
 #     command: 'xdg-open https://github.com/{repository}/pull/{number}'
@@ -313,6 +329,8 @@ dashboards:
 #   - key: 'meta 2'
 #     command: 'gh pr checkout {number} --repo {repository}'
 #     description: 'Checkout PR with gh CLI'
+#     show-output: true
+#     timeout: 60
 #     context:
 #       - pull-request
 #   - key: 'meta 3'

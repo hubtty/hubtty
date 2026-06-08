@@ -15,6 +15,7 @@
 
 import argparse
 import colorsys
+import dataclasses
 import datetime
 import dateutil
 import fcntl
@@ -22,6 +23,7 @@ import functools
 import logging
 import os
 import re
+import signal
 import shlex
 import socket
 import subprocess
@@ -60,6 +62,14 @@ SCREEN_CONTEXT_NAMES = {
     view_side_diff.SideDiffView: 'diff',
     view_unified_diff.UnifiedDiffView: 'diff',
 }
+
+
+@dataclasses.dataclass
+class _ForegroundCmdState:
+    """State for a running foreground custom command."""
+    overlay: object
+    description: str
+
 
 WELCOME_TEXT = """\
 Welcome to Hubtty!
@@ -389,6 +399,9 @@ class App:
         self.logged_warnings = set()
         self.command_pipe = self.loop.watch_pipe(self._commandPipeInput)
         self.command_queue = queue.Queue()
+        self.custom_cmd_pipe = self.loop.watch_pipe(self._customCmdPipeInput)
+        self.custom_cmd_queue = queue.Queue()
+        self._fg_cmd = None  # _ForegroundCmdState while a command is in flight
 
         warnings.showwarning = self._showWarning
 
@@ -475,17 +488,117 @@ class App:
             return
         # Run
         self.log.debug("Running custom command: %s", command)
-        inout = open(os.devnull, "r+")
+        if cmd_config.get('show-output'):
+            if self._fg_cmd is not None:
+                self.error('A command has not yet finished: %s'
+                           % self._fg_cmd.description)
+                return
+            description = cmd_config.get('description', command)
+            timeout = cmd_config.get('timeout', 30)
+            self._runCustomCommandForeground(command, description, timeout)
+        else:
+            self._runCustomCommandBackground(command)
+
+    def _runCustomCommandBackground(self, command):
+        # Popen duplicates these fds internally before returning, so
+        # closing them when the with-block exits is safe.
+        with open(os.devnull, "r+") as inout:
+            try:
+                subprocess.Popen(command, shell=True, close_fds=True,
+                                 stdin=inout, stdout=inout, stderr=inout,
+                                 start_new_session=True)
+                self.loop.screen.clear()
+            except OSError as e:
+                self.error('Failed to run command: %s' % str(e))
+
+    def _runCustomCommandForeground(self, command, description, timeout=30):
+        # Show a "Running..." popup immediately.  This gives the user
+        # visual feedback and captures focus so the key cannot be
+        # pressed again while the command is in flight.
+        dialog = mywid.MessageDialog('Running', description)
+        urwid.connect_signal(dialog, 'close',
+            lambda button: self.backScreen())
+        self.popup(dialog, min_height=6)
+        # Remember the overlay so the pipe callback can tell whether
+        # the user already dismissed it (via OK or Esc).
+        self._fg_cmd = _ForegroundCmdState(
+            overlay=self.frame.body, description=description)
+        t = threading.Thread(
+            target=self._runCustomCommandWorker,
+            args=(command, description, timeout), daemon=True)
+        t.start()
+
+    def _runCustomCommandWorker(self, command, description, timeout=30):
+        """Run *command* in a thread; deliver the result via pipe."""
         try:
-            setsid = getattr(os, 'setsid', None)
-            if not setsid:
-                setsid = getattr(os, 'setpgrp', None)
-            subprocess.Popen(command, shell=True, close_fds=True,
-                             stdin=inout, stdout=inout, stderr=inout,
-                             preexec_fn=setsid)
-            self.loop.screen.clear()
+            # start_new_session puts the shell and all its children
+            # into a new process group so we can kill the whole tree
+            # on timeout (not just the shell).
+            process = subprocess.Popen(
+                command, shell=True,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                start_new_session=True)
+            try:
+                stdout, _ = process.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                # Kill the entire process group (shell + children).
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except OSError:
+                    pass
+                # Collect any partial output and reap the process.
+                # Use a second timeout + SIGKILL so we never block
+                # indefinitely if the process ignores SIGTERM.
+                try:
+                    stdout, _ = process.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except OSError:
+                        pass
+                    stdout, _ = process.communicate()
+                if len(stdout) > 65536:
+                    stdout = b'[...truncated...]\n' + stdout[-65536:]
+                partial = stdout.decode('utf-8', errors='replace').strip()
+                title = '%s (timed out)' % description
+                message = ('Command did not complete within %d'
+                           ' seconds.' % timeout)
+                if partial:
+                    message += '\n\n' + partial
+                self.custom_cmd_queue.put((title, message))
+                os.write(self.custom_cmd_pipe, b'result\n')
+                return
+            if len(stdout) > 65536:
+                stdout = b'[...truncated...]\n' + stdout[-65536:]
+            output = stdout.decode('utf-8', errors='replace').strip()
+            if process.returncode == 0:
+                title = description
+                message = output or 'Command completed successfully.'
+            else:
+                title = '%s (exit %d)' % (description, process.returncode)
+                message = output or 'Command failed with no output.'
         except OSError as e:
-            self.error('Failed to run command: %s' % str(e))
+            title = '%s (error)' % description
+            message = 'Failed to run command: %s' % str(e)
+        self.custom_cmd_queue.put((title, message))
+        os.write(self.custom_cmd_pipe, b'result\n')
+
+    def _customCmdPipeInput(self, data=None):
+        """Called on the main thread when a foreground command finishes."""
+        try:
+            (title, message) = self.custom_cmd_queue.get_nowait()
+        except queue.Empty:
+            return
+        # Pop the "Running..." popup only if it is still on screen.
+        # The user may have already dismissed it with OK or Esc.
+        if self._fg_cmd and self.frame.body is self._fg_cmd.overlay:
+            self.backScreen()
+        self._fg_cmd = None
+        dialog = mywid.MessageDialog(title, message)
+        urwid.connect_signal(dialog, 'close',
+            lambda button: self.backScreen())
+        self.popup(dialog, min_height=max(8, min(20, message.count('\n') + 6)))
 
     def run(self):
         try:

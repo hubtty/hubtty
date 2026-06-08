@@ -15,6 +15,7 @@
 
 import datetime
 import logging
+import os
 
 import urwid
 
@@ -350,12 +351,15 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
             return None
         with self.app.db.getSession() as session:
             pr = session.getPullRequest(row.pr_key)
+            repo_path = os.path.join(self.app.config.git_root,
+                                     pr.repository.name)
             return {
                 'repository': pr.repository.name,
                 'number': str(pr.number),
                 'branch': pr.branch or '',
                 'author': pr.author_name or '',
                 'sha': row.commit_sha,
+                'repo_path': repo_path,
             }
 
     def __init__(self, app, query, query_desc=None, repository_key=None,

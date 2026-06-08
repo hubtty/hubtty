@@ -14,6 +14,7 @@
 
 import datetime
 import logging
+import os
 
 import urwid
 
@@ -129,6 +130,8 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         return {
             'repository': self.repository_name,
             'sha': self.sha,
+            'repo_path': os.path.join(self.app.config.git_root,
+                                      self.repository_name),
         }
 
     def __init__(self, app, new_commit_key):

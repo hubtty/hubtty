@@ -595,6 +595,8 @@ class PullRequestView(urwid.WidgetWrap):
             'sha': self.pr_sha or '',
             'title': self.pr_title or '',
             'url': self.pr_url or '',
+            'repo_path': os.path.join(self.app.config.git_root,
+                                      self.repository_name),
         }
 
     def __init__(self, app, pr_key):
