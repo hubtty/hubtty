@@ -48,8 +48,6 @@ TOGGLE_HELD = 'toggle held'
 TOGGLE_MARK = 'toggle process mark'
 REVIEW = 'review'
 DIFF = 'diff'
-LOCAL_CHECKOUT = 'local checkout'
-LOCAL_CHERRY_PICK = 'local cherry pick'
 SEARCH_RESULTS = 'search results'
 NEXT_PR = 'next pull request'
 PREV_PR = 'previous pull request'
@@ -117,8 +115,6 @@ DEFAULT_KEYMAP = {
     TOGGLE_MARK: '%',
     REVIEW: 'r',
     DIFF: 'd',
-    LOCAL_CHECKOUT: 'c',
-    LOCAL_CHERRY_PICK: 'x',
     SEARCH_RESULTS: 'u',
     NEXT_PR: 'n',
     PREV_PR: 'p',

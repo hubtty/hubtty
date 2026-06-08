@@ -14,6 +14,7 @@
 # under the License.
 
 import logging
+import os
 import urwid
 
 import hubtty.search
@@ -243,7 +244,10 @@ class RepositoryListView(urwid.WidgetWrap, mywid.Searchable):
         row = self.listbox.body[pos]
         if not isinstance(row, RepositoryRow):
             return None
-        return {'repository': row.repository_name}
+        repo_path = os.path.join(self.app.config.git_root,
+                                 row.repository_name)
+        return {'repository': row.repository_name,
+                'repo_path': repo_path}
 
     def __init__(self, app):
         super().__init__(urwid.Pile([]))
