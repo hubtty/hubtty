@@ -309,6 +309,18 @@ dashboards:
 # Variable values are automatically shell-quoted for safety.
 # To pass unquoted values, use command wrappers or scripts.
 #
+# SECURITY WARNING: Context variables ({number}, {branch}, {title},
+# {author}, etc.) are populated from pull request data.  A PR author
+# is an untrusted party -- they control values such as the branch
+# name, title, and commit contents.  Although variable values are
+# shell-quoted to prevent direct shell injection, any command that
+# checks out, builds, or otherwise executes code from a PR is running
+# attacker-controlled content.  Treat the PR context as untrusted
+# input and be especially careful with commands that:
+#   - check out or run code from the PR branch
+#   - pass PR-derived values to scripts that interpret them
+#   - invoke AI/LLM tools against PR content (prompt injection)
+#
 # Commands run in the directory from which hubtty was launched.
 # Use 'cd {repo_path} &&' or 'git -C {repo_path}' to operate
 # inside a repository checkout.
