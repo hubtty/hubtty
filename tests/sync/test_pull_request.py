@@ -16,7 +16,10 @@
 
 from unittest.mock import Mock, MagicMock, patch
 
-from hubtty.sync.tasks.pull_request import SyncPullRequestTask
+from hubtty.sync.tasks.pull_request import (
+    SyncPullRequestTask,
+    SyncPullRequestChecksTask,
+)
 from hubtty.gitrepo import EMPTY_TREE_SHA
 
 
@@ -79,7 +82,8 @@ def _make_commit_detail(sha, files=None):
 
 
 def _setup_sync(mock_sync, remote_pr, remote_commits, commit_details,
-                local_pr=None, local_commits_with_files=None):
+                local_pr=None, local_commits_with_files=None,
+                statuses=None, check_runs=None):
     """Wire up mock_sync.get to return the right data for each URL.
 
     Args:
@@ -90,9 +94,15 @@ def _setup_sync(mock_sync, remote_pr, remote_commits, commit_details,
         local_pr: Mock local PR (None = new PR).
         local_commits_with_files: set of SHAs that exist locally with
             files (used for the pre-fetch DB read).
+        statuses: list of commit status dicts for the /status endpoint.
+        check_runs: list of check-run dicts for the /check-runs endpoint.
     """
     app = mock_sync.app
     local_commits_with_files = local_commits_with_files or set()
+    if statuses is None:
+        statuses = []
+    if check_runs is None:
+        check_runs = []
 
     def get_side_effect(path, **kwargs):
         if path == f'repos/{PR_ID}':
@@ -111,9 +121,9 @@ def _setup_sync(mock_sync, remote_pr, remote_commits, commit_details,
                 return detail
         # Commit status / check-runs
         if '/status' in path:
-            return {'statuses': []}
+            return {'statuses': statuses}
         if '/check-runs' in path:
-            return []  # check runs (unwrapped by get())
+            return check_runs  # check runs (unwrapped by get())
         return {}
 
     mock_sync.get = Mock(side_effect=get_side_effect)
@@ -336,3 +346,225 @@ class TestSyncPullRequestParentlessCommit:
             SHA_A,
             EMPTY_TREE_SHA,
         )
+
+
+class TestSyncPullRequestChecksScheduling:
+    """Verify that SyncPullRequestChecksTask is scheduled correctly."""
+
+    @patch('hubtty.sync.tasks.pull_request.gitrepo')
+    def test_schedules_recheck_when_no_checks(self, mock_gitrepo, mock_sync):
+        """When no checks are reported yet, a re-check task is scheduled."""
+        remote_pr = _make_remote_pr()
+        remote_commits = _make_remote_commits(SHA_A)
+        commit_details = {SHA_A: _make_commit_detail(SHA_A)}
+
+        _setup_sync(
+            mock_sync, remote_pr, remote_commits, commit_details,
+            statuses=[], check_runs=[],
+        )
+
+        task = SyncPullRequestTask(PR_ID)
+        task.run(mock_sync)
+
+        # A SyncPullRequestChecksTask should have been submitted.
+        submitted = [
+            c[0][0] for c in mock_sync.submitTask.call_args_list
+            if isinstance(c[0][0], SyncPullRequestChecksTask)
+        ]
+        assert len(submitted) == 1, \
+            f"Expected 1 check re-poll task, got {len(submitted)}"
+
+    @patch('hubtty.sync.tasks.pull_request.gitrepo')
+    def test_schedules_recheck_when_pending_checks(
+            self, mock_gitrepo, mock_sync):
+        """When checks are pending, a re-check task is scheduled."""
+        remote_pr = _make_remote_pr()
+        remote_commits = _make_remote_commits(SHA_A)
+        commit_details = {SHA_A: _make_commit_detail(SHA_A)}
+
+        statuses = [{
+            'context': 'ci/prow/test',
+            'state': 'pending',
+            'target_url': 'https://example.com',
+            'description': 'Job triggered',
+            'created_at': '2025-01-01T00:00:00Z',
+            'updated_at': '2025-01-01T00:00:00Z',
+        }]
+
+        _setup_sync(
+            mock_sync, remote_pr, remote_commits, commit_details,
+            statuses=statuses,
+        )
+
+        task = SyncPullRequestTask(PR_ID)
+        task.run(mock_sync)
+
+        submitted = [
+            c[0][0] for c in mock_sync.submitTask.call_args_list
+            if isinstance(c[0][0], SyncPullRequestChecksTask)
+        ]
+        assert len(submitted) == 1, \
+            f"Expected 1 check re-poll task, got {len(submitted)}"
+
+    @patch('hubtty.sync.tasks.pull_request.gitrepo')
+    def test_no_recheck_when_all_checks_completed(
+            self, mock_gitrepo, mock_sync):
+        """When all checks are completed, no re-check task is scheduled."""
+        remote_pr = _make_remote_pr()
+        remote_commits = _make_remote_commits(SHA_A)
+        commit_details = {SHA_A: _make_commit_detail(SHA_A)}
+
+        statuses = [{
+            'context': 'ci/prow/test',
+            'state': 'success',
+            'target_url': 'https://example.com',
+            'description': 'Job succeeded',
+            'created_at': '2025-01-01T00:00:00Z',
+            'updated_at': '2025-01-01T00:00:00Z',
+        }]
+
+        _setup_sync(
+            mock_sync, remote_pr, remote_commits, commit_details,
+            statuses=statuses,
+        )
+
+        task = SyncPullRequestTask(PR_ID)
+        task.run(mock_sync)
+
+        submitted = [
+            c[0][0] for c in mock_sync.submitTask.call_args_list
+            if isinstance(c[0][0], SyncPullRequestChecksTask)
+        ]
+        assert len(submitted) == 0, \
+            f"Expected no check re-poll task, got {len(submitted)}"
+
+    @patch('hubtty.sync.tasks.pull_request.gitrepo')
+    def test_no_recheck_for_closed_pr_without_checks(
+            self, mock_gitrepo, mock_sync):
+        """Closed PRs with no checks do not schedule a re-check."""
+        remote_pr = _make_remote_pr()
+        remote_pr['state'] = 'closed'
+        remote_commits = _make_remote_commits(SHA_A)
+        commit_details = {SHA_A: _make_commit_detail(SHA_A)}
+
+        _setup_sync(
+            mock_sync, remote_pr, remote_commits, commit_details,
+            statuses=[], check_runs=[],
+        )
+
+        task = SyncPullRequestTask(PR_ID)
+        task.run(mock_sync)
+
+        submitted = [
+            c[0][0] for c in mock_sync.submitTask.call_args_list
+            if isinstance(c[0][0], SyncPullRequestChecksTask)
+        ]
+        assert len(submitted) == 0, \
+            f"Expected no check re-poll task for closed PR, got {len(submitted)}"
+
+
+def _make_checks_task_pr(state='open'):
+    """Create a minimal mock PR for SyncPullRequestChecksTask tests."""
+    commit = Mock()
+    commit.sha = SHA_A
+    pr = Mock()
+    pr.pr_id = PR_ID
+    pr.key = 100
+    pr.state = state
+    pr.commits = [commit]
+    pr.repository = Mock(key=1)
+    return pr
+
+
+def _setup_checks_task_sync(mock_sync, pr_mock):
+    """Wire mock_sync for SyncPullRequestChecksTask.run().
+
+    The task opens two DB sessions (read then write).  Both return
+    the same *pr_mock* from getPullRequestByPullRequestID.
+    """
+    def make_session():
+        cm = MagicMock()
+        session = MagicMock()
+        session.getPullRequestByPullRequestID.return_value = pr_mock
+        cm.__enter__ = Mock(return_value=session)
+        cm.__exit__ = Mock(return_value=False)
+        return cm
+
+    mock_sync.app.db.getSession = make_session
+    mock_sync.app.config.ignore_pending_checks = []
+
+
+class TestSyncPullRequestChecksTaskRun:
+    """Verify SyncPullRequestChecksTask.run() re-poll behaviour."""
+
+    @patch('hubtty.sync.tasks.pull_request.update_checks')
+    @patch('hubtty.sync.tasks.pull_request.fetch_checks')
+    def test_repoll_when_checks_empty(
+            self, mock_fetch, mock_update, mock_sync):
+        """An empty check list triggers a followup re-poll."""
+        mock_fetch.return_value = []
+        pr_mock = _make_checks_task_pr(state='open')
+        _setup_checks_task_sync(mock_sync, pr_mock)
+
+        task = SyncPullRequestChecksTask(PR_ID, REPO, attempt=0)
+        task.run(mock_sync)
+
+        assert task.followup is not None, \
+            "Expected a followup task when checks list is empty"
+        assert isinstance(task.followup, SyncPullRequestChecksTask)
+        assert task.followup.attempt == 1
+
+    @patch('hubtty.sync.tasks.pull_request.update_checks')
+    @patch('hubtty.sync.tasks.pull_request.fetch_checks')
+    def test_repoll_when_checks_pending(
+            self, mock_fetch, mock_update, mock_sync):
+        """Pending checks trigger a followup re-poll."""
+        mock_fetch.return_value = [
+            {'name': 'ci/test', 'state': 'pending',
+             'url': '', 'description': '', 'started_at': None,
+             'completed_at': None},
+        ]
+        pr_mock = _make_checks_task_pr(state='open')
+        _setup_checks_task_sync(mock_sync, pr_mock)
+
+        task = SyncPullRequestChecksTask(PR_ID, REPO, attempt=0)
+        task.run(mock_sync)
+
+        assert task.followup is not None, \
+            "Expected a followup task when checks are pending"
+        assert isinstance(task.followup, SyncPullRequestChecksTask)
+        assert task.followup.attempt == 1
+
+    @patch('hubtty.sync.tasks.pull_request.update_checks')
+    @patch('hubtty.sync.tasks.pull_request.fetch_checks')
+    def test_no_repoll_when_checks_complete(
+            self, mock_fetch, mock_update, mock_sync):
+        """Completed checks do not trigger a followup."""
+        mock_fetch.return_value = [
+            {'name': 'ci/test', 'state': 'success',
+             'url': '', 'description': '', 'started_at': None,
+             'completed_at': None},
+        ]
+        pr_mock = _make_checks_task_pr(state='open')
+        _setup_checks_task_sync(mock_sync, pr_mock)
+
+        task = SyncPullRequestChecksTask(PR_ID, REPO, attempt=0)
+        task.run(mock_sync)
+
+        assert task.followup is None, \
+            "Expected no followup when all checks are complete"
+
+    @patch('hubtty.sync.tasks.pull_request.update_checks')
+    @patch('hubtty.sync.tasks.pull_request.fetch_checks')
+    def test_no_repoll_for_closed_pr(
+            self, mock_fetch, mock_update, mock_sync):
+        """Closed PRs do not trigger a followup even with empty checks."""
+        mock_fetch.return_value = []
+        pr_mock = _make_checks_task_pr(state='closed')
+        _setup_checks_task_sync(mock_sync, pr_mock)
+
+        task = SyncPullRequestChecksTask(PR_ID, REPO, attempt=0)
+        task.run(mock_sync)
+
+        assert task.followup is None, \
+            "Expected no followup for a closed PR"
