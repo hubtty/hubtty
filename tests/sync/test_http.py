@@ -76,12 +76,13 @@ class TestHTTPHeaders:
 class TestCheckResponse:
     """Tests for response validation."""
 
-    def test_503_raises_offline(self, http_client):
-        """503 response raises OfflineError."""
+    @pytest.mark.parametrize("status_code", [500, 502, 503, 504])
+    def test_5xx_raises_offline(self, http_client, status_code):
+        """5xx responses raise OfflineError."""
         response = Mock()
-        response.status_code = 503
+        response.status_code = status_code
 
-        with pytest.raises(OfflineError):
+        with pytest.raises(OfflineError, match=str(status_code)):
             http_client.checkResponse(response)
 
     def test_403_oauth_restriction_raises_restricted(self, http_client):

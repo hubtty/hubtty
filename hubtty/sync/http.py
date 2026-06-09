@@ -79,10 +79,10 @@ class HTTPClient:
             response: The HTTP response to check.
 
         Raises:
-            OfflineError: If the server returned 503.
+            OfflineError: If the server returned a 5xx error.
             RestrictedError: If OAuth app restrictions block access.
             RateLimitError: If rate limit is exceeded.
-            Exception: For other 4xx/5xx status codes.
+            Exception: For other 4xx status codes.
         """
         self.log.debug('HTTP status code: %d', response.status_code)
 
@@ -90,9 +90,11 @@ class HTTPClient:
         if response.status_code == 429:
             self._handle_rate_limit_response(response)
 
-        # Handle 503 (service unavailable)
-        if response.status_code == 503:
-            raise OfflineError("Received 503 status code")
+        # Handle 5xx (server errors) -- transient; treat as offline to retry
+        if response.status_code >= 500:
+            raise OfflineError(
+                f"Received {response.status_code} status code"
+            )
 
         # Handle 403 (forbidden)
         elif response.status_code == 403:
