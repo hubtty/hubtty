@@ -271,7 +271,7 @@ class SyncPullRequestTask(Task):
                         )
 
                 # Commit checks
-                if remote_commit.get('_hubtty_checks'):
+                if '_hubtty_checks' in remote_commit:
                     update_checks(
                         session, commit, remote_commit['_hubtty_checks']
                     )
@@ -434,22 +434,25 @@ class SyncPullRequestTask(Task):
 
             pr.outdated = False
 
-            # If any checks are still pending, schedule a lightweight
-            # re-check so we pick up completed CI results without
+            # If any checks are still pending, or if no checks have
+            # been reported yet (CI may not have started), schedule a
+            # lightweight re-check so we pick up CI results without
             # waiting for another full PR sync.
-            if (len(remote_commits) > 0
-                    and has_pending_checks(
-                        last_commit.get('_hubtty_checks', []),
-                        frozenset(sync.app.config.ignore_pending_checks))):
-                self.log.info(
-                    "Pull request %s has pending checks, scheduling re-check",
-                    self.pr_id
-                )
-                sync.submitTask(SyncPullRequestChecksTask(
-                    pr.pr_id,
-                    pr.repository.name,
-                    priority=LOW_PRIORITY,
-                ))
+            if len(remote_commits) > 0 and pr.state == 'open':
+                checks_data = last_commit.get('_hubtty_checks', [])
+                if (not checks_data
+                        or has_pending_checks(
+                            checks_data,
+                            frozenset(sync.app.config.ignore_pending_checks))):
+                    self.log.info(
+                        "Pull request %s has pending/no checks, scheduling re-check",
+                        self.pr_id
+                    )
+                    sync.submitTask(SyncPullRequestChecksTask(
+                        pr.pr_id,
+                        pr.repository.name,
+                        priority=LOW_PRIORITY,
+                    ))
 
         for url, refs in fetches.items():
             self.log.debug("Fetching from %s with refs %s", url, refs)
@@ -498,6 +501,7 @@ class SyncPullRequestChecksTask(Task):
             last_commit = pr.commits[-1]
             commit_sha = last_commit.sha
             pr_key = pr.key
+            pr_state = pr.state
             repository_key = pr.repository.key
 
         # Fetch checks from GitHub (outside the DB session)
@@ -514,13 +518,16 @@ class SyncPullRequestChecksTask(Task):
         # Notify the UI
         self.results.append(PullRequestUpdatedEvent(repository_key, pr_key))
 
-        # Re-submit if checks are still pending
-        if has_pending_checks(checks_data,
-                               frozenset(sync.app.config.ignore_pending_checks)):
+        # Re-submit if checks are still pending or not yet reported
+        if (pr_state == 'open'
+                and (not checks_data
+                     or has_pending_checks(
+                         checks_data,
+                         frozenset(sync.app.config.ignore_pending_checks)))):
             if self.attempt + 1 < MAX_CHECK_RETRIES:
                 delay = self._BACKOFF[min(self.attempt, len(self._BACKOFF) - 1)]
                 self.log.info(
-                    "Checks still pending for %s (attempt %d/%d), "
+                    "Checks still pending/absent for %s (attempt %d/%d), "
                     "retrying in %ds",
                     self.pr_id, self.attempt + 1, MAX_CHECK_RETRIES, delay,
                 )
