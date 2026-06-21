@@ -17,6 +17,8 @@
 import pytest
 from unittest.mock import Mock, MagicMock
 
+from hubtty.sync.http import SearchResult
+
 
 @pytest.fixture
 def mock_app():
@@ -45,6 +47,6 @@ def mock_sync(mock_app):
     sync.put = Mock()
     sync.patch = Mock()
     sync.delete = Mock()
-    sync.query = Mock(return_value=[])
+    sync.query = Mock(return_value=SearchResult([], None))
     sync.submitTask = Mock()
     return sync

@@ -18,7 +18,7 @@ import pytest
 from unittest.mock import Mock, patch
 import json
 
-from hubtty.sync.http import HTTPClient
+from hubtty.sync.http import HTTPClient, SearchResult
 from hubtty.sync.exceptions import OfflineError, RateLimitError, RestrictedError
 
 
@@ -616,6 +616,51 @@ class TestQuery:
         call_arg = mock_get.call_args[0][0]
         assert 'search/issues' in call_arg
         assert 'type:pr' in call_arg
+
+    def test_query_returns_search_result(self, http_client):
+        """query() returns a SearchResult namedtuple."""
+        with patch.object(http_client, 'get', return_value=[]):
+            result = http_client.query('type:pr state:open')
+
+        assert isinstance(result, SearchResult)
+        assert result.items == []
+        assert result.total_count is None
+
+    def test_query_returns_total_count(self, http_client):
+        """query() captures total_count from the search response."""
+        response = Mock()
+        response.status_code = 200
+        response.text = json.dumps({
+            'total_count': 1523,
+            'incomplete_results': False,
+            'items': [{'id': 1}, {'id': 2}],
+        })
+        response.headers = {'X-RateLimit-Remaining': '100'}
+        response.links = {}
+
+        with patch.object(http_client.session, 'get', return_value=response):
+            result = http_client.query('type:pr state:open')
+
+        assert isinstance(result, SearchResult)
+        assert len(result.items) == 2
+        assert result.total_count == 1523
+
+    def test_query_total_count_matches_when_not_truncated(self, http_client):
+        """total_count equals len(items) when results are not truncated."""
+        response = Mock()
+        response.status_code = 200
+        response.text = json.dumps({
+            'total_count': 2,
+            'incomplete_results': False,
+            'items': [{'id': 1}, {'id': 2}],
+        })
+        response.headers = {'X-RateLimit-Remaining': '100'}
+        response.links = {}
+
+        with patch.object(http_client.session, 'get', return_value=response):
+            result = http_client.query('type:pr state:open')
+
+        assert result.total_count == len(result.items)
 
 
 class TestETagSupport:
