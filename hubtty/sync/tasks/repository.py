@@ -261,9 +261,34 @@ class SyncRepositoryTask(Task):
                     full_sync.append(repository.name)
 
         def sync_repositories(repositories, query):
+            base_query = query
             for repository_name in repositories:
                 query += f' repo:{repository_name}'
-            pull_requests = sync.query(query)
+            result = sync.query(query)
+            pull_requests = result.items
+
+            if (result.total_count is not None
+                    and result.total_count > len(pull_requests)):
+                # The batched query exceeded the GitHub Search API's
+                # 1 000-result cap.  Fall back to per-repo queries so
+                # every repository gets complete results.
+                self.log.warning(
+                    "Search results truncated (%d/%d). "
+                    "Re-querying repositories individually.",
+                    len(pull_requests), result.total_count)
+                pull_requests = []
+                for repository_name in repositories:
+                    r = sync.query(
+                        f'{base_query} repo:{repository_name}')
+                    if (r.total_count is not None
+                            and r.total_count > len(r.items)):
+                        self.log.warning(
+                            "Search results for %s still truncated "
+                            "(%d/%d)",
+                            repository_name, len(r.items),
+                            r.total_count)
+                    pull_requests.extend(r.items)
+
             pr_ids = [pr['pull_request']['url'].split('repos/')[1] for pr in pull_requests]
             with app.db.getSession() as session:
                 # Winnow the list of IDs to only the ones in the local DB.

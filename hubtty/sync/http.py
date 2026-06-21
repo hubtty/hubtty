@@ -19,6 +19,7 @@ import json
 import logging
 import re
 import time
+from collections import namedtuple
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
 import requests
@@ -28,6 +29,8 @@ from .exceptions import OfflineError, RestrictedError, RateLimitError
 
 if TYPE_CHECKING:
     from hubtty.app import App
+
+SearchResult = namedtuple('SearchResult', ['items', 'total_count'])
 
 
 class HTTPClient:
@@ -336,6 +339,9 @@ class HTTPClient:
                 # results from multiple pages are correctly merged
                 # into a single flat list.
                 if isinstance(result, dict) and 'items' in result:
+                    if is_first_page:
+                        self._last_search_total_count = result.get(
+                            'total_count')
                     result = result.get('items', [])
                 elif isinstance(result, dict) and 'check_runs' in result:
                     result = result.get('check_runs', [])
@@ -517,15 +523,19 @@ class HTTPClient:
         """
         self._mutating_request('delete', path, data, headers, response_callback)
 
-    def query(self, query: str) -> Any:
+    def query(self, query: str) -> SearchResult:
         """Execute a GitHub search query.
 
         Args:
             query: Search query string.
 
         Returns:
-            List of search results.
+            SearchResult with *items* (list) and *total_count* (int or None).
+            When *total_count* exceeds ``len(items)``, the GitHub Search API
+            silently truncated the results (hard cap of 1 000 per query).
         """
+        self._last_search_total_count = None
         q = f'search/issues?per_page=100&q={query}'
         self.log.debug('Query: %s', q)
-        return self.get(q)
+        items = self.get(q)
+        return SearchResult(items, self._last_search_total_count)
