@@ -1,5 +1,9 @@
 # Hubtty changelog
 
+## Release 0.4.1 - 2026/06/21
+
+- Fix publish workflow ([#144](https://github.com/hubtty/hubtty/pull/144))
+
 ## Release 0.4 - 2026/06/21
 
 ### Breaking changes
