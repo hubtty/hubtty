@@ -22,6 +22,7 @@ from hubtty import gitrepo
 from hubtty import keymap
 from hubtty import mywid
 from hubtty import sync
+from hubtty.generated import GeneratedFileFilter
 from hubtty.view import mouse_scroll_decorator
 
 
@@ -181,15 +182,17 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             self.pr_key = new_commit.pull_request.key
             self.repository_name = new_commit.pull_request.repository.name
             self.sha = new_commit.sha
-            self._generated_paths = set()
             self._files_with_comments = set()
+            repo_path = os.path.join(self.app.config.git_root,
+                                     self.repository_name)
+            self._generated_filter = GeneratedFileFilter(
+                repo_path=repo_path,
+                commit_sha=self.sha,
+                user_patterns=self.app.config.generated_files,
+            )
             for f in new_commit.files:
                 new_comments += f.current_comments
                 self.new_file_keys[f.path] = f.key
-                if f.generated:
-                    self._generated_paths.add(f.path)
-                    if f.old_path:
-                        self._generated_paths.add(f.old_path)
                 if f.current_comments or f.draft_comments:
                     self._files_with_comments.add(f.path)
                     if f.old_path:
@@ -534,10 +537,15 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             pr_view.reviewKey(reviewkey)
         self.app.backScreen()
 
+    _DIFF_SENTINELS = frozenset({'Empty file', 'Unknown File', '/dev/null'})
+
     def _is_generated_diff(self, diff):
         """Return True if *diff* corresponds to a generated file."""
-        return (diff.newname in self._generated_paths
-                or diff.oldname in self._generated_paths)
+        for name in (diff.newname, diff.oldname):
+            if name and name not in self._DIFF_SENTINELS:
+                if self._generated_filter.is_generated(name):
+                    return True
+        return False
 
     def _has_comments(self, diff):
         """Return True if *diff* has inline comments."""

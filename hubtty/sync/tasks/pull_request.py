@@ -23,7 +23,6 @@ from typing import TYPE_CHECKING
 import dateutil.parser
 
 from hubtty import gitrepo
-from hubtty.generated import GeneratedFileFilter
 from ..task import Task
 from ..constants import LOW_PRIORITY
 from ..events import RepositoryAddedEvent, PullRequestAddedEvent, PullRequestUpdatedEvent
@@ -231,16 +230,6 @@ class SyncPullRequestTask(Task):
                     pr.removeLabel(label)
 
             repo = gitrepo.get_repo(pr.repository.name, app.config)
-            # Build the generated-file filter once for the whole PR
-            # using the head commit's .gitattributes.  This avoids
-            # creating a new git.Repo and re-reading the blob for
-            # every commit.
-            if remote_commits:
-                generated_filter = GeneratedFileFilter(
-                    repo_path=repo.path,
-                    commit_sha=remote_commits[-1]['sha'],
-                    user_patterns=app.config.generated_files,
-                )
             for remote_commit in remote_commits:
                 commit = pr.getCommitBySha(remote_commit['sha'])
                 # TODO: handle multiple parents
@@ -279,12 +268,7 @@ class SyncPullRequestTask(Task):
                             file['filename'], file['status'],
                             file.get('previous_filename'),
                             inserted, deleted,
-                            generated=generated_filter.is_generated(
-                                file['filename']),
                         )
-                    else:
-                        f.generated = generated_filter.is_generated(
-                            file['filename'])
 
                 # Commit checks
                 if '_hubtty_checks' in remote_commit:
