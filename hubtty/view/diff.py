@@ -111,7 +111,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             (keymap.TOGGLE_DIFF_VIEW,
              "Toggle between unified and side-by-side diff"),
             (keymap.TOGGLE_GENERATED_FILES,
-             "Toggle display of generated files"),
+             "Toggle diff content of generated files"),
             ]
 
     def help(self):
@@ -262,23 +262,20 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 diffs.append(diff)
             else:
                 self.log.debug("Unable to find file %s in commit %s", filename, self.sha)
-        hidden_generated_count = 0
-        visible_count = 0
         for i, diff in enumerate(diffs):
-            # Always register in file_diffs for comment handling.
+            if i > 0:
+                lines.append(urwid.Text(''))
             self.file_diffs[gitrepo.OLD][diff.oldname] = diff
             self.file_diffs[gitrepo.NEW][diff.newname] = diff
-            # Skip generated files when hiding is enabled, unless
-            # the file has inline comments that must be displayed.
-            if (self.hide_generated
-                    and self._is_generated_diff(diff)
+            is_gen = self._is_generated_diff(diff)
+            # Show file header (with [generated] marker when applicable).
+            lines.extend(self.makeFileHeader(diff, comment_lists,
+                                             generated=is_gen))
+            # Collapse diff content for generated files when hiding is
+            # enabled, unless the file has inline comments.
+            if (self.hide_generated and is_gen
                     and not self._has_comments(diff)):
-                hidden_generated_count += 1
                 continue
-            if visible_count > 0:
-                lines.append(urwid.Text(''))
-            visible_count += 1
-            lines.extend(self.makeFileHeader(diff, comment_lists))
             for chunk in diff.chunks:
                 if chunk.context:
                     if not chunk.first:
@@ -296,15 +293,6 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                         lines.remove(button)
                 else:
                     lines += self.makeLines(diff, chunk.lines, comment_lists)
-        if hidden_generated_count:
-            if visible_count > 0:
-                lines.append(urwid.Text(''))
-            key_str = self.app.config.keymap.formatKeys(
-                keymap.TOGGLE_GENERATED_FILES)
-            lines.append(urwid.Text(('generated-summary',
-                f'  {hidden_generated_count} generated '
-                f'file{"s" if hidden_generated_count != 1 else ""} '
-                f'hidden (press {key_str} to show)')))
         listwalker = urwid.SimpleFocusListWalker(lines)
         self.listbox = urwid.ListBox(listwalker)
         self._w.contents.append((self.listbox, ('weight', 1)))
@@ -398,7 +386,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
     def makeLines(self, diff, lines_to_add, comment_lists):
         raise NotImplementedError
 
-    def makeFileHeader(self, diff, comment_lists):
+    def makeFileHeader(self, diff, comment_lists, generated=False):
         raise NotImplementedError
 
     def makeFileReminder(self):
