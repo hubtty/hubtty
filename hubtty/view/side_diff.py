@@ -128,14 +128,21 @@ class SideDiffLine(BaseDiffLine):
         return ret
 
 class SideFileHeader(BaseFileHeader):
-    def __init__(self, app, context, old, new, callback=None):
+    def __init__(self, app, context, old, new,
+                 callback=None, generated=False):
         super().__init__('', on_press=callback)
         self.context = context
+        old_parts = [('filename', old)]
+        new_parts = [('filename', new)]
+        if generated:
+            old_parts.append(('generated-filename', ' [generated]'))
+            new_parts.append(('generated-filename', ' [generated]'))
         col = urwid.Columns([
-                urwid.Text(('filename', old)),
-                urwid.Text(('filename', new))])
+                urwid.Text(old_parts),
+                urwid.Text(new_parts)])
         map = {None: 'focused-filename',
-               'filename': 'focused-filename'}
+               'filename': 'focused-filename',
+               'generated-filename': 'focused-filename'}
         self._w = urwid.AttrMap(col, None, focus_map=map)
 
 class SideFileReminder(BaseFileReminder):
@@ -190,11 +197,12 @@ class SideDiffView(BaseDiffView):
     def makeFileReminder(self):
         return SideFileReminder()
 
-    def makeFileHeader(self, diff, comment_lists):
+    def makeFileHeader(self, diff, comment_lists, generated=False):
         context = self.makeContext(diff, None, None, header=True)
         lines = []
         lines.append(SideFileHeader(self.app, context, diff.oldname, diff.newname,
-                                    callback=self.onSelect))
+                                    callback=self.onSelect,
+                                    generated=generated))
 
         # see if there are any comments for this file
         key = f'old-None-{diff.oldname}'

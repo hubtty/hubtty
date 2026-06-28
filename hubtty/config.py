@@ -142,6 +142,8 @@ class ConfigSchema:
                            'expire-age': str,
                            'ignore-pending-checks': [str],
                            'size-column': self.size_column,
+                           'generated-files': [str],
+                           'hide-generated-files': bool,
                            })
         return schema
 
@@ -281,6 +283,9 @@ class Config:
         self.expire_age = self.config.get('expire-age', '2 months')
 
         self.ignore_pending_checks = self.config.get('ignore-pending-checks', [])
+
+        self.generated_files = self.config.get('generated-files', [])
+        self.hide_generated_files = self.config.get('hide-generated-files', True)
 
         self.size_column = self.config.get('size-column', {})
         self.size_column['type'] = self.size_column.get('type', 'graph')

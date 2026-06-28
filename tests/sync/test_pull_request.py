@@ -205,6 +205,7 @@ def _setup_sync(mock_sync, remote_pr, remote_commits, commit_details,
 
     # Mock gitrepo.get_repo
     app.config.ignore_pending_checks = []
+    app.config.generated_files = []
     app.repository_cache = MagicMock()
 
     return mock_sync
@@ -492,6 +493,7 @@ def _setup_checks_task_sync(mock_sync, pr_mock):
 
     mock_sync.app.db.getSession = make_session
     mock_sync.app.config.ignore_pending_checks = []
+    mock_sync.app.config.generated_files = []
 
 
 class TestSyncPullRequestChecksTaskRun:

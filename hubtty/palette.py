@@ -80,6 +80,7 @@ DEFAULT_PALETTE={
     'check-skipped': ['dark gray', ''],
     'check-cancelled': ['dark gray', ''],
     'state-draft': ['yellow', ''],
+    'generated-filename': ['dark gray', ''],
     # repository list
     'unreviewed-repository': ['white', ''],
     'subscribed-repository': ['default', ''],

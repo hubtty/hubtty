@@ -101,19 +101,26 @@ class UnifiedDiffLine(BaseDiffLine):
         return self.text_widget.search(search, attribute)
 
 class UnifiedFileHeader(BaseFileHeader):
-    def __init__(self, app, context, oldnew, old, new, callback=None):
+    def __init__(self, app, context, oldnew, old, new,
+                 callback=None, generated=False):
         super().__init__('', on_press=callback)
         self.context = context
         self.oldnew = oldnew
         if oldnew == gitrepo.OLD:
-            col = urwid.Columns([
-                    urwid.Text(('filename', old))])
+            parts = [('filename', old)]
+            if generated:
+                parts.append(('generated-filename', ' [generated]'))
+            col = urwid.Columns([urwid.Text(parts)])
         elif oldnew == gitrepo.NEW:
+            parts = [('filename', new)]
+            if generated:
+                parts.append(('generated-filename', ' [generated]'))
             col = urwid.Columns([
                     (LN_COL_WIDTH, urwid.Text('')),
-                    urwid.Text(('filename', new))])
+                    urwid.Text(parts)])
         map = {None: 'focused-filename',
-               'filename': 'focused-filename'}
+               'filename': 'focused-filename',
+               'generated-filename': 'focused-filename'}
         self._w = urwid.AttrMap(col, None, focus_map=map)
 
 class UnifiedFileReminder(BaseFileReminder):
@@ -205,12 +212,13 @@ class UnifiedDiffView(BaseDiffView):
     def makeFileReminder(self):
         return UnifiedFileReminder()
 
-    def makeFileHeader(self, diff, comment_lists):
+    def makeFileHeader(self, diff, comment_lists, generated=False):
         context = self.makeContext(diff, None, None, header=True)
         lines = []
         lines.append(UnifiedFileHeader(self.app, context, gitrepo.OLD,
                                        diff.oldname, diff.newname,
-                                       callback=self.onSelect))
+                                       callback=self.onSelect,
+                                       generated=generated))
         # see if there are any comments for this file
         key = f'old-None-{diff.oldname}'
         old_list = comment_lists.pop(key, [])
@@ -230,7 +238,8 @@ class UnifiedDiffView(BaseDiffView):
         # new line
         lines.append(UnifiedFileHeader(self.app, context, gitrepo.NEW,
                                        diff.oldname, diff.newname,
-                                       callback=self.onSelect))
+                                       callback=self.onSelect,
+                                       generated=generated))
 
         # see if there are any comments for this file
         key = f'new-None-{diff.newname}'
