@@ -143,6 +143,19 @@ color in the light palette, and one color in a custom palette.
      - name: custom
        filename: ['light yellow', '']
 
+Syntax highlighting in diff views uses additional palette entries for
+language tokens.  The defaults are tuned for dark backgrounds.  Override
+them the same way as any other palette entry.  On changed lines
+(added/removed), syntax colours are combined with the diff background
+automatically; the combined attrs follow the naming pattern
+``syn-*-on-{added,removed}-line`` (e.g. ``syn-keyword-on-added-line``).
+These can also be overridden.
+
+The syntax highlighting palette entries are: ``syn-keyword``,
+``syn-string``, ``syn-comment``, ``syn-name-function``, ``syn-type``,
+``syn-number``, ``syn-builtin``, and ``syn-decorator``.  See
+``reference-hubtty.yaml`` for the default color values.
+
 Palettes may be selected at runtime with the `-p PALETTE` command
 line option, or you may set the default palette in the config file.
 
@@ -331,6 +344,15 @@ For example, to hide comments from a CI system:
 **diff-view**
   Specifies how patch diffs should be displayed.  The values `unified`
   or `side-by-side` (the default) are supported.
+
+**syntax-highlighting**
+  Syntax highlighting is enabled by default in diff views.  Set this
+  to `false` to disable it.
+
+**max-highlight-size**
+  Maximum file size (in bytes) for syntax highlighting.  Files larger
+  than this threshold are shown without highlighting.  The default is
+  ``524288`` (512 KiB).
 
 **close-pr-on-review**
   When a review is saved, close the pull request view and pop up to the
