@@ -26,6 +26,7 @@ from hubtty import keymap
 from hubtty import mywid
 from hubtty import sync
 from hubtty import markdown
+from hubtty.generated import GeneratedFileFilter
 from hubtty.view import side_diff as view_side_diff
 from hubtty.view import unified_diff as view_unified_diff
 from hubtty.view import mouse_scroll_decorator
@@ -304,6 +305,14 @@ class CommitRow(urwid.WidgetWrap):
         generated_added = 0
         generated_removed = 0
         hide_generated = app.config.hide_generated_files
+        if hide_generated:
+            repo_path = os.path.join(app.config.git_root,
+                                     self.repository_name)
+            generated_filter = GeneratedFileFilter(
+                repo_path=repo_path,
+                commit_sha=commit.sha,
+                user_patterns=app.config.generated_files,
+            )
         for rfile in commit.files:
             if rfile.status is None:
                 continue
@@ -311,7 +320,7 @@ class CommitRow(urwid.WidgetWrap):
             removed = rfile.deleted or 0
             total_added += added
             total_removed += removed
-            if hide_generated and rfile.generated:
+            if hide_generated and generated_filter.is_generated(rfile.path):
                 generated_count += 1
                 generated_added += added
                 generated_removed += removed

@@ -168,7 +168,6 @@ file_table = Table(
     Column('inserted', Integer),
     Column('deleted', Integer),
     Column('status', String(16), index=True, nullable=False),
-    Column('generated', Boolean, nullable=False, server_default=text('0')),
     )
 server_table = Table(
     'server', metadata,
@@ -553,14 +552,13 @@ class PendingMerge:
 
 class File:
     def __init__(self, commit, path, status, old_path=None,
-                 inserted=None, deleted=None, generated=False):
+                 inserted=None, deleted=None):
         self.commit_key = commit.key
         self.path = path
         self.status = status
         self.old_path = old_path
         self.inserted = inserted
         self.deleted = deleted
-        self.generated = generated
 
     @property
     def display_path(self):

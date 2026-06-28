@@ -81,6 +81,10 @@ BUILTIN_GENERATED_PATTERNS = [
     '*.Designer.cs',
     '*.g.cs',
     '*.generated.cs',
+    # Vendored dependencies
+    'vendor/**',
+    'node_modules/**',
+    'third_party/**',
 ]
 
 

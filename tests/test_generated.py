@@ -239,6 +239,18 @@ class TestGeneratedFileFilter:
         assert filt.is_generated('Model.g.cs')
         assert filt.is_generated('Dto.generated.cs')
 
+    def test_builtin_vendor_directories(self):
+        filt = GeneratedFileFilter()
+        assert filt.is_generated('vendor/lib.go')
+        assert filt.is_generated('vendor/github.com/foo/bar/baz.go')
+        assert filt.is_generated('node_modules/lodash/index.js')
+        assert filt.is_generated('node_modules/@scope/pkg/lib.js')
+        assert filt.is_generated('third_party/protobuf/message.cc')
+        assert filt.is_generated('third_party/deep/nested/file.h')
+        # Files that merely *contain* the word vendor are not matched.
+        assert not filt.is_generated('src/vendor.go')
+        assert not filt.is_generated('my_vendor_lib.py')
+
     def test_normal_files_not_generated(self):
         filt = GeneratedFileFilter()
         assert not filt.is_generated('main.py')
