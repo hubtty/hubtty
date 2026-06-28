@@ -300,6 +300,10 @@ class CommitRow(urwid.WidgetWrap):
         table = mywid.Table(columns=3)
         total_added = 0
         total_removed = 0
+        generated_count = 0
+        generated_added = 0
+        generated_removed = 0
+        hide_generated = app.config.hide_generated_files
         for rfile in commit.files:
             if rfile.status is None:
                 continue
@@ -307,10 +311,23 @@ class CommitRow(urwid.WidgetWrap):
             removed = rfile.deleted or 0
             total_added += added
             total_removed += removed
+            if hide_generated and rfile.generated:
+                generated_count += 1
+                generated_added += added
+                generated_removed += removed
+                continue
             table.addRow([urwid.Text(('filename', rfile.display_path), wrap='clip'),
                           urwid.Text([('lines-added', '+%i' % (added,)), ', '],
                                      align=urwid.RIGHT),
                           urwid.Text(('lines-removed', '-%i' % (removed,)))])
+        if generated_count:
+            label = '%i generated file%s' % (
+                generated_count, 's' if generated_count != 1 else '')
+            table.addRow([
+                urwid.Text(('generated-filename', label), wrap='clip'),
+                urwid.Text([('lines-added', '+%i' % (generated_added,)), ', '],
+                           align=urwid.RIGHT),
+                urwid.Text(('lines-removed', '-%i' % (generated_removed,)))])
         table.addRow([urwid.Text(''),
                       urwid.Text([('lines-added', '+%i' % (total_added,)), ', '],
                                  align=urwid.RIGHT),

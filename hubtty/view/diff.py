@@ -110,6 +110,8 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
              "Interactive search"),
             (keymap.TOGGLE_DIFF_VIEW,
              "Toggle between unified and side-by-side diff"),
+            (keymap.TOGGLE_GENERATED_FILES,
+             "Toggle display of generated files"),
             ]
 
     def help(self):
@@ -140,6 +142,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         self.app = app
         self.old_commit_key = None  # Base
         self.new_commit_key = new_commit_key
+        self.hide_generated = app.config.hide_generated_files
         self._init()
 
     def _init(self):
@@ -178,9 +181,19 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             self.pr_key = new_commit.pull_request.key
             self.repository_name = new_commit.pull_request.repository.name
             self.sha = new_commit.sha
+            self._generated_paths = set()
+            self._files_with_comments = set()
             for f in new_commit.files:
                 new_comments += f.current_comments
                 self.new_file_keys[f.path] = f.key
+                if f.generated:
+                    self._generated_paths.add(f.path)
+                    if f.old_path:
+                        self._generated_paths.add(f.old_path)
+                if f.current_comments or f.draft_comments:
+                    self._files_with_comments.add(f.path)
+                    if f.old_path:
+                        self._files_with_comments.add(f.old_path)
             comment_lists = {}
             comment_filenames = set()
             for comment in new_comments:
@@ -249,11 +262,22 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 diffs.append(diff)
             else:
                 self.log.debug("Unable to find file %s in commit %s", filename, self.sha)
+        hidden_generated_count = 0
+        visible_count = 0
         for i, diff in enumerate(diffs):
-            if i > 0:
-                lines.append(urwid.Text(''))
+            # Always register in file_diffs for comment handling.
             self.file_diffs[gitrepo.OLD][diff.oldname] = diff
             self.file_diffs[gitrepo.NEW][diff.newname] = diff
+            # Skip generated files when hiding is enabled, unless
+            # the file has inline comments that must be displayed.
+            if (self.hide_generated
+                    and self._is_generated_diff(diff)
+                    and not self._has_comments(diff)):
+                hidden_generated_count += 1
+                continue
+            if visible_count > 0:
+                lines.append(urwid.Text(''))
+            visible_count += 1
             lines.extend(self.makeFileHeader(diff, comment_lists))
             for chunk in diff.chunks:
                 if chunk.context:
@@ -272,6 +296,15 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                         lines.remove(button)
                 else:
                     lines += self.makeLines(diff, chunk.lines, comment_lists)
+        if hidden_generated_count:
+            if visible_count > 0:
+                lines.append(urwid.Text(''))
+            key_str = self.app.config.keymap.formatKeys(
+                keymap.TOGGLE_GENERATED_FILES)
+            lines.append(urwid.Text(('generated-summary',
+                f'  {hidden_generated_count} generated '
+                f'file{"s" if hidden_generated_count != 1 else ""} '
+                f'hidden (press {key_str} to show)')))
         listwalker = urwid.SimpleFocusListWalker(lines)
         self.listbox = urwid.ListBox(listwalker)
         self._w.contents.append((self.listbox, ('weight', 1)))
@@ -438,6 +471,13 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         if keymap.TOGGLE_DIFF_VIEW in commands:
             self.toggleDiffView()
             return None
+        if keymap.TOGGLE_GENERATED_FILES in commands:
+            self.app.input_buffer = []
+            self.toggleGeneratedFiles()
+            return None
+        if keymap.FURTHER_INPUT in commands:
+            self.app.input_buffer = keys
+            return None
         if key in self.app.config.reviewkeys:
             self.reviewKey(self.app.config.reviewkeys[key])
             return None
@@ -505,6 +545,20 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         if pr_view:
             pr_view.reviewKey(reviewkey)
         self.app.backScreen()
+
+    def _is_generated_diff(self, diff):
+        """Return True if *diff* corresponds to a generated file."""
+        return (diff.newname in self._generated_paths
+                or diff.oldname in self._generated_paths)
+
+    def _has_comments(self, diff):
+        """Return True if *diff* has inline comments."""
+        return (diff.newname in self._files_with_comments
+                or diff.oldname in self._files_with_comments)
+
+    def toggleGeneratedFiles(self):
+        self.hide_generated = not self.hide_generated
+        self._init()
 
     def toggleDiffView(self):
         config = self.app.config
