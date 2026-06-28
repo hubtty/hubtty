@@ -33,6 +33,11 @@ If Hubtty is offline, it will so indicate in the status bar.  It will
 retry requests if needed, and will switch between offline and online
 mode automatically.
 
+To inspect what Hubtty is doing behind the scenes, press `Ctrl+T` to
+open the sync task queue viewer.  It shows the currently running task
+and all queued tasks grouped by priority.  The "Sync" indicator in the
+header bar is also clickable and opens the same dialog.
+
 If you review a pull request while offline with a positive vote, and someone
 else leaves a negative vote on that pull request before Hubtty is able to
 upload your review, Hubtty will detect the situation and mark the pull request
@@ -47,6 +52,12 @@ If Hubtty encounters an error, this will also be indicated in the status bar.
 You may wish to examine ``$XDG_DATA_HOME/hubtty/hubtty.log`` to see what the
 error was.  In many cases, Hubtty can continue after encountering an error.
 The error flag will be cleared when you leave the current screen.
+
+Diff views support both side-by-side and unified layouts.  The default
+can be set with the ``diff-view`` configuration option.  While viewing
+a diff, press the `toggle diff view` key (`F2` in the default keymap,
+`td` in the vi keymap) to switch between the two layouts at runtime
+without changing the configuration file.
 
 To select text (e.g., to copy to the clipboard), hold Shift while
 selecting the text.
