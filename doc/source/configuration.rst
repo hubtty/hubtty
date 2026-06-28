@@ -466,6 +466,19 @@ General Options
   interfering with your terminal's mouse handling, set this value to
   `false`.
 
+**ignore-pending-checks**
+  Hubtty re-polls CI checks while any check is still "pending".  Some
+  status contexts (like ``tide``) remain pending indefinitely because
+  they reflect merge-gate conditions rather than CI jobs.  List their
+  names here to exclude them from pending-check polling decisions.
+
+  Example:
+
+  .. code-block:: yaml
+
+     ignore-pending-checks:
+       - tide
+
 **expire-age**
   By default, closed pull requests that are older than two months are
   removed from the local database (and their refs are removed from the
