@@ -336,6 +336,39 @@ For example, to hide comments from a CI system:
   When a review is saved, close the pull request view and pop up to the
   previous screen, which will be the pull request list for the repo.
 
+**hide-generated-files**
+  A boolean (default ``true``) controlling whether diff content for
+  generated files is collapsed in the diff view.  When enabled,
+  generated files still appear with their filename and a
+  ``[generated]`` marker, but the diff chunks are hidden.  In the pull
+  request view, generated files are grouped into a single summary row.
+  Press ``G`` (or ``t g`` in vi mode) in the diff view to toggle
+  expansion of generated file diffs.
+
+  Generated files are detected from three sources:
+
+  - ``.gitattributes`` entries with ``linguist-generated`` (as used by
+    GitHub).  A ``linguist-generated=false`` entry takes highest
+    precedence and can un-mark a file.
+  - Built-in heuristic patterns for commonly generated files (lock
+    files, protobuf output, minified assets, etc.), derived from
+    `GitHub Linguist
+    <https://github.com/github-linguist/linguist/blob/master/lib/linguist/generated.rb>`_.
+  - User-supplied patterns via the ``generated-files`` option below.
+
+**generated-files**
+  A list of glob patterns identifying additional generated files
+  beyond the built-in heuristics and ``.gitattributes`` markers.
+  Patterns without a ``/`` are matched against the basename;
+  patterns with a ``/`` are matched against the full path (``*``
+  matches within a path component, ``**`` matches across components).
+
+.. code-block:: yaml
+
+   generated-files:
+     - "*.snap"
+     - "generated/**"
+
 Dashboards
 ++++++++++
 
