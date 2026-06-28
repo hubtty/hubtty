@@ -447,6 +447,99 @@ requesting for changes.
         description: 'Request unit tests'
         draft: True
 
+Custom Commands
++++++++++++++++
+
+Custom commands allow binding keys to run shell commands with context
+variable interpolation from the current screen.  They appear in the
+help text for the screen(s) where they are available.
+
+**custom-commands**
+  A list of custom command definitions.  The format of each entry is
+  described below.
+
+  **key (required)**
+    The key to which this command should be bound.
+
+  **command (required)**
+    The shell command to execute.  Context variables enclosed in
+    ``{braces}`` are interpolated from the current screen (see the
+    table below).  Variable values are automatically shell-quoted for
+    safety.
+
+  **description**
+    A short description shown in the help text.
+
+  **context**
+    A list of screen names where this command is available.  If
+    omitted, the command is available on all screens (but
+    interpolation will fail if a referenced variable is not available
+    on the current screen).  The supported screen names are:
+
+    * ``repository-list``
+    * ``pull-request-list``
+    * ``pull-request``
+    * ``diff``
+
+  **show-output**
+    If ``true``, the command runs synchronously and its stdout/stderr
+    is displayed in a dialog when it finishes.  The default is
+    ``false`` (fire-and-forget background execution).
+
+  **timeout**
+    Timeout in seconds.  The default is ``30``.
+
+The available context variables per screen are:
+
+==================== =========================================================
+Screen               Variables
+==================== =========================================================
+repository-list      ``{repository}``, ``{repo_path}``
+pull-request-list    ``{repository}``, ``{repo_path}``, ``{number}``,
+                     ``{branch}``, ``{author}``, ``{sha}``
+pull-request         ``{repository}``, ``{repo_path}``, ``{number}``,
+                     ``{branch}``, ``{author}``, ``{sha}``, ``{title}``,
+                     ``{url}``
+diff                 ``{repository}``, ``{repo_path}``, ``{sha}``
+==================== =========================================================
+
+``{repo_path}`` is constructed as ``<git-root>/<repository>`` (the
+local clone path, not the GitHub URL).
+
+Commands run in the directory from which Hubtty was launched.  Use
+``cd {repo_path} &&`` or ``git -C {repo_path}`` to operate inside a
+repository checkout.
+
+.. warning::
+
+   Context variables (``{number}``, ``{branch}``, ``{title}``,
+   ``{author}``, etc.) are populated from pull request data.  A PR
+   author is an untrusted party -- they control values such as the
+   branch name, title, and commit contents.  Although variable values
+   are shell-quoted to prevent direct shell injection, any command
+   that checks out, builds, or otherwise executes code from a PR is
+   running attacker-controlled content.  Treat the PR context as
+   untrusted input.
+
+Example:
+
+.. code-block:: yaml
+
+   custom-commands:
+     - key: 'meta 1'
+       command: 'xdg-open https://github.com/{repository}/pull/{number}'
+       description: 'Open PR in browser'
+       context:
+         - pull-request
+         - pull-request-list
+     - key: 'meta 2'
+       command: 'gh pr checkout {number} --repo {repository}'
+       description: 'Checkout PR with gh CLI'
+       show-output: true
+       timeout: 60
+       context:
+         - pull-request
+
 General Options
 +++++++++++++++
 
