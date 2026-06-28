@@ -18,9 +18,10 @@ As compared to the web interface, the main advantages are:
  * Speed -- user actions modify locally cached content and need not
    wait for server interaction.
 
- * Convenience -- because Hubtty downloads all pull requests to local git
-   repos, a single command instructs it to checkout a pull request into that
-   repo for detailed examination or testing of larger pull requests.
+ * Convenience -- Hubtty downloads all pull requests to local git
+   repos.  Custom commands can be configured to bind keys to shell
+   actions with context variable interpolation -- open a PR in your
+   browser, check it out with ``gh``, or run any workflow you like.
 
 
 Contents:
