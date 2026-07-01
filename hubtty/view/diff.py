@@ -340,7 +340,14 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 label = 'Commits (%d-%d/%d):' % (
                     self._range_start, self._range_end,
                     self._total_commits)
-            lines.append(urwid.Text(('filename', label)))
+            commit_label = mywid.TextButton(
+                ('filename', label),
+                on_press=lambda b: self.openInterdiffDialog())
+            commit_label._w = urwid.AttrMap(
+                commit_label.text, None,
+                focus_map={None: 'focused-filename',
+                           'filename': 'focused-filename'})
+            lines.append(commit_label)
             for sha, subject in self._commit_summary:
                 lines.append(urwid.Text(
                     [('commit-sha', '  ' + sha[0:7]),
