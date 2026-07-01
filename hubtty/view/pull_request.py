@@ -251,6 +251,133 @@ class EditPullRequestDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         fill = urwid.Filler(pile, valign='top')
         super().__init__(urwid.LineBox(fill, 'Edit Pull Request'))
 
+class InterdiffDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
+    signals = ['diff', 'cancel']
+
+    def __init__(self, app, pr):
+        self.app = app
+        self.from_group = []
+        self.to_group = []
+        # Store commit data: list of (key, sha, first-line-of-message)
+        self.commits = []
+        # The parent of the first commit is the PR base.
+        self.base_sha = pr.commits[0].parent
+
+        for commit in pr.commits:
+            self.commits.append((
+                commit.key,
+                commit.sha,
+                commit.message.split('\n')[0],
+            ))
+
+        diff_button = mywid.FixedButton('Diff')
+        cancel_button = mywid.FixedButton('Cancel')
+        urwid.connect_signal(diff_button, 'click',
+            lambda button: self._emit('diff'))
+        urwid.connect_signal(cancel_button, 'click',
+            lambda button: self._emit('cancel'))
+
+        rows = []
+        rows.append(urwid.Text('From:'))
+        # "Base" option in the from-group (selected by default)
+        b = urwid.RadioButton(self.from_group,
+            'Base (%s)' % self.base_sha[0:7], state=True)
+        b._value = None  # sentinel: means "use base_sha"
+        urwid.connect_signal(b, 'change', self._fromChanged)
+        rows.append(b)
+        # Exclude the last commit — it can never be a valid From
+        # because there are no later commits to select as To.
+        for i, (key, sha, subject) in enumerate(self.commits[:-1]):
+            label = '%s %s' % (sha[0:7], subject)
+            b = urwid.RadioButton(self.from_group, label, state=False)
+            b._value = i
+            urwid.connect_signal(b, 'change', self._fromChanged)
+            rows.append(b)
+        rows.append(urwid.Divider())
+
+        # The To section is rebuilt dynamically when From changes.
+        self._to_pile = urwid.Pile([])
+        self._rebuildToGroup()
+        rows.append(self._to_pile)
+
+        button_widgets = [('pack', diff_button), ('pack', cancel_button)]
+        button_columns = urwid.Columns(button_widgets, dividechars=2)
+        rows.append(button_columns)
+        pile = urwid.Pile(rows)
+        fill = urwid.Filler(pile, valign='top')
+        super().__init__(urwid.LineBox(fill, 'Select Commit Range'))
+
+    def _getFromIdx(self):
+        """Return the _value of the selected From button."""
+        for button in self.from_group:
+            if button.state:
+                return button._value
+        return None
+
+    def _fromChanged(self, button, state):
+        if state:  # Only rebuild when a button becomes selected.
+            self._rebuildToGroup(from_idx=button._value)
+
+    def _rebuildToGroup(self, from_idx=None):
+        min_to = 0 if from_idx is None else from_idx + 1
+
+        self.to_group = []
+        widgets = [urwid.Text('To:')]
+        for i in range(min_to, len(self.commits)):
+            key, sha, subject = self.commits[i]
+            label = '%s %s' % (sha[0:7], subject)
+            is_last = (i == len(self.commits) - 1)
+            b = urwid.RadioButton(self.to_group, label, state=is_last)
+            b._value = i
+            widgets.append(b)
+        widgets.append(urwid.Divider())
+
+        del self._to_pile.contents[:]
+        for w in widgets:
+            self._to_pile.contents.append(
+                (w, self._to_pile.options()))
+
+    def getValues(self):
+        """Return (old_commit_key_or_None, new_commit_key, base_sha_or_None).
+
+        When the user selects 'Base' as from, old_commit_key is None and
+        base_sha is the parent of the first commit.  Otherwise base_sha
+        is the sha of the selected from-commit.
+        """
+        from_idx = self._getFromIdx()
+        to_idx = None
+        for button in self.to_group:
+            if button.state:
+                to_idx = button._value
+                break
+        if to_idx is None:
+            to_idx = len(self.commits) - 1
+
+        new_commit_key = self.commits[to_idx][0]
+
+        if from_idx is None:
+            # "Base" selected
+            return (None, new_commit_key, self.base_sha)
+        else:
+            old_commit_key = self.commits[from_idx][0]
+            base_sha = self.commits[from_idx][1]
+            return (old_commit_key, new_commit_key, base_sha)
+
+    def validate(self):
+        """Return True if the selection is valid."""
+        return len(self.to_group) > 0
+
+    def keypress(self, size, key):
+        if not self.app.input_buffer:
+            key = super().keypress(size, key)
+        keys = self.app.input_buffer + [key]
+        commands = self.app.config.keymap.getCommands(keys)
+        if keymap.PREV_SCREEN in commands:
+            self._emit('cancel')
+            return None
+        return key
+
+
 class ReviewButton(mywid.FixedButton):
     def __init__(self, commit_row):
         super().__init__(('commit-button', 'Review'))
@@ -550,7 +677,9 @@ class PullRequestView(urwid.WidgetWrap):
     def getCommands(self):
         return [
             (keymap.DIFF,
-             "Show the diff of the first commit"),
+             "Diff this pull request (configurable via diff-default)"),
+            (keymap.INTERDIFF,
+             "Select commit range to diff"),
             (keymap.TOGGLE_HIDDEN,
              "Toggle the hidden flag for the current pull request"),
             (keymap.NEXT_PR,
@@ -1036,8 +1165,14 @@ class PullRequestView(urwid.WidgetWrap):
             row.review_button.openReview()
             return None
         if keymap.DIFF in commands:
-            row = self.commit_rows[self.first_commit_key]
-            row.diff(None)
+            if self.app.config.diff_default == 'full':
+                self.openFullDiff()
+            else:
+                row = self.commit_rows[self.first_commit_key]
+                row.diff(None)
+            return None
+        if keymap.INTERDIFF in commands:
+            self.openInterdiffDialog()
             return None
         if keymap.SEARCH_RESULTS in commands:
             widget = self.app.findPullRequestList()
@@ -1091,12 +1226,47 @@ class PullRequestView(urwid.WidgetWrap):
             return None
         return key
 
-    def diff(self, commit_key):
+    def diff(self, commit_key, old_commit_key=None, base_sha=None):
         if self.app.config.diff_view == 'unified':
-            screen = view_unified_diff.UnifiedDiffView(self.app, commit_key)
+            screen = view_unified_diff.UnifiedDiffView(
+                self.app, commit_key,
+                old_commit_key=old_commit_key, base_sha=base_sha)
         else:
-            screen = view_side_diff.SideDiffView(self.app, commit_key)
+            screen = view_side_diff.SideDiffView(
+                self.app, commit_key,
+                old_commit_key=old_commit_key, base_sha=base_sha)
         self.app.changeScreen(screen)
+
+    def openFullDiff(self):
+        with self.app.db.getSession() as session:
+            pr = session.getPullRequest(self.pr_key)
+            base_sha = pr.commits[0].parent
+            last_commit_key = pr.commits[-1].key
+        self.diff(last_commit_key, base_sha=base_sha)
+
+    def openInterdiffDialog(self):
+        with self.app.db.getSession() as session:
+            pr = session.getPullRequest(self.pr_key)
+            if not pr.commits:
+                self.app.error('No commits synced for this pull request')
+                return
+            dialog = InterdiffDialog(self.app, pr)
+        urwid.connect_signal(dialog, 'cancel',
+            lambda button: self.app.backScreen())
+        urwid.connect_signal(dialog, 'diff',
+            lambda button: self.doInterdiff(dialog))
+        self.app.popup(dialog,
+                       relative_width=60, relative_height=50,
+                       min_width=40, min_height=12)
+
+    def doInterdiff(self, dialog):
+        if not dialog.validate():
+            self.app.error('"From" must be before "To"')
+            return
+        old_commit_key, new_commit_key, base_sha = dialog.getValues()
+        self.app.backScreen()
+        self.diff(new_commit_key, old_commit_key=old_commit_key,
+                  base_sha=base_sha)
 
     def closePullRequest(self):
         dialog = mywid.TextEditDialog('Close pull request', 'Message:',

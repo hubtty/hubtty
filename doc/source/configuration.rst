@@ -341,6 +341,13 @@ For example, to hide comments from a CI system:
    hide-comments:
      - author: "^(.*CI|Jenkins)$"
 
+**diff-default**
+  Controls which diff is opened when pressing `d` in the pull request
+  view.  The values ``first-commit`` (the default) and ``full`` are
+  supported.  ``first-commit`` opens the diff for the first (or
+  selected) commit.  ``full`` opens a combined diff of all commits in
+  the pull request.
+
 **diff-view**
   Specifies how patch diffs should be displayed.  The values `unified`
   or `side-by-side` (the default) are supported.

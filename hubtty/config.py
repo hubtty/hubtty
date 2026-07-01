@@ -129,6 +129,7 @@ class ConfigSchema:
                            'reviewkeys': self.reviewkeys,
                            'custom-commands': self.custom_commands,
                            'pr-list-query': str,
+                           'diff-default': v.Any('first-commit', 'full'),
                            'diff-view': str,
                            'syntax-highlighting': bool,
                            'max-highlight-size': int,
@@ -247,6 +248,7 @@ class Config:
         self.repository_pr_list_query = self.config.get('pr-list-query', 'state:open')
 
         self.diff_view = self.config.get('diff-view', 'side-by-side')
+        self.diff_default = self.config.get('diff-default', 'first-commit')
 
         self.syntax_highlighting = self.config.get('syntax-highlighting', True)
         self.max_highlight_size = self.config.get('max-highlight-size',

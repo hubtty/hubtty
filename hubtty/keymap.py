@@ -48,6 +48,7 @@ TOGGLE_HELD = 'toggle held'
 TOGGLE_MARK = 'toggle process mark'
 REVIEW = 'review'
 DIFF = 'diff'
+INTERDIFF = 'interdiff'
 SEARCH_RESULTS = 'search results'
 NEXT_PR = 'next pull request'
 PREV_PR = 'previous pull request'
@@ -116,6 +117,7 @@ DEFAULT_KEYMAP = {
     TOGGLE_MARK: '%',
     REVIEW: 'r',
     DIFF: 'd',
+    INTERDIFF: 'D',
     SEARCH_RESULTS: 'u',
     NEXT_PR: 'n',
     PREV_PR: 'p',
@@ -176,6 +178,7 @@ VI_KEYMAP = {
     TOGGLE_GENERATED_FILES: [['t', 'g']],
 
     EDIT_PULL_REQUEST: 'ctrl e',
+    INTERDIFF: 'D',
 }
 
 URWID_COMMANDS = frozenset((
