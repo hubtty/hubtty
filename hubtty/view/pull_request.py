@@ -251,6 +251,122 @@ class EditPullRequestDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         fill = urwid.Filler(pile, valign='top')
         super().__init__(urwid.LineBox(fill, 'Edit Pull Request'))
 
+class InterdiffDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
+    signals = ['diff', 'cancel']
+
+    def __init__(self, app, pr):
+        self.app = app
+        diff_button = mywid.FixedButton('Diff')
+        cancel_button = mywid.FixedButton('Cancel')
+        urwid.connect_signal(diff_button, 'click',
+            lambda button: self._emit('diff'))
+        urwid.connect_signal(cancel_button, 'click',
+            lambda button: self._emit('cancel'))
+
+        self.from_group = []
+        self.to_group = []
+        # Store commit data: list of (key, sha, first-line-of-message)
+        self.commits = []
+        # The parent of the first commit is the PR base.
+        self.base_sha = pr.commits[0].parent
+
+        for commit in pr.commits:
+            self.commits.append((
+                commit.key,
+                commit.sha,
+                commit.message.split('\n')[0],
+            ))
+
+        rows = []
+        rows.append(urwid.Text('From:'))
+        # "Base" option in the from-group (selected by default)
+        b = urwid.RadioButton(self.from_group,
+            'Base (%s)' % self.base_sha[0:7], state=True)
+        b._value = None  # sentinel: means "use base_sha"
+        rows.append(b)
+        for i, (key, sha, subject) in enumerate(self.commits):
+            label = '%s %s' % (sha[0:7], subject)
+            b = urwid.RadioButton(self.from_group, label, state=False)
+            b._value = i
+            rows.append(b)
+        rows.append(urwid.Divider())
+
+        rows.append(urwid.Text('To:'))
+        for i, (key, sha, subject) in enumerate(self.commits):
+            label = '%s %s' % (sha[0:7], subject)
+            is_last = (i == len(self.commits) - 1)
+            b = urwid.RadioButton(self.to_group, label, state=is_last)
+            b._value = i
+            rows.append(b)
+        rows.append(urwid.Divider())
+
+        button_widgets = [('pack', diff_button), ('pack', cancel_button)]
+        button_columns = urwid.Columns(button_widgets, dividechars=2)
+        rows.append(button_columns)
+        pile = urwid.Pile(rows)
+        fill = urwid.Filler(pile, valign='top')
+        super().__init__(urwid.LineBox(fill, 'Select Commit Range'))
+
+    def getValues(self):
+        """Return (old_commit_key_or_None, new_commit_key, base_sha_or_None).
+
+        When the user selects 'Base' as from, old_commit_key is None and
+        base_sha is the parent of the first commit.  Otherwise base_sha
+        is the sha of the selected from-commit.
+        """
+        from_idx = None
+        for button in self.from_group:
+            if button.state:
+                from_idx = button._value
+                break
+        to_idx = None
+        for button in self.to_group:
+            if button.state:
+                to_idx = button._value
+                break
+        if to_idx is None:
+            to_idx = len(self.commits) - 1
+
+        new_commit_key = self.commits[to_idx][0]
+
+        if from_idx is None:
+            # "Base" selected
+            return (None, new_commit_key, self.base_sha)
+        else:
+            old_commit_key = self.commits[from_idx][0]
+            base_sha = self.commits[from_idx][1]
+            return (old_commit_key, new_commit_key, base_sha)
+
+    def validate(self):
+        """Return True if the selection is valid (from < to)."""
+        from_idx = None
+        for button in self.from_group:
+            if button.state:
+                from_idx = button._value
+                break
+        to_idx = None
+        for button in self.to_group:
+            if button.state:
+                to_idx = button._value
+                break
+        if to_idx is None:
+            return False
+        if from_idx is None:
+            # Base is always before any commit
+            return True
+        return from_idx < to_idx
+
+    def keypress(self, size, key):
+        if not self.app.input_buffer:
+            key = super().keypress(size, key)
+        keys = self.app.input_buffer + [key]
+        commands = self.app.config.keymap.getCommands(keys)
+        if keymap.PREV_SCREEN in commands:
+            self._emit('cancel')
+            return None
+        return key
+
+
 class ReviewButton(mywid.FixedButton):
     def __init__(self, commit_row):
         super().__init__(('commit-button', 'Review'))
