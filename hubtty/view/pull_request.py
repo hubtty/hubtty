@@ -667,6 +667,8 @@ class PullRequestView(urwid.WidgetWrap):
         return [
             (keymap.DIFF,
              "Show the diff of the first commit"),
+            (keymap.INTERDIFF,
+             "Select commit range to diff"),
             (keymap.TOGGLE_HIDDEN,
              "Toggle the hidden flag for the current pull request"),
             (keymap.NEXT_PR,
@@ -1155,6 +1157,9 @@ class PullRequestView(urwid.WidgetWrap):
             row = self.commit_rows[self.first_commit_key]
             row.diff(None)
             return None
+        if keymap.INTERDIFF in commands:
+            self.openInterdiffDialog()
+            return None
         if keymap.SEARCH_RESULTS in commands:
             widget = self.app.findPullRequestList()
             if widget:
@@ -1207,12 +1212,40 @@ class PullRequestView(urwid.WidgetWrap):
             return None
         return key
 
-    def diff(self, commit_key):
+    def diff(self, commit_key, old_commit_key=None, base_sha=None):
         if self.app.config.diff_view == 'unified':
-            screen = view_unified_diff.UnifiedDiffView(self.app, commit_key)
+            screen = view_unified_diff.UnifiedDiffView(
+                self.app, commit_key,
+                old_commit_key=old_commit_key, base_sha=base_sha)
         else:
-            screen = view_side_diff.SideDiffView(self.app, commit_key)
+            screen = view_side_diff.SideDiffView(
+                self.app, commit_key,
+                old_commit_key=old_commit_key, base_sha=base_sha)
         self.app.changeScreen(screen)
+
+    def openInterdiffDialog(self):
+        with self.app.db.getSession() as session:
+            pr = session.getPullRequest(self.pr_key)
+            if not pr.commits:
+                self.app.error('No commits synced for this pull request')
+                return
+            dialog = InterdiffDialog(self.app, pr)
+        urwid.connect_signal(dialog, 'cancel',
+            lambda button: self.app.backScreen())
+        urwid.connect_signal(dialog, 'diff',
+            lambda button: self.doInterdiff(dialog))
+        self.app.popup(dialog,
+                       relative_width=60, relative_height=50,
+                       min_width=40, min_height=12)
+
+    def doInterdiff(self, dialog):
+        if not dialog.validate():
+            self.app.error('"From" must be before "To"')
+            return
+        old_commit_key, new_commit_key, base_sha = dialog.getValues()
+        self.app.backScreen()
+        self.diff(new_commit_key, old_commit_key=old_commit_key,
+                  base_sha=base_sha)
 
     def closePullRequest(self):
         dialog = mywid.TextEditDialog('Close pull request', 'Message:',

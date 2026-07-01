@@ -115,6 +115,8 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
              "Toggle between unified and side-by-side diff"),
             (keymap.TOGGLE_GENERATED_FILES,
              "Toggle diff content of generated files"),
+            (keymap.INTERDIFF,
+             "Select commit range to diff"),
             ]
 
     def help(self):
@@ -573,6 +575,10 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             self.app.input_buffer = []
             self.toggleGeneratedFiles()
             return None
+        if keymap.INTERDIFF in commands:
+            self.app.input_buffer = []
+            self.openInterdiffDialog()
+            return None
         if keymap.FURTHER_INPUT in commands:
             self.app.input_buffer = keys
             return None
@@ -679,6 +685,32 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                                          base_sha=self._explicit_base_sha)
         self.app.changeScreen(new_screen, push=False)
 
+    def openInterdiffDialog(self):
+        from hubtty.view.pull_request import InterdiffDialog
+        with self.app.db.getSession() as session:
+            pr = session.getPullRequest(self.pr_key)
+            if not pr.commits:
+                self.app.error('No commits synced for this pull request')
+                return
+            dialog = InterdiffDialog(self.app, pr)
+        urwid.connect_signal(dialog, 'cancel',
+            lambda button: self.app.backScreen())
+        urwid.connect_signal(dialog, 'diff',
+            lambda button: self._doInterdiff(dialog))
+        self.app.popup(dialog,
+                       relative_width=60, relative_height=50,
+                       min_width=40, min_height=12)
+
+    def _doInterdiff(self, dialog):
+        if not dialog.validate():
+            self.app.error('"From" must be before "To"')
+            return
+        old_commit_key, new_commit_key, base_sha = dialog.getValues()
+        self.app.backScreen()
+        self.old_commit_key = old_commit_key
+        self.new_commit_key = new_commit_key
+        self._explicit_base_sha = base_sha
+        self._init()
 
     def moveCommit(self, offset):
         commits = []
