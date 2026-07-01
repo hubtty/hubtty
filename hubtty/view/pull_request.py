@@ -256,13 +256,6 @@ class InterdiffDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
 
     def __init__(self, app, pr):
         self.app = app
-        diff_button = mywid.FixedButton('Diff')
-        cancel_button = mywid.FixedButton('Cancel')
-        urwid.connect_signal(diff_button, 'click',
-            lambda button: self._emit('diff'))
-        urwid.connect_signal(cancel_button, 'click',
-            lambda button: self._emit('cancel'))
-
         self.from_group = []
         self.to_group = []
         # Store commit data: list of (key, sha, first-line-of-message)
@@ -277,28 +270,35 @@ class InterdiffDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                 commit.message.split('\n')[0],
             ))
 
+        diff_button = mywid.FixedButton('Diff')
+        cancel_button = mywid.FixedButton('Cancel')
+        urwid.connect_signal(diff_button, 'click',
+            lambda button: self._emit('diff'))
+        urwid.connect_signal(cancel_button, 'click',
+            lambda button: self._emit('cancel'))
+
         rows = []
         rows.append(urwid.Text('From:'))
         # "Base" option in the from-group (selected by default)
         b = urwid.RadioButton(self.from_group,
             'Base (%s)' % self.base_sha[0:7], state=True)
         b._value = None  # sentinel: means "use base_sha"
+        urwid.connect_signal(b, 'change', self._fromChanged)
         rows.append(b)
-        for i, (key, sha, subject) in enumerate(self.commits):
+        # Exclude the last commit — it can never be a valid From
+        # because there are no later commits to select as To.
+        for i, (key, sha, subject) in enumerate(self.commits[:-1]):
             label = '%s %s' % (sha[0:7], subject)
             b = urwid.RadioButton(self.from_group, label, state=False)
             b._value = i
+            urwid.connect_signal(b, 'change', self._fromChanged)
             rows.append(b)
         rows.append(urwid.Divider())
 
-        rows.append(urwid.Text('To:'))
-        for i, (key, sha, subject) in enumerate(self.commits):
-            label = '%s %s' % (sha[0:7], subject)
-            is_last = (i == len(self.commits) - 1)
-            b = urwid.RadioButton(self.to_group, label, state=is_last)
-            b._value = i
-            rows.append(b)
-        rows.append(urwid.Divider())
+        # The To section is rebuilt dynamically when From changes.
+        self._to_pile = urwid.Pile([])
+        self._rebuildToGroup()
+        rows.append(self._to_pile)
 
         button_widgets = [('pack', diff_button), ('pack', cancel_button)]
         button_columns = urwid.Columns(button_widgets, dividechars=2)
@@ -307,6 +307,36 @@ class InterdiffDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         fill = urwid.Filler(pile, valign='top')
         super().__init__(urwid.LineBox(fill, 'Select Commit Range'))
 
+    def _getFromIdx(self):
+        """Return the _value of the selected From button."""
+        for button in self.from_group:
+            if button.state:
+                return button._value
+        return None
+
+    def _fromChanged(self, button, state):
+        if state:  # Only rebuild when a button becomes selected.
+            self._rebuildToGroup(from_idx=button._value)
+
+    def _rebuildToGroup(self, from_idx=None):
+        min_to = 0 if from_idx is None else from_idx + 1
+
+        self.to_group = []
+        widgets = [urwid.Text('To:')]
+        for i in range(min_to, len(self.commits)):
+            key, sha, subject = self.commits[i]
+            label = '%s %s' % (sha[0:7], subject)
+            is_last = (i == len(self.commits) - 1)
+            b = urwid.RadioButton(self.to_group, label, state=is_last)
+            b._value = i
+            widgets.append(b)
+        widgets.append(urwid.Divider())
+
+        del self._to_pile.contents[:]
+        for w in widgets:
+            self._to_pile.contents.append(
+                (w, self._to_pile.options()))
+
     def getValues(self):
         """Return (old_commit_key_or_None, new_commit_key, base_sha_or_None).
 
@@ -314,11 +344,7 @@ class InterdiffDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         base_sha is the parent of the first commit.  Otherwise base_sha
         is the sha of the selected from-commit.
         """
-        from_idx = None
-        for button in self.from_group:
-            if button.state:
-                from_idx = button._value
-                break
+        from_idx = self._getFromIdx()
         to_idx = None
         for button in self.to_group:
             if button.state:
@@ -338,23 +364,8 @@ class InterdiffDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             return (old_commit_key, new_commit_key, base_sha)
 
     def validate(self):
-        """Return True if the selection is valid (from < to)."""
-        from_idx = None
-        for button in self.from_group:
-            if button.state:
-                from_idx = button._value
-                break
-        to_idx = None
-        for button in self.to_group:
-            if button.state:
-                to_idx = button._value
-                break
-        if to_idx is None:
-            return False
-        if from_idx is None:
-            # Base is always before any commit
-            return True
-        return from_idx < to_idx
+        """Return True if the selection is valid."""
+        return len(self.to_group) > 0
 
     def keypress(self, size, key):
         if not self.app.input_buffer:
