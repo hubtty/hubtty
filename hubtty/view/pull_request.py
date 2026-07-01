@@ -666,7 +666,7 @@ class PullRequestView(urwid.WidgetWrap):
     def getCommands(self):
         return [
             (keymap.DIFF,
-             "Show the diff of the first commit"),
+             "Diff this pull request (configurable via diff-default)"),
             (keymap.INTERDIFF,
              "Select commit range to diff"),
             (keymap.TOGGLE_HIDDEN,
@@ -1154,8 +1154,11 @@ class PullRequestView(urwid.WidgetWrap):
             row.review_button.openReview()
             return None
         if keymap.DIFF in commands:
-            row = self.commit_rows[self.first_commit_key]
-            row.diff(None)
+            if self.app.config.diff_default == 'full':
+                self.openFullDiff()
+            else:
+                row = self.commit_rows[self.first_commit_key]
+                row.diff(None)
             return None
         if keymap.INTERDIFF in commands:
             self.openInterdiffDialog()
@@ -1222,6 +1225,13 @@ class PullRequestView(urwid.WidgetWrap):
                 self.app, commit_key,
                 old_commit_key=old_commit_key, base_sha=base_sha)
         self.app.changeScreen(screen)
+
+    def openFullDiff(self):
+        with self.app.db.getSession() as session:
+            pr = session.getPullRequest(self.pr_key)
+            base_sha = pr.commits[0].parent
+            last_commit_key = pr.commits[-1].key
+        self.diff(last_commit_key, base_sha=base_sha)
 
     def openInterdiffDialog(self):
         with self.app.db.getSession() as session:
