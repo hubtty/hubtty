@@ -20,6 +20,7 @@ import urwid
 
 from hubtty import gitrepo
 from hubtty import keymap
+from hubtty import markdown
 from hubtty import mywid
 from hubtty import sync
 from hubtty.generated import GeneratedFileFilter
@@ -96,6 +97,46 @@ class DiffContextButton(urwid.WidgetWrap):
 
     def next(self, button):
         self.view.expandChunk(self.diff, self.chunk, from_end=-10)
+
+class DiffCommitEntry(urwid.WidgetWrap):
+    """An expandable commit entry for the diff view's commit summary."""
+    _focus_map = {
+        'commit-name': 'focused-commit-name',
+        'commit-sha': 'focused-commit-sha',
+    }
+
+    def __init__(self, app, sha, message, repository_name=None):
+        subject = message.split('\n')[0]
+        self.title = mywid.TextButton(
+            [('commit-sha', '  ' + sha[0:7]),
+             ('commit-name', ' ' + subject)],
+            on_press=self.expandContract)
+        self.title._w = urwid.AttrMap(
+            self.title.text, None, focus_map=self._focus_map)
+        # Build the detail body: rendered commit message or placeholder.
+        body_text = message.split('\n', 1)[1].rstrip() if '\n' in message else ''
+        if body_text:
+            md = markdown.Renderer(app)
+            rendered = md.render(body_text)
+            context = {'repository': repository_name} if repository_name else None
+            for commentlink in app.config.commentlinks:
+                rendered = commentlink.run(app, rendered, context)
+            body_content = mywid.HyperText(rendered)
+        else:
+            body_content = urwid.Text(('md-emphasis', 'Empty commit message'))
+        self.body = urwid.Padding(body_content, left=10)
+        self.pile = urwid.Pile([self.title])
+        super().__init__(self.pile)
+        self.expanded = False
+
+    def expandContract(self, button):
+        if self.expanded:
+            self.pile.contents.pop()
+            self.expanded = False
+        else:
+            self.pile.contents.append((self.body, ('pack', None)))
+            self.expanded = True
+
 
 @mouse_scroll_decorator.ScrollByWheel
 class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
@@ -205,7 +246,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                     if not found_base:
                         continue
                     self._commit_summary.append(
-                        (c.sha, c.message.split('\n')[0]))
+                        (c.key, c.sha, c.message))
                     if c.key == self.new_commit_key:
                         break
                 # If base_sha is the first commit's parent (full PR
@@ -213,7 +254,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 if not self._commit_summary:
                     for c in pr.commits:
                         self._commit_summary.append(
-                            (c.sha, c.message.split('\n')[0]))
+                            (c.key, c.sha, c.message))
                         if c.key == self.new_commit_key:
                             break
                 # If still empty (data inconsistency), include all
@@ -232,7 +273,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 if n == 1:
                     # Single commit in range — use the normal
                     # single-commit title format.
-                    subject = self._commit_summary[0][1]
+                    subject = self._commit_summary[0][2].split('\n')[0]
                     self.title = 'Diff of {} — {} {}'.format(
                         repo_name,
                         new_commit.sha[0:7], subject)
@@ -248,7 +289,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             else:
                 subject = new_commit.message.split('\n')[0]
                 self._commit_summary = [
-                    (new_commit.sha, subject)]
+                    (new_commit.key, new_commit.sha, new_commit.message)]
                 self.title = 'Diff of {} — {} {}'.format(
                     repo_name,
                     new_commit.sha[0:7], subject)
@@ -256,8 +297,8 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             # Compute 1-based positions within the full PR commit list.
             all_shas = [c.sha for c in pr.commits]
             self._total_commits = len(all_shas)
-            first_sha = self._commit_summary[0][0]
-            last_sha = self._commit_summary[-1][0]
+            first_sha = self._commit_summary[0][1]
+            last_sha = self._commit_summary[-1][1]
             try:
                 self._range_start = all_shas.index(first_sha) + 1
             except ValueError:
@@ -348,10 +389,14 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 focus_map={None: 'focused-filename',
                            'filename': 'focused-filename'})
             lines.append(commit_label)
-            for sha, subject in self._commit_summary:
-                lines.append(urwid.Text(
-                    [('commit-sha', '  ' + sha[0:7]),
-                     ('commit-name', ' ' + subject)]))
+            single_commit = (len(self._commit_summary) == 1)
+            for commit_key, sha, message in self._commit_summary:
+                entry = DiffCommitEntry(
+                    self.app, sha, message,
+                    repository_name=self.repository_name)
+                if single_commit:
+                    entry.expandContract(None)
+                lines.append(entry)
             lines.append(urwid.Text(''))
         self.file_diffs = [{}, {}]  # Mapping of fn -> DiffFile object (old, new)
         # this is a list of files:
