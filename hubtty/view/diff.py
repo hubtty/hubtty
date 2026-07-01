@@ -103,10 +103,12 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         return [
             (keymap.ACTIVATE,
              "Add an inline comment"),
+        ] + ([
             (keymap.NEXT_COMMIT,
              "Diff the next commit"),
             (keymap.PREV_COMMIT,
              "Diff the previous commit"),
+        ] if not self._multi_commit else []) + [
             (keymap.INTERACTIVE_SEARCH,
              "Interactive search"),
             (keymap.TOGGLE_DIFF_VIEW,
@@ -137,12 +139,14 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                                       self.repository_name),
         }
 
-    def __init__(self, app, new_commit_key):
+    def __init__(self, app, new_commit_key, old_commit_key=None,
+                 base_sha=None):
         super().__init__(urwid.Pile([]))
         self.log = logging.getLogger('hubtty.view.diff')
         self.app = app
-        self.old_commit_key = None  # Base
+        self.old_commit_key = old_commit_key
         self.new_commit_key = new_commit_key
+        self._explicit_base_sha = base_sha
         self.hide_generated = app.config.hide_generated_files
         self._init()
 
@@ -155,7 +159,18 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             new_comments = []
             self.old_file_keys = {}
             self.new_file_keys = {}
-            if self.old_commit_key is not None:
+            if self._explicit_base_sha is not None:
+                old_commit = None
+                self.base_sha = self._explicit_base_sha
+                show_old_commit = False
+                # Use the new commit's file info for old-side lookup,
+                # same as the single-commit case.
+                for f in new_commit.files:
+                    if f.old_path:
+                        self.old_file_keys[f.old_path] = f.key
+                    else:
+                        self.old_file_keys[f.path] = f.key
+            elif self.old_commit_key is not None:
                 old_commit = session.getCommit(self.old_commit_key)
                 self.base_sha = old_commit.sha
                 for f in old_commit.files:
@@ -174,11 +189,81 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                         self.old_file_keys[f.old_path] = f.key
                     else:
                         self.old_file_keys[f.path] = f.key
-            self.title = 'Diff of {} from {} to {}'.format(
-                new_commit.pull_request.repository.name,
-                new_commit.parent[0:7],
-                new_commit.sha[0:7])
-            self.short_title = f'Diff of {new_commit.sha[0:7]}'
+            repo_name = new_commit.pull_request.repository.name
+            pr = new_commit.pull_request
+            self._multi_commit = (self._explicit_base_sha is not None)
+            if self._multi_commit:
+                # Build commit summary for the range.
+                self._commit_summary = []
+                found_base = False
+                for c in pr.commits:
+                    if c.sha == self.base_sha:
+                        found_base = True
+                        continue
+                    if not found_base:
+                        continue
+                    self._commit_summary.append(
+                        (c.sha, c.message.split('\n')[0]))
+                    if c.key == self.new_commit_key:
+                        break
+                # If base_sha is the first commit's parent (full PR
+                # diff), include all commits up to new_commit.
+                if not self._commit_summary:
+                    for c in pr.commits:
+                        self._commit_summary.append(
+                            (c.sha, c.message.split('\n')[0]))
+                        if c.key == self.new_commit_key:
+                            break
+                # If still empty (data inconsistency), include all
+                # commits so we don't crash on an empty list.
+                if not self._commit_summary:
+                    self.log.warning(
+                        "Could not find commit %s in PR commits; "
+                        "showing all commits", self.new_commit_key)
+                    self._commit_summary = [
+                        (c.key, c.sha, c.message)
+                        for c in pr.commits]
+                n = len(self._commit_summary)
+                # A range that resolved to a single commit is
+                # effectively a normal single-commit view.
+                self._multi_commit = (n > 1)
+                if n == 1:
+                    # Single commit in range — use the normal
+                    # single-commit title format.
+                    subject = self._commit_summary[0][1]
+                    self.title = 'Diff of {} — {} {}'.format(
+                        repo_name,
+                        new_commit.sha[0:7], subject)
+                    self.short_title = f'Diff of {new_commit.sha[0:7]}'
+                else:
+                    self.title = 'Diff of {} — {}{}'.format(
+                        repo_name,
+                        '{} commits'.format(n),
+                        ' ({}..{})'.format(
+                            self.base_sha[0:7], new_commit.sha[0:7]))
+                    self.short_title = 'Diff {}..{}'.format(
+                        self.base_sha[0:7], new_commit.sha[0:7])
+            else:
+                subject = new_commit.message.split('\n')[0]
+                self._commit_summary = [
+                    (new_commit.sha, subject)]
+                self.title = 'Diff of {} — {} {}'.format(
+                    repo_name,
+                    new_commit.sha[0:7], subject)
+                self.short_title = f'Diff of {new_commit.sha[0:7]}'
+            # Compute 1-based positions within the full PR commit list.
+            all_shas = [c.sha for c in pr.commits]
+            self._total_commits = len(all_shas)
+            first_sha = self._commit_summary[0][0]
+            last_sha = self._commit_summary[-1][0]
+            try:
+                self._range_start = all_shas.index(first_sha) + 1
+            except ValueError:
+                self._range_start = 1
+            try:
+                self._range_end = all_shas.index(last_sha) + 1
+            except ValueError:
+                self._range_end = self._total_commits
             self.pr_key = new_commit.pull_request.key
             self.repository_name = new_commit.pull_request.repository.name
             self.sha = new_commit.sha
@@ -245,12 +330,32 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         self.file_reminder = self.makeFileReminder()
         self._w.contents.append((self.file_reminder, ('pack', 1)))
         lines = []  # The initial set of lines to display
+        if self._commit_summary:
+            if self._range_start == self._range_end:
+                label = 'Commit (%d/%d):' % (
+                    self._range_start, self._total_commits)
+            else:
+                label = 'Commits (%d-%d/%d):' % (
+                    self._range_start, self._range_end,
+                    self._total_commits)
+            lines.append(urwid.Text(('filename', label)))
+            for sha, subject in self._commit_summary:
+                lines.append(urwid.Text(
+                    [('commit-sha', '  ' + sha[0:7]),
+                     ('commit-name', ' ' + subject)]))
+            lines.append(urwid.Text(''))
         self.file_diffs = [{}, {}]  # Mapping of fn -> DiffFile object (old, new)
         # this is a list of files:
         diffs = repo.diff(self.base_sha, self.sha,
                           show_old_commit=show_old_commit,
                           syntax_highlighting=self.app.config.syntax_highlighting,
                           max_highlight_size=self.app.config.max_highlight_size)
+        # Filter out synthetic /COMMIT_MSG entries that can appear in
+        # combined (multi-commit) diffs.  Harmless for single-commit
+        # diffs since git does not produce these entries.
+        diffs = [d for d in diffs
+                 if d.oldname != '/COMMIT_MSG'
+                 and d.newname != '/COMMIT_MSG']
         for diff in diffs:
             comment_filenames.discard(diff.oldname)
             comment_filenames.discard(diff.newname)
@@ -451,10 +556,12 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             (old_focus != new_focus or (keymap.PREV_SCREEN in commands))):
             self.cleanupEdit(old_focus)
         if keymap.NEXT_COMMIT in commands:
-            self.moveCommit(1)
+            if not self._multi_commit:
+                self.moveCommit(1)
             return None
         if keymap.PREV_COMMIT in commands:
-            self.moveCommit(-1)
+            if not self._multi_commit:
+                self.moveCommit(-1)
             return None
         if keymap.INTERACTIVE_SEARCH in commands:
             self.searchStart()
@@ -561,12 +668,17 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         if config.diff_view == 'unified':
             config.diff_view = 'side-by-side'
             from hubtty.view.side_diff import SideDiffView
-            new_screen = SideDiffView(self.app, self.new_commit_key)
+            new_screen = SideDiffView(self.app, self.new_commit_key,
+                                      old_commit_key=self.old_commit_key,
+                                      base_sha=self._explicit_base_sha)
         else:
             config.diff_view = 'unified'
             from hubtty.view.unified_diff import UnifiedDiffView
-            new_screen = UnifiedDiffView(self.app, self.new_commit_key)
+            new_screen = UnifiedDiffView(self.app, self.new_commit_key,
+                                         old_commit_key=self.old_commit_key,
+                                         base_sha=self._explicit_base_sha)
         self.app.changeScreen(new_screen, push=False)
+
 
     def moveCommit(self, offset):
         commits = []
@@ -584,5 +696,8 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             return
         if commit_idx < 0:
             return
+        # Leave interdiff mode when navigating commits.
+        self.old_commit_key = None
+        self._explicit_base_sha = None
         self.new_commit_key = commits[commit_idx]
         self._init()
