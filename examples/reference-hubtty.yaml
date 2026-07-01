@@ -191,6 +191,11 @@ commentlinks:
 # a review.
 # close-pr-on-review: true
 
+# Controls which diff is opened when pressing 'd' in the pull request
+# view.  'first-commit' (the default) opens the diff for the first (or
+# selected) commit.  'full' opens a combined diff of all commits.
+# diff-default: first-commit
+
 # Uncomment the following line to use a unified diff view instead
 # of the default side-by-side:
 # diff-view: unified

@@ -59,5 +59,25 @@ a diff, press the `toggle diff view` key (`F2` in the default keymap,
 `td` in the vi keymap) to switch between the two layouts at runtime
 without changing the configuration file.
 
+Commit Range Diffs (Interdiff)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Hubtty supports viewing diffs for arbitrary ranges of commits within a
+pull request.  Press `D` in the pull request view or any diff view to
+open the commit range dialog.  Select the starting ("From") and ending
+("To") commits, then press Diff to display the combined diff for that
+range.  Selecting "Base" as the starting point diffs from the PR base
+to the chosen commit.
+
+In the diff view, the "Commit (1/N)" label at the top is clickable and
+also opens the commit range dialog.  Individual commit entries listed
+below it can be clicked (or activated with Enter) to expand and show
+the full commit message, rendered with markdown and commentlinks.
+In single-commit view, the commit message is expanded by default.
+
+The `diff-default` configuration option controls the default behavior
+of the `d` key in the pull request view (see the configuration
+documentation for details).
+
 To select text (e.g., to copy to the clipboard), hold Shift while
 selecting the text.
