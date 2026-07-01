@@ -216,6 +216,14 @@ commentlinks:
 # Default is 524288 (512 KiB).
 # max-highlight-size: 524288
 
+# Collapse diffs for common Kubernetes / OpenShift generated files.
+# The built-in heuristics already cover go.sum and several other
+# lock files; the patterns below add k8s code-generator output.
+generated-files:
+  - "zz_generated.*.go"
+  - "pkg/clients/**/*.go"
+  - "config/crd/bases/*.yaml"
+
 # Times are displayed in the local timezone by default.  To display
 # them in UTC instead, uncomment the following line:
 # display-times-in-utc: true

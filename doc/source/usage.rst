@@ -59,6 +59,9 @@ a diff, press the `toggle diff view` key (`F2` in the default keymap,
 `td` in the vi keymap) to switch between the two layouts at runtime
 without changing the configuration file.
 
+To select text (e.g., to copy to the clipboard), hold Shift while
+selecting the text.
+
 Commit Range Diffs (Interdiff)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -79,5 +82,21 @@ The `diff-default` configuration option controls the default behavior
 of the `d` key in the pull request view (see the configuration
 documentation for details).
 
-To select text (e.g., to copy to the clipboard), hold Shift while
-selecting the text.
+Generated Files
+~~~~~~~~~~~~~~~
+
+Hubtty automatically detects generated files and collapses their diffs
+by default.  Generated files still appear in the diff view with their
+filename and a ``[generated]`` marker, but the diff chunks are hidden.
+In the pull request view, generated files are grouped into a single
+summary row.
+
+Press ``G`` (or ``t g`` in vi mode) in the diff view to toggle
+expansion of generated file diffs.
+
+Generated files are identified from three sources: ``.gitattributes``
+entries with ``linguist-generated``, built-in heuristic patterns for
+commonly generated files (lock files, protobuf output, minified assets,
+etc.), and user-supplied glob patterns.  See the ``hide-generated-files``
+and ``generated-files`` options in the configuration documentation for
+details.

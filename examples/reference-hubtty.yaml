@@ -209,6 +209,31 @@ commentlinks:
 # Default is 524288 (512 KiB).
 # max-highlight-size: 524288
 
+# Generated files are collapsed by default in diff views: the filename
+# and a [generated] marker are shown but the diff chunks are hidden.
+# In the pull request view, generated files are grouped into a single
+# summary row.
+#
+# Generated files are detected from three sources:
+#   - .gitattributes entries with linguist-generated (as used by GitHub).
+#     A linguist-generated=false entry takes highest precedence and can
+#     un-mark a file.
+#   - Built-in heuristic patterns for commonly generated files (lock
+#     files, protobuf output, minified assets, etc.).
+#   - User-supplied patterns via the generated-files option below.
+#
+# To show generated file diffs expanded by default, uncomment:
+# hide-generated-files: false
+
+# Additional glob patterns identifying generated files beyond the
+# built-in heuristics and .gitattributes markers.  Patterns without a
+# '/' are matched against the basename; patterns with a '/' are matched
+# against the full path ('*' matches within a path component, '**'
+# matches across components).
+# generated-files:
+#   - "*.snap"
+#   - "generated/**"
+
 # Times are displayed in the local timezone by default.  To display
 # them in UTC instead, uncomment the following line:
 # display-times-in-utc: true
