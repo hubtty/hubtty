@@ -27,6 +27,92 @@ from hubtty.generated import GeneratedFileFilter
 from hubtty.view import mouse_scroll_decorator
 
 
+def _is_whitespace_only(markup):
+    """Return True if urwid text *markup* contains only whitespace."""
+    if isinstance(markup, str):
+        return not markup.strip()
+    if isinstance(markup, list):
+        return all(_is_whitespace_only(item) for item in markup)
+    if isinstance(markup, tuple):
+        return _is_whitespace_only(markup[1])
+    # Link or other non-text object — not whitespace.
+    return False
+
+
+def apply_commentlinks(app, markup, context):
+    for commentlink in app.config.commentlinks:
+        markup = commentlink.run(app, markup, context)
+    return markup
+
+
+def build_comment_widget(app, comment, md=None, repository_name=None):
+    """Build a urwid widget for a diff inline comment.
+
+    *comment* is either a plain string (draft) or a dict with
+    ``'author'`` and ``'body'`` keys (non-draft).  Returns a widget
+    suitable for embedding in a ``Columns`` row.
+
+    An optional *md* ``markdown.Renderer`` instance can be passed to
+    avoid creating a new parser for every call.  *repository_name* is
+    used as context for commentlink processing.
+    """
+    if isinstance(comment, str):
+        return urwid.AttrMap(urwid.Text(comment), 'comment')
+
+    author = comment['author']
+    body = comment['body']
+    if md is None:
+        md = markdown.Renderer(app)
+    context = ({'repository': repository_name}
+               if repository_name else None)
+    segments = md.render_structured(body)
+    has_details = any(s[0] == 'details' for s in segments)
+
+    if not has_details:
+        # Single HyperText with author prefix.
+        # render_structured() always returns at least [('text', [])],
+        # so segments[0] is safe to access here.
+        markup = segments[0][1] if segments else []
+        combined = [('comment-name', author),
+                    ('comment', ': ')] + list(markup)
+        combined = apply_commentlinks(app, combined, context)
+        return urwid.AttrMap(mywid.HyperText(combined), 'comment')
+
+    # Multiple segments — build a Pile of widgets.
+    widgets = []
+    first = segments[0]
+    if first[0] == 'text':
+        markup = list(first[1])
+        combined = [('comment-name', author),
+                    ('comment', ': ')] + markup
+        combined = apply_commentlinks(app, combined, context)
+        widgets.append(urwid.AttrMap(mywid.HyperText(combined), 'comment'))
+        remaining = segments[1:]
+    else:
+        widgets.append(urwid.AttrMap(
+            mywid.HyperText([('comment-name', author), ('comment', ':')]),
+            'comment'))
+        remaining = segments
+
+    for seg in remaining:
+        if seg[0] == 'text':
+            if _is_whitespace_only(seg[1]):
+                continue
+            seg_markup = apply_commentlinks(
+                app, list(seg[1]), context)
+            widgets.append(
+                urwid.AttrMap(mywid.HyperText(seg_markup), 'comment'))
+        else:  # 'details'
+            _, summary, body_markup = seg
+            body_markup = apply_commentlinks(
+                app, list(body_markup), context)
+            body_widget = mywid.HyperText(body_markup)
+            body_padded = urwid.Padding(body_widget, left=2)
+            widgets.append(mywid.CollapsibleSection(summary, body_padded))
+
+    return urwid.AttrMap(urwid.Pile(widgets), 'comment')
+
+
 class LineContext:
     def __init__(self, old_file_key, new_file_key,
                  old_fn, new_fn, old_ln, new_ln,
@@ -309,6 +395,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 self._range_end = self._total_commits
             self.pr_key = new_commit.pull_request.key
             self.repository_name = new_commit.pull_request.repository.name
+            self._md = markdown.Renderer(self.app)
             self.sha = new_commit.sha
             self._files_with_comments = set()
             repo_path = os.path.join(self.app.config.git_root,
@@ -345,8 +432,10 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 if comment.draft:
                     message = comment.message
                 else:
-                    message = [('comment-name', comment.author.name or comment.author.username),
-                               ('comment', ': '+comment.message)]
+                    message = {
+                        'author': comment.author.name or comment.author.username,
+                        'body': comment.message,
+                    }
                 comment_list.append((comment.key, message))
                 comment_lists[key] = comment_list
                 comment_filenames.add(path)
@@ -363,8 +452,10 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 if comment.draft:
                     message = comment.message
                 else:
-                    message = [('comment-name', comment.author.name or comment.author.username),
-                               ('comment', ': '+comment.message)]
+                    message = {
+                        'author': comment.author.name or comment.author.username,
+                        'body': comment.message,
+                    }
                 comment_list.append((comment.key, message))
                 comment_lists[key] = comment_list
                 comment_filenames.add(path)
