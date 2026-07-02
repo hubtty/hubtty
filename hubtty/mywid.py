@@ -499,6 +499,11 @@ class HyperText(urwid.Text):
         data['pos'] += len(markup)
         return markup
 
+    @property
+    def markup(self):
+        """The original markup passed to :meth:`set_text`."""
+        return self._markup
+
     def set_text(self, markup):
         self._markup = markup
         self.selectable_items = []
@@ -516,6 +521,50 @@ class HyperText(urwid.Text):
         if (not focus) and (self.focused_index is not None):
             self.focusItem(None)
         return super().render(size, focus)
+
+class CollapsibleSection(urwid.WidgetWrap):
+    """An expandable/collapsible section widget.
+
+    Shows a clickable summary line with a disclosure triangle
+    (▶ collapsed, ▼ expanded).  Clicking toggles visibility of the
+    body widget.  Collapsed by default.
+    """
+    _focus_map = {
+        'collapsible-title': 'focused-collapsible-title',
+    }
+
+    def __init__(self, title, body, expanded=False):
+        self.title_text = title
+        self.body = body
+        self._title_widget = TextButton(
+            self._make_label(expanded),
+            on_press=self.toggle)
+        # Override the AttrMap set by TextButton.__init__ to use
+        # collapsible-specific focus_map instead of the default 'focused'.
+        self._title_widget._w = urwid.AttrMap(
+            self._title_widget.text, None,
+            focus_map=self._focus_map)
+        self.pile = urwid.Pile([self._title_widget])
+        if expanded:
+            self.pile.contents.append((self.body, ('pack', None)))
+        super().__init__(self.pile)
+        self.expanded = expanded
+
+    def _make_label(self, expanded):
+        indicator = '▼ ' if expanded else '▶ '
+        return ('collapsible-title', indicator + self.title_text)
+
+    def toggle(self, button):
+        if self.expanded:
+            self.pile.contents.pop()
+            self.expanded = False
+        else:
+            self.pile.contents.append(
+                (self.body, ('pack', None)))
+            self.expanded = True
+        self._title_widget.text.set_text(
+            self._make_label(self.expanded))
+
 
 class Link(urwid.Widget):
     signals = ['selected']

@@ -131,6 +131,9 @@ DEFAULT_PALETTE={
     'md-codespan': ['', 'dark gray'],
     'md-strikethrough': ['strikethrough', ''],
     'md-thematicbreak': ['light gray', ''],
+    # Collapsible sections
+    'collapsible-title': ['dark cyan', ''],
+    'focused-collapsible-title': ['light cyan,standout', ''],
     }
 
 # A delta from the default palette
