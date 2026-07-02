@@ -44,10 +44,10 @@ class TextButton(urwid.Button):
     def selectable(self):
         return True
 
-    def __init__(self, text, on_press=None, user_data=None):
+    def __init__(self, text, on_press=None, user_data=None, focus_map='focused'):
         super().__init__('', on_press=on_press, user_data=user_data)
         self.text = urwid.Text(text)
-        self._w = urwid.AttrMap(self.text, None, focus_map='focused')
+        self._w = urwid.AttrMap(self.text, None, focus_map=focus_map)
 
 class FixedButton(urwid.Button):
     def sizing(self):
@@ -538,11 +538,7 @@ class CollapsibleSection(urwid.WidgetWrap):
         self.body = body
         self._title_widget = TextButton(
             self._make_label(expanded),
-            on_press=self.toggle)
-        # Override the AttrMap set by TextButton.__init__ to use
-        # collapsible-specific focus_map instead of the default 'focused'.
-        self._title_widget._w = urwid.AttrMap(
-            self._title_widget.text, None,
+            on_press=self.toggle,
             focus_map=self._focus_map)
         self.pile = urwid.Pile([self._title_widget])
         if expanded:
