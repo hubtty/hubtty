@@ -19,6 +19,7 @@ from hubtty import mywid
 from hubtty.syntax import build_syntax_focus_map
 from hubtty.view.diff import BaseDiffComment, BaseDiffCommentEdit, BaseDiffLine
 from hubtty.view.diff import BaseFileHeader, BaseFileReminder, BaseDiffView
+from hubtty.view.diff import build_comment_widget
 
 LN_COL_WIDTH = 5
 
@@ -68,15 +69,17 @@ class SideDiffCommentEdit(BaseDiffCommentEdit):
         return key
 
 class SideDiffComment(BaseDiffComment):
-    def __init__(self, context, old, new):
+    def __init__(self, app, context, old, new, md=None):
         super().__init__([])
         self.context = context
-        oldt = urwid.Text(old)
-        newt = urwid.Text(new)
         if old:
-            oldt = urwid.AttrMap(oldt, 'comment')
+            oldt = build_comment_widget(app, old, md=md)
+        else:
+            oldt = urwid.Text('')
         if new:
-            newt = urwid.AttrMap(newt, 'comment')
+            newt = build_comment_widget(app, new, md=md)
+        else:
+            newt = urwid.Text('')
         self.contents.append((urwid.Text(''), ('given', LN_COL_WIDTH, False)))
         self.contents.append((oldt, ('weight', 1, False)))
         self.contents.append((urwid.Text(''), ('given', LN_COL_WIDTH, False)))
@@ -175,7 +178,7 @@ class SideDiffView(BaseDiffView):
                     (old_comment_key, old_comment) = old_list.pop(0)
                 if new_list:
                     (new_comment_key, new_comment) = new_list.pop(0)
-                lines.append(SideDiffComment(context, old_comment, new_comment))
+                lines.append(SideDiffComment(self.app, context, old_comment, new_comment))
             # see if there are any draft comments for this line
             key = f'olddraft-{old[0]}-{diff.oldname}'
             old_list = comment_lists.pop(key, [])
@@ -216,7 +219,7 @@ class SideDiffView(BaseDiffView):
                 (old_comment_key, old_comment) = old_list.pop(0)
             if new_list:
                 (new_comment_key, new_comment) = new_list.pop(0)
-            lines.append(SideDiffComment(context, old_comment, new_comment))
+            lines.append(SideDiffComment(self.app, context, old_comment, new_comment))
         # see if there are any draft comments for this file
         key = f'olddraft-None-{diff.oldname}'
         old_list = comment_lists.pop(key, [])
