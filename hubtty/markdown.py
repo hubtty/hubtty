@@ -26,6 +26,8 @@ class Renderer:
     def __init__(self, app):
         self.log = logging.getLogger('hubtty.markdown')
         self.app = app
+        self._parser = mistune.create_markdown(
+            renderer='ast', plugins=['strikethrough', 'table'])
 
     @staticmethod
     def _extract_summary(raw_html):
@@ -250,15 +252,11 @@ class Renderer:
         return True
         
 
-    def _create_parser(self):
-        return mistune.create_markdown(
-            renderer='ast', plugins=['strikethrough', 'table'])
-
     def render(self, text):
         """Render markdown *text* into a flat urwid markup list."""
         if not text:
             return []
-        ast = self._create_parser()(text)
+        ast = self._parser(text)
         return self.toUrwidMarkup(ast)
 
     def render_structured(self, text):
@@ -273,7 +271,7 @@ class Renderer:
         if not text:
             return [('text', [])]
 
-        ast = self._create_parser()(text)
+        ast = self._parser(text)
 
         segments = []
         current_nodes = []
