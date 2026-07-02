@@ -27,6 +27,7 @@ from hubtty import mywid
 from hubtty import sync
 from hubtty import markdown
 from hubtty.generated import GeneratedFileFilter
+from hubtty.view.diff import apply_commentlinks
 from hubtty.view import side_diff as view_side_diff
 from hubtty.view import unified_diff as view_unified_diff
 from hubtty.view import mouse_scroll_decorator
@@ -588,9 +589,7 @@ class PullRequestMessageBox(urwid.WidgetWrap):
         row.review_button.openReview(reply_text)
 
     def _apply_commentlinks(self, markup, context):
-        for commentlink in self.app.config.commentlinks:
-            markup = commentlink.run(self.app, markup, context)
-        return markup
+        return apply_commentlinks(self.app, markup, context)
 
     @staticmethod
     def _merge_header_body(header_markup, body):

@@ -39,7 +39,13 @@ def _is_whitespace_only(markup):
     return False
 
 
-def build_comment_widget(app, comment, md=None):
+def apply_commentlinks(app, markup, context):
+    for commentlink in app.config.commentlinks:
+        markup = commentlink.run(app, markup, context)
+    return markup
+
+
+def build_comment_widget(app, comment, md=None, repository_name=None):
     """Build a urwid widget for a diff inline comment.
 
     *comment* is either a plain string (draft) or a dict with
@@ -47,7 +53,8 @@ def build_comment_widget(app, comment, md=None):
     suitable for embedding in a ``Columns`` row.
 
     An optional *md* ``markdown.Renderer`` instance can be passed to
-    avoid creating a new parser for every call.
+    avoid creating a new parser for every call.  *repository_name* is
+    used as context for commentlink processing.
     """
     if isinstance(comment, str):
         return urwid.AttrMap(urwid.Text(comment), 'comment')
@@ -56,14 +63,19 @@ def build_comment_widget(app, comment, md=None):
     body = comment['body']
     if md is None:
         md = markdown.Renderer(app)
+    context = ({'repository': repository_name}
+               if repository_name else None)
     segments = md.render_structured(body)
     has_details = any(s[0] == 'details' for s in segments)
 
     if not has_details:
         # Single HyperText with author prefix.
+        # render_structured() always returns at least [('text', [])],
+        # so segments[0] is safe to access here.
         markup = segments[0][1] if segments else []
         combined = [('comment-name', author),
                     ('comment', ': ')] + list(markup)
+        combined = apply_commentlinks(app, combined, context)
         return urwid.AttrMap(mywid.HyperText(combined), 'comment')
 
     # Multiple segments — build a Pile of widgets.
@@ -73,6 +85,7 @@ def build_comment_widget(app, comment, md=None):
         markup = list(first[1])
         combined = [('comment-name', author),
                     ('comment', ': ')] + markup
+        combined = apply_commentlinks(app, combined, context)
         widgets.append(urwid.AttrMap(mywid.HyperText(combined), 'comment'))
         remaining = segments[1:]
     else:
@@ -85,10 +98,14 @@ def build_comment_widget(app, comment, md=None):
         if seg[0] == 'text':
             if _is_whitespace_only(seg[1]):
                 continue
+            seg_markup = apply_commentlinks(
+                app, list(seg[1]), context)
             widgets.append(
-                urwid.AttrMap(mywid.HyperText(seg[1]), 'comment'))
+                urwid.AttrMap(mywid.HyperText(seg_markup), 'comment'))
         else:  # 'details'
             _, summary, body_markup = seg
+            body_markup = apply_commentlinks(
+                app, list(body_markup), context)
             body_widget = mywid.HyperText(body_markup)
             body_padded = urwid.Padding(body_widget, left=2)
             widgets.append(mywid.CollapsibleSection(summary, body_padded))
@@ -378,6 +395,7 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                 self._range_end = self._total_commits
             self.pr_key = new_commit.pull_request.key
             self.repository_name = new_commit.pull_request.repository.name
+            self._md = markdown.Renderer(self.app)
             self.sha = new_commit.sha
             self._files_with_comments = set()
             repo_path = os.path.join(self.app.config.git_root,

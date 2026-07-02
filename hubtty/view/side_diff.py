@@ -69,15 +69,18 @@ class SideDiffCommentEdit(BaseDiffCommentEdit):
         return key
 
 class SideDiffComment(BaseDiffComment):
-    def __init__(self, app, context, old, new, md=None):
+    def __init__(self, app, context, old, new, md=None,
+                 repository_name=None):
         super().__init__([])
         self.context = context
         if old:
-            oldt = build_comment_widget(app, old, md=md)
+            oldt = build_comment_widget(app, old, md=md,
+                                        repository_name=repository_name)
         else:
             oldt = urwid.Text('')
         if new:
-            newt = build_comment_widget(app, new, md=md)
+            newt = build_comment_widget(app, new, md=md,
+                                        repository_name=repository_name)
         else:
             newt = urwid.Text('')
         self.contents.append((urwid.Text(''), ('given', LN_COL_WIDTH, False)))
@@ -178,7 +181,8 @@ class SideDiffView(BaseDiffView):
                     (old_comment_key, old_comment) = old_list.pop(0)
                 if new_list:
                     (new_comment_key, new_comment) = new_list.pop(0)
-                lines.append(SideDiffComment(self.app, context, old_comment, new_comment))
+                lines.append(SideDiffComment(self.app, context, old_comment, new_comment,
+                                             md=self._md, repository_name=self.repository_name))
             # see if there are any draft comments for this line
             key = f'olddraft-{old[0]}-{diff.oldname}'
             old_list = comment_lists.pop(key, [])
@@ -219,7 +223,8 @@ class SideDiffView(BaseDiffView):
                 (old_comment_key, old_comment) = old_list.pop(0)
             if new_list:
                 (new_comment_key, new_comment) = new_list.pop(0)
-            lines.append(SideDiffComment(self.app, context, old_comment, new_comment))
+            lines.append(SideDiffComment(self.app, context, old_comment, new_comment,
+                                         md=self._md, repository_name=self.repository_name))
         # see if there are any draft comments for this file
         key = f'olddraft-None-{diff.oldname}'
         old_list = comment_lists.pop(key, [])
