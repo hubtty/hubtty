@@ -535,6 +535,13 @@ class PullRequestButton(urwid.Button):
             self.pr_view.app.error(e.message)
 
 class PullRequestMessageBox(urwid.WidgetWrap):
+    """A PR comment rendered as a Pile of widgets.
+
+    Wraps an ``urwid.Pile`` (not a ``HyperText`` subclass) so that
+    messages containing ``<details>`` blocks can include collapsible
+    sections alongside regular text widgets.
+    """
+
     def __init__(self, pr_view, pr, message):
         self.pr_view = pr_view
         self.app = pr_view.app
@@ -584,6 +591,25 @@ class PullRequestMessageBox(urwid.WidgetWrap):
         for commentlink in self.app.config.commentlinks:
             markup = commentlink.run(self.app, markup, context)
         return markup
+
+    @staticmethod
+    def _merge_header_body(header_markup, body):
+        """Combine header markup and body markup into a single list.
+
+        Joins the two so that the body text appears on the line after
+        the header.  Handles the case where the first body element is
+        not a plain string (e.g. a styled tuple or a Link widget)
+        and cannot be string-concatenated.
+        """
+        combined = list(header_markup)
+        if body:
+            if not isinstance(body[0], str):
+                combined.append("\n")
+                combined.extend(body)
+            else:
+                combined.append("\n" + body[0])
+                combined.extend(body[1:])
+        return combined
 
     def _build_widgets_from_segments(self, segments, context):
         """Convert a list of render_structured segments into widgets."""
@@ -702,30 +728,16 @@ class PullRequestMessageBox(urwid.WidgetWrap):
         # approach: header + comment body in one widget.
         has_details = any(s[0] == 'details' for s in segments)
         if not has_details:
-            combined = list(header_markup)
             body = list(segments[0][1]) if segments else []
-            if body:
-                if isinstance(body[0], tuple):
-                    combined.append("\n")
-                    combined.extend(body)
-                else:
-                    body[0] = "\n%s" % body[0]
-                    combined.extend(body)
+            combined = self._merge_header_body(header_markup, body)
             combined = self._apply_commentlinks(combined, context)
             widgets.append(mywid.HyperText(combined))
         else:
             # Multiple segments — build a Pile of widgets.
             first = segments[0]
             if first[0] == 'text':
-                combined = list(header_markup)
                 body = list(first[1])
-                if body:
-                    if isinstance(body[0], tuple):
-                        combined.append("\n")
-                        combined.extend(body)
-                    else:
-                        body[0] = "\n%s" % body[0]
-                        combined.extend(body)
+                combined = self._merge_header_body(header_markup, body)
                 combined = self._apply_commentlinks(
                     combined, context)
                 widgets.append(mywid.HyperText(combined))

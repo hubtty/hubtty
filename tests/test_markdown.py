@@ -12,7 +12,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-"""Tests for the markdown renderer."""
+"""Tests for the markdown renderer and related helpers."""
 
 from unittest.mock import Mock
 
@@ -20,6 +20,7 @@ import urwid
 
 from hubtty.markdown import Renderer
 from hubtty import mywid
+from hubtty.view.pull_request import PullRequestMessageBox
 
 
 # ---------------------------------------------------------------------------
@@ -570,3 +571,34 @@ class TestCollapsibleSection:
         label = cs._title_widget.text.get_text()[0]
         assert '▼' in label
         assert 'MyTitle' in label
+
+
+# ---------------------------------------------------------------------------
+# _merge_header_body
+# ---------------------------------------------------------------------------
+
+class TestMergeHeaderBody:
+    def test_body_starts_with_string(self):
+        header = ['Author ', ('bold', 'name')]
+        body = ['hello', ' world']
+        result = PullRequestMessageBox._merge_header_body(header, body)
+        assert result == ['Author ', ('bold', 'name'), '\nhello', ' world']
+
+    def test_body_starts_with_tuple(self):
+        header = ['Author']
+        body = [('md-strong', 'bold text'), ' rest']
+        result = PullRequestMessageBox._merge_header_body(header, body)
+        assert result == ['Author', '\n', ('md-strong', 'bold text'), ' rest']
+
+    def test_body_starts_with_link(self):
+        header = ['Author']
+        link = mywid.Link('click here', 'link-attr', None)
+        body = [link, ' some text']
+        result = PullRequestMessageBox._merge_header_body(header, body)
+        # Must not crash; newline is prepended as a separate element.
+        assert result == ['Author', '\n', link, ' some text']
+
+    def test_empty_body(self):
+        header = ['Author']
+        result = PullRequestMessageBox._merge_header_body(header, [])
+        assert result == ['Author']
