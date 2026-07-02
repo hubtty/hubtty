@@ -92,16 +92,18 @@ class Renderer:
                 width = self._plain_text_len(cell)
                 padding = ' ' * max(0, col_widths[i] - width)
                 if header_cells and row_idx == 0:
-                    # Note: nested styles (e.g. inline code) inside
-                    # header cells may not render as expected due to
-                    # urwid's attribute nesting behaviour.
-                    text.append(('md-strong', cell))
+                    # Include padding inside the styled tuple so the
+                    # full column width renders with the header style.
+                    if isinstance(cell, list):
+                        text.append(('md-strong', cell + [padding]))
+                    else:
+                        text.append(('md-strong', cell + padding))
                 else:
                     if isinstance(cell, list):
                         text.extend(cell)
                     else:
                         text.append(cell)
-                text.append(padding)
+                    text.append(padding)
                 if i < num_cols - 1:
                     text.append('  ')
             text.append('\n')
