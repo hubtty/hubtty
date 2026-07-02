@@ -534,12 +534,13 @@ class PullRequestButton(urwid.Button):
         except hubtty.view.DisplayError as e:
             self.pr_view.app.error(e.message)
 
-class PullRequestMessageBox(mywid.HyperText):
+class PullRequestMessageBox(urwid.WidgetWrap):
     def __init__(self, pr_view, pr, message):
-        super().__init__('')
         self.pr_view = pr_view
         self.app = pr_view.app
-        self.md = markdown.Renderer(self.app)
+        self.md = pr_view.md
+        self.pile = urwid.Pile([])
+        super().__init__(self.pile)
         self.refresh(pr, message)
 
     def formatReply(self):
@@ -579,6 +580,80 @@ class PullRequestMessageBox(mywid.HyperText):
         row = self.pr_view.commit_rows[self.commit_key]
         row.review_button.openReview(reply_text)
 
+    def _apply_commentlinks(self, markup, context):
+        for commentlink in self.app.config.commentlinks:
+            markup = commentlink.run(self.app, markup, context)
+        return markup
+
+    def _build_widgets_from_segments(self, segments, context):
+        """Convert a list of render_structured segments into widgets."""
+        widgets = []
+        for seg in segments:
+            if seg[0] == 'text':
+                seg_markup = self._apply_commentlinks(
+                    list(seg[1]), context)
+                widgets.append(mywid.HyperText(seg_markup))
+            else:  # 'details'
+                _, summary, body_markup = seg
+                body_markup = self._apply_commentlinks(
+                    list(body_markup), context)
+                body_widget = mywid.HyperText(body_markup)
+                body_padded = urwid.Padding(body_widget, left=2)
+                widgets.append(
+                    mywid.CollapsibleSection(
+                        summary, body_padded))
+        return widgets
+
+    def _build_inline_comments(self, message, context):
+        """Build widgets for inline comments attached to this message."""
+        inline_comments = {}
+        for comment in message.comments:
+            if comment.file:
+                path = comment.file.path
+            else:
+                path = "outdated"
+            inline_comments.setdefault(path, [])
+            inline_comments[path].append(
+                (comment.original_commit_id[0:7],
+                 comment.original_line or 0, comment.message))
+        for v in inline_comments.values():
+            v.sort()
+
+        widgets = []
+        for path, comments in inline_comments.items():
+            widgets.append(
+                urwid.Text(('filename-inline-comment', path)))
+            for sha, line, comment_text in comments:
+                location_str = ''
+                if sha:
+                    location_str += sha
+                    if line:
+                        location_str += ", "
+                if line:
+                    location_str += str(line)
+                if location_str:
+                    location_str += ": "
+
+                segments = self.md.render_structured(comment_text)
+                body_widgets = self._build_widgets_from_segments(
+                    segments, context)
+
+                # Prepend location to the first widget's text when
+                # it is a HyperText, otherwise add a separate line.
+                prefix = '\n  %s' % location_str
+                if (body_widgets
+                        and isinstance(body_widgets[0], mywid.HyperText)):
+                    old = body_widgets[0].markup
+                    if isinstance(old, list):
+                        body_widgets[0].set_text([prefix] + old)
+                    else:
+                        body_widgets[0].set_text([prefix, old])
+                else:
+                    body_widgets.insert(0, mywid.HyperText(prefix))
+
+                widgets.extend(body_widgets)
+        return widgets
+
     def refresh(self, pr, message):
         self.commit_key = self.pr_view.last_commit_key
         self.message_created = message.created
@@ -599,64 +674,77 @@ class PullRequestMessageBox(mywid.HyperText):
             else:
                 reviewer_string = message.author_name
 
-        text = [(name_style, reviewer_string),
-                (header_style,
-                 created.strftime(' (%Y-%m-%d %H:%M:%S%z)'))]
+        header_markup = [(name_style, reviewer_string),
+                         (header_style,
+                          created.strftime(' (%Y-%m-%d %H:%M:%S%z)'))]
         if message.draft and not message.pending:
-            text.append(('pr-message-draft', ' (draft)'))
+            header_markup.append(('pr-message-draft', ' (draft)'))
         else:
             link = mywid.Link('< Reply >',
                               'commit-button',
                               'focused-commit-button')
             urwid.connect_signal(link, 'selected',
                                  lambda link:self.reply())
-            text.append(' ')
-            text.append(link)
+            header_markup.append(' ')
+            header_markup.append(link)
 
-        comment_text = self.md.render(message.message)
-        if len(comment_text) > 0:
-            if isinstance(comment_text[0], tuple):
-                comment_text = ["\n"] + comment_text
+        context = (
+            {'repository': self.pr_view.repository_name}
+            if hasattr(self.pr_view, 'repository_name') else None)
+
+        segments = self.md.render_structured(message.message)
+        inline_widgets = self._build_inline_comments(message, context)
+
+        widgets = []
+
+        # When there are no <details> sections the rendering of
+        # the message body is identical to the old single-HyperText
+        # approach: header + comment body in one widget.
+        has_details = any(s[0] == 'details' for s in segments)
+        if not has_details:
+            combined = list(header_markup)
+            body = list(segments[0][1]) if segments else []
+            if body:
+                if isinstance(body[0], tuple):
+                    combined.append("\n")
+                    combined.extend(body)
+                else:
+                    body[0] = "\n%s" % body[0]
+                    combined.extend(body)
+            combined = self._apply_commentlinks(combined, context)
+            widgets.append(mywid.HyperText(combined))
+        else:
+            # Multiple segments — build a Pile of widgets.
+            first = segments[0]
+            if first[0] == 'text':
+                combined = list(header_markup)
+                body = list(first[1])
+                if body:
+                    if isinstance(body[0], tuple):
+                        combined.append("\n")
+                        combined.extend(body)
+                    else:
+                        body[0] = "\n%s" % body[0]
+                        combined.extend(body)
+                combined = self._apply_commentlinks(
+                    combined, context)
+                widgets.append(mywid.HyperText(combined))
+                remaining = segments[1:]
             else:
-                comment_text[0] = "\n%s" % comment_text[0]
-        context = {'repository': self.pr_view.repository_name} if hasattr(self.pr_view, 'repository_name') else None
-        for commentlink in self.app.config.commentlinks:
-            comment_text = commentlink.run(self.app, comment_text, context)
+                # First segment is <details> — header stands alone.
+                widgets.append(mywid.HyperText(header_markup))
+                remaining = segments
 
-        inline_comments = {}
-        for comment in message.comments:
-            if comment.file:
-                path = comment.file.path
-            else:
-                path = "outdated"
-            inline_comments.setdefault(path, [])
-            inline_comments[path].append((comment.original_commit_id[0:7], comment.original_line or 0, comment.message))
-        for v in inline_comments.values():
-            v.sort()
+            widgets.extend(
+                self._build_widgets_from_segments(remaining, context))
 
-        if inline_comments:
-            comment_text.append('\n')
-        for key, value in inline_comments.items():
-            comment_text.append(('filename-inline-comment', '%s' % key))
-            for sha, line, comment in value:
-                location_str = ''
-                if sha:
-                    location_str += sha
-                    if line: location_str += ", "
-                if line:
-                    location_str += str(line)
-                if location_str:
-                    location_str += ": "
-                comment_text.append('\n  %s' % (location_str))
-                # Let's pass the rendered comment through commentlinks, but not
-                # location_str
-                rendered_comment = self.md.render(comment)
-                for commentlink in self.app.config.commentlinks:
-                    rendered_comment = commentlink.run(self.app, rendered_comment, context)
-                comment_text.extend(rendered_comment)
-                comment_text.append('\n')
+        # Inline comments as individually collapsible widgets.
+        widgets.extend(inline_widgets)
 
-        self.set_text(text+comment_text)
+        # Rebuild the pile contents.
+        del self.pile.contents[:]
+        for w in widgets:
+            self.pile.contents.append((w, ('pack', None)))
 
 class PrDescriptionBox(mywid.HyperText):
     def __init__(self, app, message, repository_name=None):
