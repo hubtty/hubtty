@@ -666,17 +666,18 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
             (widget, pos, rows) = top[1][-1]
         elif middle:
             pos = middle[2]
+        else:
+            return None
         # Make sure the first header shows up as soon as it scrolls up
         if pos > 1:
             pos -= 1
         context = None
-        while True:
+        while pos >= 0:
             item = self.listbox.body[pos]
             if hasattr(item, 'context'):
+                context = item.context
                 break
             pos -= 1
-        if pos > 0:
-            context = item.context
         return context
 
     def keypress(self, size, key):
