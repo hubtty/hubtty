@@ -45,12 +45,53 @@ def apply_commentlinks(app, markup, context):
     return markup
 
 
+def _comment_header(app, comment):
+    """Return the author + date header markup for a comment dict."""
+    author = comment['author']
+    created = comment.get('created')
+    if comment.get('is_own'):
+        name_style = 'pr-message-own-name'
+        date_style = 'pr-message-own-header'
+    else:
+        name_style = 'pr-message-name'
+        date_style = 'pr-message-header'
+    header = [(name_style, author)]
+    if created is not None:
+        date_str = app.time(created).strftime('%Y-%m-%d %H:%M')
+        header.append((date_style, f' ({date_str})'))
+    header.append(('comment', ': '))
+    return header
+
+
+def _wrap_with_border(content_widget, is_reply=False):
+    """Wrap a comment content widget with a full-height left border.
+
+    Uses ``urwid.SolidFill`` so the border spans every row of the
+    comment, including wrapped lines.  Reply comments get extra left
+    padding to visually indent them under their parent.
+    """
+    border = urwid.AttrMap(urwid.SolidFill(' '), 'comment-border')
+    cols = [(1, border)]
+    box_cols = [0]
+    if is_reply:
+        # Extra indent before the border for threaded replies.
+        indent = urwid.AttrMap(urwid.SolidFill(' '), 'comment')
+        cols = [(2, indent), (1, border)]
+        box_cols = [0, 1]
+    cols.append(urwid.Padding(content_widget, left=1))
+    return urwid.Columns(cols, box_columns=box_cols)
+
+
 def build_comment_widget(app, comment, md=None, repository_name=None):
     """Build a urwid widget for a diff inline comment.
 
     *comment* is either a plain string (draft) or a dict with
-    ``'author'`` and ``'body'`` keys (non-draft).  Returns a widget
-    suitable for embedding in a ``Columns`` row.
+    ``'author'``, ``'body'``, and optionally ``'created'``,
+    ``'in_reply_to'``, and ``'id'`` keys (non-draft).  Returns a
+    widget suitable for embedding in a ``Columns`` row.
+
+    A full-height coloured border is drawn on the left edge of the
+    comment.  Reply comments (``in_reply_to`` is set) are indented.
 
     An optional *md* ``markdown.Renderer`` instance can be passed to
     avoid creating a new parser for every call.  *repository_name* is
@@ -59,8 +100,9 @@ def build_comment_widget(app, comment, md=None, repository_name=None):
     if isinstance(comment, str):
         return urwid.AttrMap(urwid.Text(comment), 'comment')
 
-    author = comment['author']
     body = comment['body']
+    is_reply = comment.get('in_reply_to') is not None
+    header = _comment_header(app, comment)
     if md is None:
         md = markdown.Renderer(app)
     context = ({'repository': repository_name}
@@ -73,25 +115,23 @@ def build_comment_widget(app, comment, md=None, repository_name=None):
         # render_structured() always returns at least [('text', [])],
         # so segments[0] is safe to access here.
         markup = segments[0][1] if segments else []
-        combined = [('comment-name', author),
-                    ('comment', ': ')] + list(markup)
+        combined = header + list(markup)
         combined = apply_commentlinks(app, combined, context)
-        return urwid.AttrMap(mywid.HyperText(combined), 'comment')
+        inner = urwid.AttrMap(mywid.HyperText(combined), 'comment')
+        return _wrap_with_border(inner, is_reply)
 
     # Multiple segments — build a Pile of widgets.
     widgets = []
     first = segments[0]
     if first[0] == 'text':
         markup = list(first[1])
-        combined = [('comment-name', author),
-                    ('comment', ': ')] + markup
+        combined = header + markup
         combined = apply_commentlinks(app, combined, context)
         widgets.append(urwid.AttrMap(mywid.HyperText(combined), 'comment'))
         remaining = segments[1:]
     else:
         widgets.append(urwid.AttrMap(
-            mywid.HyperText([('comment-name', author), ('comment', ':')]),
-            'comment'))
+            mywid.HyperText(header), 'comment'))
         remaining = segments
 
     for seg in remaining:
@@ -110,7 +150,8 @@ def build_comment_widget(app, comment, md=None, repository_name=None):
             body_padded = urwid.Padding(body_widget, left=2)
             widgets.append(mywid.CollapsibleSection(summary, body_padded))
 
-    return urwid.AttrMap(urwid.Pile(widgets), 'comment')
+    inner = urwid.AttrMap(urwid.Pile(widgets), 'comment')
+    return _wrap_with_border(inner, is_reply)
 
 
 class LineContext:
@@ -435,6 +476,10 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                     message = {
                         'author': comment.author.name or comment.author.username,
                         'body': comment.message,
+                        'created': comment.created,
+                        'in_reply_to': comment.in_reply_to,
+                        'id': comment.id,
+                        'is_own': self.app.isOwnAccount(comment.author),
                     }
                 comment_list.append((comment.key, message))
                 comment_lists[key] = comment_list
@@ -455,6 +500,10 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
                     message = {
                         'author': comment.author.name or comment.author.username,
                         'body': comment.message,
+                        'created': comment.created,
+                        'in_reply_to': comment.in_reply_to,
+                        'id': comment.id,
+                        'is_own': self.app.isOwnAccount(comment.author),
                     }
                 comment_list.append((comment.key, message))
                 comment_lists[key] = comment_list
