@@ -711,6 +711,11 @@ class PullRequestMessageBox(urwid.WidgetWrap):
                 seg_markup = self._apply_commentlinks(
                     list(seg[1]), context)
                 widgets.append(mywid.HyperText(seg_markup))
+            elif seg[0] == 'code_block':
+                widgets.append(
+                    urwid.AttrMap(
+                        mywid.HyperText(seg[1]),
+                        'md-blockcode'))
             else:  # 'details'
                 _, summary, body_markup = seg
                 body_markup = self._apply_commentlinks(
@@ -815,11 +820,11 @@ class PullRequestMessageBox(urwid.WidgetWrap):
 
         widgets = []
 
-        # When there are no <details> sections the rendering of
-        # the message body is identical to the old single-HyperText
-        # approach: header + comment body in one widget.
-        has_details = any(s[0] == 'details' for s in segments)
-        if not has_details:
+        # When there is exactly one plain text segment the rendering
+        # is the simple single-HyperText approach: header + body in
+        # one widget.  Code blocks and <details> need the Pile path.
+        needs_pile = len(segments) > 1 or segments[0][0] != 'text'
+        if not needs_pile:
             body = list(segments[0][1]) if segments else []
             combined = self._merge_header_body(header_markup, body)
             combined = self._apply_commentlinks(combined, context)

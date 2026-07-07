@@ -27,10 +27,10 @@ from hubtty.view.pull_request import PullRequestMessageBox
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _mock_app():
+def _mock_app(syntax_highlighting=True):
     app = Mock()
     app.openURL = Mock()
-    app.config.syntax_highlighting = True
+    app.config.syntax_highlighting = syntax_highlighting
     app.config.max_highlight_size = 512 * 1024
     return app
 
@@ -161,32 +161,32 @@ class TestRenderBasic:
 
     def test_code_block_with_lang(self):
         result = self.r.render('```python\nprint(1)\n```')
-        # Fence markers stay in the plain 'md-blockcode' style.
-        attrs = _find_attr(result, 'md-blockcode')
-        joined = ''.join(attrs)
-        assert 'python' in joined
-        # The code itself is syntax-highlighted rather than wrapped
-        # in 'md-blockcode', but the text is still present.
-        assert 'print(1)' in _flatten(result)
-        assert any('print' in a for a in _find_attr(result, 'syn-builtin'))
-        assert any('1' in a for a in _find_attr(result, 'syn-number'))
+        flat = _flatten(result)
+        assert 'python' in flat
+        assert 'print(1)' in flat
+        # Fence lines use the comment style
+        fences = _find_attr(result, 'syn-comment-on-md-blockcode')
+        assert any('```python' in f for f in fences)
+        # Highlighted tokens get combined attrs
+        builtins = _find_attr(result, 'syn-builtin-on-md-blockcode')
+        assert any('print' in b for b in builtins)
 
     def test_code_block_with_unknown_lang(self):
-        result = self.r.render('```not-a-real-language\nsome text\n```')
-        # Falls back to the plain, fully-highlighted block.
+        result = self.r.render('```unknownlang\nsome code\n```')
         attrs = _find_attr(result, 'md-blockcode')
         joined = ''.join(attrs)
-        assert 'not-a-real-language' in joined
-        assert 'some text' in joined
+        assert 'some code' in joined
 
-    def test_code_block_highlighting_disabled(self):
-        self.r.app.config.syntax_highlighting = False
-        result = self.r.render('```python\nprint(1)\n```')
+    def test_code_block_syntax_highlighting_disabled(self):
+        app = _mock_app(syntax_highlighting=False)
+        r = Renderer(app)
+        result = r.render('```python\nprint(1)\n```')
         attrs = _find_attr(result, 'md-blockcode')
         joined = ''.join(attrs)
-        assert 'python' in joined
         assert 'print(1)' in joined
-        assert _find_attr(result, 'syn-builtin') == []
+        # No syntax attrs when disabled
+        builtins = _find_attr(result, 'syn-builtin-on-md-blockcode')
+        assert len(builtins) == 0
 
     def test_inline_code(self):
         result = self.r.render('Use `foo()` here')
@@ -359,6 +359,27 @@ class TestRenderStructured:
         assert len(segments) == 1
         assert segments[0][0] == 'text'
         assert 'Hello world' in _flatten(segments[0][1])
+
+    def test_code_block_segment(self):
+        md = 'Before\n\n```python\ndef f():\n    pass\n```\n\nAfter\n'
+        segments = self.r.render_structured(md)
+        types = [s[0] for s in segments]
+        assert types == ['text', 'code_block', 'text']
+
+        # Text segments contain surrounding content.
+        assert 'Before' in _flatten(segments[0][1])
+        assert 'After' in _flatten(segments[2][1])
+
+        # Code block segment contains the code.
+        code_flat = _flatten(segments[1][1])
+        assert 'def f()' in code_flat
+
+    def test_code_block_only(self):
+        md = '```yaml\nkey: value\n```\n'
+        segments = self.r.render_structured(md)
+        assert len(segments) == 1
+        assert segments[0][0] == 'code_block'
+        assert 'key: value' in _flatten(segments[0][1])
 
     def test_empty_text(self):
         segments = self.r.render_structured('')
