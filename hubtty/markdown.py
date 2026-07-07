@@ -116,6 +116,45 @@ class Renderer:
 
         return text
 
+    @staticmethod
+    def _ends_with_newline(item):
+        """Check if a markup item ends with a newline character."""
+        while True:
+            if isinstance(item, str):
+                return item.endswith('\n')
+            elif isinstance(item, tuple):
+                item = item[-1]
+            elif isinstance(item, list):
+                if not item:
+                    return False
+                item = item[-1]
+            else:
+                return False
+
+    def _insert_line_prefix(self, markup, prefix):
+        """Insert *prefix* at the start of each line in *markup*.
+
+        Walks the top-level items in the markup list and inserts
+        *prefix* at the beginning and after every item that ends
+        with a newline (when followed by more content).
+
+        This handles the ``| `` prefix for blockquotes so that
+        every visual line gets the prefix, not just the first.
+        Newlines from terminal line-wrapping are not handled
+        (that would require widget-level changes).
+        """
+        if not markup:
+            return []
+
+        result = [prefix]
+        for i, item in enumerate(markup):
+            result.append(item)
+            if (i < len(markup) - 1
+                    and self._ends_with_newline(item)):
+                result.append(prefix)
+
+        return result
+
     def _group_details(self, nodes):
         """Group AST *nodes* by extracting ``<details>`` blocks.
 
@@ -209,7 +248,11 @@ class Renderer:
                 case 'thematic_break':
                     text.append(('md-thematicbreak', "\n———————————————\n\n"))
                 case 'block_quote':
-                    text.append(('md-blockquote', ["| ", self.toUrwidMarkup(element['children'])]))
+                    inner = self.toUrwidMarkup(
+                        element['children'])
+                    prefixed = self._insert_line_prefix(
+                        inner, '| ')
+                    text.append(('md-blockquote', prefixed))
                 case 'block_code':
                     info = element.get('attrs', {}).get('info', '')
                     if info is None:
