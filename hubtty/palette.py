@@ -131,6 +131,8 @@ DEFAULT_PALETTE={
     'md-codespan': ['', 'dark gray'],
     'md-strikethrough': ['strikethrough', ''],
     'md-thematicbreak': ['light gray', ''],
+    'md-list-bullet': ['dark cyan', ''],
+    'md-checkbox': ['dark green', ''],
     # Collapsible sections
     'collapsible-title': ['dark cyan', ''],
     'focused-collapsible-title': ['light cyan,standout', ''],
@@ -172,6 +174,8 @@ LIGHT_PALETTE = {
     'md-blockcode': ['', 'light gray'],
     'md-codespan': ['', 'light gray'],
     'md-thematicbreak': ['dark gray', ''],
+    'md-list-bullet': ['dark blue', ''],
+    'md-checkbox': ['dark green', ''],
     }
 
 class Palette:

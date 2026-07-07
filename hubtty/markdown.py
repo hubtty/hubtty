@@ -27,7 +27,8 @@ class Renderer:
         self.log = logging.getLogger('hubtty.markdown')
         self.app = app
         self._parser = mistune.create_markdown(
-            renderer='ast', plugins=['strikethrough', 'table'])
+            renderer='ast',
+            plugins=['strikethrough', 'table', 'task_lists'])
 
     @staticmethod
     def _extract_summary(raw_html):
@@ -284,13 +285,25 @@ class Renderer:
                     if ordered:
                         idx = 1
                         for li in element['children']:
-                            text.append("  " * depth + "%s. " % idx)
+                            indent = "  " * depth
+                            text.append(('md-list-bullet',
+                                         indent + "%s. " % idx))
                             text.extend(self.toUrwidMarkup([li]))
                             idx += 1
                     else:
+                        bullet = '\u25e6 ' if depth else '\u2022 '
                         for li in element['children']:
-                            text.append("  " * depth + "- ")
+                            indent = "  " * depth
+                            text.append(('md-list-bullet',
+                                         indent + bullet))
                             text.extend(self.toUrwidMarkup([li]))
+                case 'task_list_item':
+                    checked = element.get('attrs', {}).get(
+                        'checked', False)
+                    marker = '\u2611 ' if checked else '\u2610 '
+                    text.append(('md-checkbox', marker))
+                    text.extend(self.toUrwidMarkup(
+                        element['children']))
                 case 'list_item':
                     text.extend(self.toUrwidMarkup(element['children']))
                 case 'block_text':

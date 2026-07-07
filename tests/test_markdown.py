@@ -174,12 +174,41 @@ class TestRenderBasic:
         flat = _flatten(result)
         assert 'item1' in flat
         assert 'item2' in flat
+        # Styled bullet character
+        bullets = _find_attr(result, 'md-list-bullet')
+        assert any('\u2022' in b for b in bullets)
+
+    def test_unordered_list_nested(self):
+        result = self.r.render('- outer\n  - inner')
+        flat = _flatten(result)
+        assert 'outer' in flat
+        assert 'inner' in flat
+        bullets = _find_attr(result, 'md-list-bullet')
+        assert any('\u2022' in b for b in bullets)  # outer
+        assert any('\u25e6' in b for b in bullets)  # inner
 
     def test_ordered_list(self):
         result = self.r.render('1. first\n2. second')
         flat = _flatten(result)
         assert 'first' in flat
         assert 'second' in flat
+        nums = _find_attr(result, 'md-list-bullet')
+        assert any('1.' in n for n in nums)
+        assert any('2.' in n for n in nums)
+
+    def test_task_list_unchecked(self):
+        result = self.r.render('- [ ] todo')
+        flat = _flatten(result)
+        assert 'todo' in flat
+        cb = _find_attr(result, 'md-checkbox')
+        assert any('\u2610' in c for c in cb)
+
+    def test_task_list_checked(self):
+        result = self.r.render('- [x] done')
+        flat = _flatten(result)
+        assert 'done' in flat
+        cb = _find_attr(result, 'md-checkbox')
+        assert any('\u2611' in c for c in cb)
 
     def test_link(self):
         result = self.r.render('[click](https://example.com)')
