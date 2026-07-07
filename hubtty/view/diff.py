@@ -108,9 +108,9 @@ def build_comment_widget(app, comment, md=None, repository_name=None):
     context = ({'repository': repository_name}
                if repository_name else None)
     segments = md.render_structured(body)
-    has_details = any(s[0] == 'details' for s in segments)
+    needs_pile = len(segments) > 1 or segments[0][0] != 'text'
 
-    if not has_details:
+    if not needs_pile:
         # Single HyperText with author prefix.
         # render_structured() always returns at least [('text', [])],
         # so segments[0] is safe to access here.
@@ -142,6 +142,10 @@ def build_comment_widget(app, comment, md=None, repository_name=None):
                 app, list(seg[1]), context)
             widgets.append(
                 urwid.AttrMap(mywid.HyperText(seg_markup), 'comment'))
+        elif seg[0] == 'code_block':
+            widgets.append(
+                urwid.AttrMap(
+                    mywid.HyperText(seg[1]), 'md-blockcode'))
         else:  # 'details'
             _, summary, body_markup = seg
             body_markup = apply_commentlinks(

@@ -69,12 +69,14 @@ SYNTAX_PALETTE = {
 DIFF_LINE_STYLES = {
     'added-line': ('dark green', '#204020'),
     'removed-line': ('dark red', '#402020'),
+    'md-blockcode': ('dark gray', '#282828'),
 }
 
 # Light-theme diff backgrounds (softer tints suitable for light terminals).
 LIGHT_DIFF_LINE_STYLES = {
     'added-line': ('light green', '#c8e6c8'),
     'removed-line': ('light red', '#e6c8c8'),
+    'md-blockcode': ('light gray', '#eeeeee'),
 }
 
 # Foreground adjustments for readability on coloured backgrounds.
@@ -84,12 +86,16 @@ _FG_ADJUST = {
     ('dark gray', 'dark red'): 'light gray',
     ('dark gray', 'dark green'): 'light gray',
     ('dark cyan', 'dark green'): 'light cyan',
+    ('dark gray', 'dark gray'): 'light gray',
+    ('dark green', 'dark gray'): 'light green',
+    ('dark magenta', 'dark gray'): 'light magenta',
 }
 
 # Light-theme foreground adjustments.
 _LIGHT_FG_ADJUST = {
     ('dark green', 'light green'): 'dark green',
     ('dark magenta', 'light red'): 'dark magenta',
+    ('dark blue', 'light gray'): 'dark blue',
 }
 
 # Default maximum file size (bytes) to attempt highlighting.
@@ -178,37 +184,40 @@ def highlight_file(filename, content, max_file_size=DEFAULT_MAX_FILE_SIZE):
     return _highlight_with_lexer(lexer, content)
 
 
-def highlight_code(content, language, max_file_size=DEFAULT_MAX_FILE_SIZE):
-    """Highlight *content* by explicit *language* name.
-
-    Used for markdown fenced code blocks (e.g. ```` ```python ````),
-    where the language is given directly rather than inferred from a
-    filename.
+def highlight_code(language, content, bg_style='md-blockcode'):
+    """Highlight *content* by language name and return urwid markup.
 
     Args:
-        content:       Code text (``str``).
-        language:      Pygments lexer name/alias (e.g. ``'python'``).
-        max_file_size: Skip content larger than this (bytes).
+        language:  Pygments language name (e.g. ``'python'``, ``'yaml'``).
+        content:   Source code text.
+        bg_style:  Background palette attr applied to unstyled tokens.
+                   Styled tokens receive a combined attr such as
+                   ``syn-keyword-on-md-blockcode``.
 
     Returns:
-        ``dict[int, markup]`` — 1-based line number → urwid text
-        markup.  Empty if *language* is blank/unrecognized, or the
-        resolved lexer is a plain-text lexer.
+        A list of urwid text markup segments, or *None* if the
+        language is not recognised or *content* is empty.
     """
-    if not content or not language or len(content) > max_file_size:
-        return {}
-
-    content = content.replace('\r\n', '\n').replace('\r', '\n')
+    if not language or not content:
+        return None
 
     try:
         lexer = get_lexer_by_name(language, stripall=False)
     except ClassNotFound:
-        return {}
+        return None
 
     if isinstance(lexer, TextLexer):
-        return {}
+        return None
 
-    return _highlight_with_lexer(lexer, content)
+    markup = []
+    for token_type, value in lex(content, lexer):
+        attr = _token_to_attr(token_type)
+        if attr:
+            markup.append((f'{attr}-on-{bg_style}', value))
+        else:
+            markup.append((bg_style, value))
+
+    return _simplify_markup(markup) if markup else None
 
 
 def _simplify_markup(markup):

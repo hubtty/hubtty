@@ -20,7 +20,7 @@ import urwid
 from urwid.str_util import calc_width
 
 from hubtty import mywid
-from hubtty import syntax
+from hubtty.syntax import highlight_code
 
 
 class Renderer:
@@ -256,25 +256,11 @@ class Renderer:
                         inner, '│ ')
                     text.append(('md-blockquote', prefixed))
                 case 'block_code':
-                    info = element.get('attrs', {}).get('info', '')
-                    if info is None:
-                        info = ""
+                    info = element.get('attrs', {}).get('info', '') or ''
                     raw_code = element.get('raw', '')
-                    language = info.split()[0] if info.split() else ''
-                    highlighted = {}
-                    if language and self.app.config.syntax_highlighting:
-                        highlighted = syntax.highlight_code(
-                            raw_code, language,
-                            max_file_size=self.app.config.max_highlight_size)
-                    if highlighted:
-                        text.append(('md-blockcode', "```%s\n" % info))
-                        lines = raw_code.splitlines()
-                        for i, line in enumerate(lines, start=1):
-                            text.append(highlighted.get(i, line))
-                            text.append("\n")
-                        text.append(('md-blockcode', "```\n"))
-                    else:
-                        text.append(('md-blockcode', ["```%s\n" % info, raw_code, "```\n"]))
+                    code_markup = self._render_code_block_markup(
+                        info, raw_code)
+                    text.append(('md-blockcode', code_markup))
                 case 'table':
                     if self.needsNewLine(text):
                         text.append("\n")
@@ -440,12 +426,75 @@ class Renderer:
 
         return result
 
+    def _render_code_block_markup(self, info, raw_code):
+        """Return urwid markup list for a fenced code block.
+
+        When syntax highlighting is enabled and *info* names a
+        recognised language, tokens receive combined attrs such as
+        ``syn-keyword-on-md-blockcode``.  Otherwise plain strings
+        are returned (suitable for wrapping in ``md-blockcode``
+        by the caller).
+        """
+        # urwid renders literal tabs as '?'; expand to spaces.
+        raw_code = raw_code.expandtabs(4)
+        highlighted = None
+        if info and self.app.config.syntax_highlighting:
+            highlighted = highlight_code(info, raw_code)
+        if highlighted is not None:
+            body = highlighted if isinstance(highlighted, list) \
+                else [highlighted]
+            return [('syn-comment-on-md-blockcode', "```%s\n" % info)] \
+                + body + [('syn-comment-on-md-blockcode', "```\n")]
+        return [('syn-comment-on-md-blockcode', "```%s\n" % info),
+                raw_code,
+                ('syn-comment-on-md-blockcode', "```\n")]
+
+    def _render_node_segments(self, nodes, segments):
+        """Render AST *nodes*, splitting code blocks into segments.
+
+        Regular nodes are batched and rendered via
+        ``toUrwidMarkup`` as ``('text', markup)`` segments.
+        ``block_code`` nodes become ``('code_block', markup)``
+        segments so callers can wrap them in a widget with a
+        full-width background.
+        """
+        current = []
+        for node in nodes:
+            if node['type'] == 'block_code':
+                if current:
+                    markup = self.toUrwidMarkup(current)
+                    if markup:
+                        segments.append(('text', markup))
+                    current = []
+                info = node.get('attrs', {}).get('info', '') or ''
+                raw_code = node.get('raw', '')
+                code_markup = self._render_code_block_markup(
+                    info, raw_code)
+                # Strip the trailing newline from the closing
+                # fence — as a standalone widget the extra line
+                # would show an empty row with the background.
+                last = code_markup[-1]
+                if isinstance(last, tuple):
+                    code_markup[-1] = (last[0],
+                                       last[1].rstrip('\n'))
+                else:
+                    code_markup[-1] = last.rstrip('\n')
+                segments.append(('code_block', code_markup))
+            else:
+                current.append(node)
+        if current:
+            markup = self.toUrwidMarkup(current)
+            if markup:
+                segments.append(('text', markup))
+
     def render_structured(self, text):
         """Render markdown into structured segments.
 
         Returns a list of segment tuples:
 
         * ``('text', urwid_markup_list)`` — plain content
+        * ``('code_block', urwid_markup_list)`` — fenced code
+          block (wrap in ``AttrMap`` for full-width background)
         * ``('details', summary_str, urwid_markup_list)`` —
           collapsible ``<details>`` section
         """
@@ -459,9 +508,7 @@ class Renderer:
         segments = []
         for seg in grouped:
             if seg[0] == 'text':
-                markup = self.toUrwidMarkup(seg[1])
-                if markup:
-                    segments.append(('text', markup))
+                self._render_node_segments(seg[1], segments)
             else:  # 'details'
                 _, summary, detail_nodes = seg
                 body_markup = self.toUrwidMarkup(detail_nodes)
