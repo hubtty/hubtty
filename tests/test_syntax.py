@@ -28,6 +28,7 @@ from hubtty.syntax import (
     build_light_syntax_palette,
     build_syntax_focus_map,
     build_syntax_palette,
+    highlight_code,
     highlight_file,
     merge_syntax_with_diff,
 )
@@ -483,3 +484,105 @@ class TestBuildSyntaxFocusMap:
         fm = build_syntax_focus_map()
         expected = len(SYNTAX_PALETTE) * (1 + len(DIFF_LINE_STYLES))
         assert len(fm) == expected
+
+
+# ------------------------------------------------------------------
+# highlight_code
+# ------------------------------------------------------------------
+
+class TestHighlightCode:
+
+    def test_default_size_limit(self):
+        assert highlight_code('python', 'x' * (512 * 1024 + 1)) is None
+
+    def test_custom_size_limit(self):
+        code = 'print(1)\n'
+        assert highlight_code('python', code, max_file_size=2) is None
+        assert highlight_code('python', code, max_file_size=len(code))
+
+    def test_normalizes_line_endings(self):
+        result = highlight_code('python', 'x = 1\r\ny = 2\r')
+        text = ''.join(char for _, char in _flatten_to_chars(result))
+        assert text == 'x = 1\ny = 2\n'
+
+    def test_python_keyword(self):
+        result = highlight_code('python', 'def foo():\n')
+        assert result is not None
+        flat = _flatten_to_chars(result)
+        attrs = {a for a, _ in flat if a is not None}
+        assert 'syn-keyword-on-md-blockcode' in attrs
+
+    def test_python_builtin(self):
+        result = highlight_code('python', 'print(1)\n')
+        assert result is not None
+        flat = _flatten_to_chars(result)
+        attrs = {a for a, _ in flat if a is not None}
+        assert 'syn-builtin-on-md-blockcode' in attrs
+
+    def test_python_string(self):
+        result = highlight_code('python', 'x = "hello"\n')
+        assert result is not None
+        flat = _flatten_to_chars(result)
+        attrs = {a for a, _ in flat if a is not None}
+        assert 'syn-string-on-md-blockcode' in attrs
+
+    def test_python_comment(self):
+        result = highlight_code('python', '# comment\n')
+        assert result is not None
+        flat = _flatten_to_chars(result)
+        attrs = {a for a, _ in flat if a is not None}
+        assert 'syn-comment-on-md-blockcode' in attrs
+
+    def test_yaml_language(self):
+        result = highlight_code('yaml', 'key: value\n')
+        assert result is not None
+        flat = _flatten_to_chars(result)
+        text = ''.join(c for _, c in flat)
+        assert 'key' in text
+        assert 'value' in text
+
+    def test_custom_bg_style(self):
+        result = highlight_code('python', 'def f():\n',
+                                bg_style='custom-bg')
+        assert result is not None
+        flat = _flatten_to_chars(result)
+        attrs = {a for a, _ in flat if a is not None}
+        assert 'syn-keyword-on-custom-bg' in attrs
+        # Unstyled tokens use the bg_style directly
+        assert 'custom-bg' in attrs
+
+    def test_unknown_language(self):
+        assert highlight_code('nonexistent_lang_xyz', 'code') is None
+
+    def test_empty_language(self):
+        assert highlight_code('', 'code') is None
+
+    def test_none_language(self):
+        assert highlight_code(None, 'code') is None
+
+    def test_empty_content(self):
+        assert highlight_code('python', '') is None
+
+    def test_none_content(self):
+        assert highlight_code('python', None) is None
+
+    def test_plain_text_language(self):
+        """The 'text' lexer produces no styled tokens."""
+        assert highlight_code('text', 'hello world') is None
+
+    def test_preserves_content(self):
+        code = 'def foo():\n    return 42\n'
+        result = highlight_code('python', code)
+        assert result is not None
+        flat = _flatten_to_chars(result)
+        text = ''.join(c for _, c in flat)
+        assert text == code
+
+    def test_unstyled_tokens_use_bg_style(self):
+        """Tokens without a syntax mapping get the bg_style attr."""
+        result = highlight_code('python', '()')
+        assert result is not None
+        flat = _flatten_to_chars(result)
+        # Parentheses are punctuation — no syntax attr
+        paren_attrs = {a for a, c in flat if c in '()'}
+        assert 'md-blockcode' in paren_attrs
