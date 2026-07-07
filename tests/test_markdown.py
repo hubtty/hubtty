@@ -507,6 +507,93 @@ class TestRenderStructured:
         assert 'Before' in flat
         assert 'After' in flat
 
+    def test_details_inside_blockquote_collapsible(self):
+        """<details> inside a blockquote should become a proper
+        collapsible details segment, not inline text."""
+        md = (
+            '> Some intro\n'
+            '>\n'
+            '> <details>\n'
+            '> <summary>Run configuration</summary>\n'
+            '>\n'
+            '> **Profile**: CHILL\n'
+            '>\n'
+            '> </details>\n'
+            '>\n'
+            '> After text.\n'
+        )
+        segments = self.r.render_structured(md)
+        types = [s[0] for s in segments]
+        assert 'details' in types
+
+        details = [s for s in segments if s[0] == 'details']
+        assert len(details) == 1
+        assert details[0][1] == 'Run configuration'
+        assert 'CHILL' in _flatten(details[0][2])
+
+        # Surrounding text should be in text segments.
+        texts = [s for s in segments if s[0] == 'text']
+        all_text = ''.join(_flatten(s[1]) for s in texts)
+        assert 'Some intro' in all_text
+        assert 'After text' in all_text
+
+    def test_details_inside_blockquote_with_emoji(self):
+        md = (
+            '> <details>\n'
+            '> <summary>\u2699\ufe0f Run configuration</summary>\n'
+            '>\n'
+            '> **Plan**: Enterprise\n'
+            '>\n'
+            '> </details>\n'
+        )
+        segments = self.r.render_structured(md)
+        details = [s for s in segments if s[0] == 'details']
+        assert len(details) == 1
+        assert 'Run configuration' in details[0][1]
+        assert 'Enterprise' in _flatten(details[0][2])
+
+    def test_coderabbit_blockquoted_details(self):
+        """Simulate the CodeRabbit comment with blockquoted <details>."""
+        md = (
+            '> [!IMPORTANT]\n'
+            '> ## Review skipped\n'
+            '>\n'
+            '> Auto reviews are disabled.\n'
+            '>\n'
+            '> <details>\n'
+            '> <summary>\u2699\ufe0f Run configuration</summary>\n'
+            '>\n'
+            '> **Configuration used**: Repo config\n'
+            '>\n'
+            '> **Review profile**: CHILL\n'
+            '>\n'
+            '> </details>\n'
+            '>\n'
+            '> You can disable this status message.\n'
+        )
+        segments = self.r.render_structured(md)
+
+        # The details section should be a collapsible segment.
+        details = [s for s in segments if s[0] == 'details']
+        assert len(details) == 1
+        assert 'Run configuration' in details[0][1]
+        body = _flatten(details[0][2])
+        assert 'Configuration used' in body
+        assert 'CHILL' in body
+
+        # Text before and after should be in text segments.
+        texts = [s for s in segments if s[0] == 'text']
+        all_text = ''.join(_flatten(s[1]) for s in texts)
+        assert 'Review skipped' in all_text
+        assert 'disable this status' in all_text
+
+    def test_blockquote_without_details_unchanged(self):
+        """A plain blockquote without <details> renders normally."""
+        md = '> Just a quote\n'
+        result = self.r.render(md)
+        bq = _find_attr(result, 'md-blockquote')
+        assert any('Just a quote' in b for b in bq)
+
     def test_block_html_inside_details_not_dropped(self):
         """Non-<details> block HTML inside a <details> section should
         pass through to toUrwidMarkup for the details body."""

@@ -116,6 +116,73 @@ class Renderer:
 
         return text
 
+    def _group_details(self, nodes):
+        """Group AST *nodes* by extracting ``<details>`` blocks.
+
+        Returns a list of segment tuples whose payloads are raw AST
+        node lists (not yet rendered to urwid markup):
+
+        * ``('text', node_list)`` — regular AST nodes
+        * ``('details', summary_str, node_list)`` — ``<details>``
+          section
+        """
+        segments = []
+        current_nodes = []
+        details_stack = []  # list of (summary, node_list)
+
+        for node in nodes:
+            if node['type'] == 'block_html':
+                raw = node.get('raw', '').strip()
+                raw_lower = raw.lower()
+                if raw_lower.startswith('<details'):
+                    # Flush accumulated nodes.
+                    if details_stack:
+                        details_stack[-1][1].extend(current_nodes)
+                    elif current_nodes:
+                        segments.append(('text', current_nodes))
+                    current_nodes = []
+                    summary = self._extract_summary(raw)
+                    details_stack.append((summary, []))
+                    continue
+                elif raw_lower.startswith('</details'):
+                    if details_stack:
+                        details_stack[-1][1].extend(current_nodes)
+                        current_nodes = []
+                        summary, detail_nodes = details_stack.pop()
+                        if details_stack:
+                            # Nested — fold into parent as plain
+                            # content (no nested collapsibles).
+                            details_stack[-1][1].extend(
+                                detail_nodes)
+                        else:
+                            segments.append(
+                                ('details', summary,
+                                 detail_nodes))
+                    continue
+                # Other block HTML — fall through.
+
+            # Regular AST node.
+            if details_stack:
+                details_stack[-1][1].append(node)
+            else:
+                current_nodes.append(node)
+
+        # Flush remaining accumulated nodes.
+        if current_nodes:
+            if details_stack:
+                details_stack[-1][1].extend(current_nodes)
+                current_nodes = []
+
+        # Handle any unclosed <details> blocks.
+        while details_stack:
+            summary, detail_nodes = details_stack.pop()
+            segments.append(('details', summary, detail_nodes))
+
+        if current_nodes:
+            segments.append(('text', current_nodes))
+
+        return segments
+
     def toUrwidMarkup(self, ast):
         text = []
         for element in ast:
@@ -259,6 +326,49 @@ class Renderer:
         ast = self._parser(text)
         return self.toUrwidMarkup(ast)
 
+    def _expand_blockquote_details(self, ast):
+        """Lift ``<details>`` blocks out of block-quotes.
+
+        When a ``block_quote`` node's children contain ``<details>``
+        sections, the quote is split so that each details section
+        becomes a top-level segment (processable by
+        ``_group_details`` / ``render_structured``) while the
+        surrounding text stays in separate ``block_quote`` nodes.
+        """
+        result = []
+        for node in ast:
+            if node['type'] != 'block_quote':
+                result.append(node)
+                continue
+
+            sub = self._group_details(node['children'])
+            if not any(s[0] == 'details' for s in sub):
+                result.append(node)
+                continue
+
+            # Split the blockquote.
+            for seg in sub:
+                if seg[0] == 'text':
+                    if seg[1]:
+                        result.append({
+                            'type': 'block_quote',
+                            'children': seg[1],
+                        })
+                else:
+                    _, summary, detail_nodes = seg
+                    result.append({
+                        'type': 'block_html',
+                        'raw': '<details><summary>%s</summary>'
+                               % summary,
+                    })
+                    result.extend(detail_nodes)
+                    result.append({
+                        'type': 'block_html',
+                        'raw': '</details>',
+                    })
+
+        return result
+
     def render_structured(self, text):
         """Render markdown into structured segments.
 
@@ -272,67 +382,19 @@ class Renderer:
             return [('text', [])]
 
         ast = self._parser(text)
+        ast = self._expand_blockquote_details(ast)
+        grouped = self._group_details(ast)
 
         segments = []
-        current_nodes = []
-        details_stack = []  # list of (summary, node_list)
-
-        for node in ast:
-            if node['type'] == 'block_html':
-                raw = node.get('raw', '').strip()
-                raw_lower = raw.lower()
-                if raw_lower.startswith('<details'):
-                    # Flush accumulated nodes.
-                    if details_stack:
-                        details_stack[-1][1].extend(current_nodes)
-                    elif current_nodes:
-                        markup = self.toUrwidMarkup(current_nodes)
-                        if markup:
-                            segments.append(('text', markup))
-                    current_nodes = []
-                    summary = self._extract_summary(raw)
-                    details_stack.append((summary, []))
-                    continue
-                elif raw_lower.startswith('</details'):
-                    if details_stack:
-                        details_stack[-1][1].extend(current_nodes)
-                        current_nodes = []
-                        summary, detail_nodes = details_stack.pop()
-                        if details_stack:
-                            # Nested — fold into parent as plain
-                            # content (no nested collapsibles).
-                            details_stack[-1][1].extend(detail_nodes)
-                        else:
-                            body_markup = self.toUrwidMarkup(
-                                detail_nodes)
-                            segments.append(
-                                ('details', summary, body_markup))
-                    continue
-                # Other block HTML (comments, images, …) — pass
-                # through to toUrwidMarkup for consistent handling.
-
-            # Regular AST node.
-            if details_stack:
-                details_stack[-1][1].append(node)
-            else:
-                current_nodes.append(node)
-
-        # Flush remaining accumulated nodes.
-        if current_nodes:
-            if details_stack:
-                details_stack[-1][1].extend(current_nodes)
-                current_nodes = []
-
-        # Handle any unclosed <details> blocks.
-        while details_stack:
-            summary, detail_nodes = details_stack.pop()
-            body_markup = self.toUrwidMarkup(detail_nodes)
-            segments.append(('details', summary, body_markup))
-
-        if current_nodes:
-            markup = self.toUrwidMarkup(current_nodes)
-            if markup:
-                segments.append(('text', markup))
+        for seg in grouped:
+            if seg[0] == 'text':
+                markup = self.toUrwidMarkup(seg[1])
+                if markup:
+                    segments.append(('text', markup))
+            else:  # 'details'
+                _, summary, detail_nodes = seg
+                body_markup = self.toUrwidMarkup(detail_nodes)
+                segments.append(('details', summary, body_markup))
 
         if not segments:
             segments = [('text', [])]
