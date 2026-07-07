@@ -251,7 +251,7 @@ class Renderer:
                     inner = self.toUrwidMarkup(
                         element['children'])
                     prefixed = self._insert_line_prefix(
-                        inner, '| ')
+                        inner, '│ ')
                     text.append(('md-blockquote', prefixed))
                 case 'block_code':
                     info = element.get('attrs', {}).get('info', '')

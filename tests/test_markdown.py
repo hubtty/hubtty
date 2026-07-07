@@ -193,12 +193,12 @@ class TestRenderBasic:
         assert any('quoted' in a for a in attrs)
 
     def test_blockquote_multiline_prefix(self):
-        """Each line in a multi-paragraph blockquote gets '| ' prefix."""
+        """Each line in a multi-paragraph blockquote gets '│ ' prefix."""
         md = '> para one\n>\n> para two\n'
         result = self.r.render(md)
         flat = _flatten(result)
-        # Count '| ' occurrences — at least one per paragraph.
-        assert flat.count('| ') >= 2
+        # Count '│ ' occurrences — at least one per paragraph.
+        assert flat.count('│ ') >= 2
         assert 'para one' in flat
         assert 'para two' in flat
 
@@ -206,7 +206,7 @@ class TestRenderBasic:
         md = '> ## Title\n>\n> Body text\n'
         result = self.r.render(md)
         flat = _flatten(result)
-        assert flat.count('| ') >= 2
+        assert flat.count('│ ') >= 2
         assert 'Title' in flat
         assert 'Body text' in flat
 
@@ -215,7 +215,7 @@ class TestRenderBasic:
         md = '> > inner quote\n'
         result = self.r.render(md)
         flat = _flatten(result)
-        assert '| | ' in flat
+        assert '│ │ ' in flat
         assert 'inner quote' in flat
 
     def test_blockquote_with_list(self):
@@ -224,7 +224,7 @@ class TestRenderBasic:
         flat = _flatten(result)
         assert 'item1' in flat
         assert 'item2' in flat
-        assert flat.startswith('| ')
+        assert flat.startswith('│ ')
 
     def test_strikethrough(self):
         result = self.r.render('~~removed~~')
