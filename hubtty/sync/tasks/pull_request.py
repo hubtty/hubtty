@@ -550,3 +550,54 @@ class SyncPullRequestChecksTask(Task):
                 "All checks completed for %s after %d attempt(s)",
                 self.pr_id, self.attempt + 1,
             )
+
+
+@dataclass
+class ApproveWorkflowRunsTask(Task):
+    """Approve pending workflow runs for a PR.
+
+    Approves all 'action_required' checks with a run_id on the
+    latest commit, then re-polls checks.
+    """
+
+    pr_key: int
+
+    def run(self, sync: 'Sync') -> None:
+        """Args:
+            sync: The Sync instance to use for API calls.
+        """
+        app = sync.app
+        with app.db.getSession() as session:
+            pr = session.getPullRequest(self.pr_key)
+            if not pr or not pr.commits:
+                return
+            repository_name = pr.repository.name
+            pr_id = pr.pr_id
+            last_commit = pr.commits[-1]
+            run_ids = [c.run_id for c in last_commit.checks
+                      if c.state == 'action_required' and c.run_id]
+
+        if not run_ids:
+            self.log.debug(
+                "No pending workflow-run approvals found for %s", pr_id
+            )
+            return
+
+        approved_any = False
+        for run_id in run_ids:
+            self.log.info("Approving workflow run %s for %s", run_id, pr_id)
+            try:
+                sync.post(
+                    f'repos/{repository_name}/actions/runs/{run_id}/approve',
+                    {},
+                )
+                approved_any = True
+            except Exception:
+                self.log.exception(
+                    "Failed to approve workflow run %s for %s",
+                    run_id, pr_id,
+                )
+
+        if approved_any:
+            sync.submitTask(SyncPullRequestChecksTask(
+                pr_id, repository_name, priority=self.priority))

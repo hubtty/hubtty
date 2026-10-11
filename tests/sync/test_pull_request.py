@@ -19,6 +19,7 @@ from unittest.mock import Mock, MagicMock, patch
 from hubtty.sync.tasks.pull_request import (
     SyncPullRequestTask,
     SyncPullRequestChecksTask,
+    ApproveWorkflowRunsTask,
 )
 from hubtty.gitrepo import EMPTY_TREE_SHA
 
@@ -568,3 +569,114 @@ class TestSyncPullRequestChecksTaskRun:
 
         assert task.followup is None, \
             "Expected no followup for a closed PR"
+
+
+def _make_check(name, state, run_id=None):
+    check = Mock()
+    check.name = name
+    check.state = state
+    check.run_id = run_id
+    return check
+
+
+def _make_approve_task_pr(checks):
+    commit = Mock()
+    commit.checks = checks
+    pr = Mock()
+    pr.pr_id = PR_ID
+    pr.commits = [commit]
+    pr.repository = Mock(name=REPO)
+    pr.repository.name = REPO
+    return pr
+
+
+class TestApproveWorkflowRunsTask:
+    """Verify ApproveWorkflowRunsTask.run() behaviour."""
+
+    def test_approves_pending_runs_only(self, mock_sync):
+        """Only action_required checks with a run_id are approved."""
+        pr_mock = _make_approve_task_pr([
+            _make_check('CI', 'action_required', run_id=555),
+            _make_check('Lint', 'success'),
+            # Non-action_required state with no run_id.
+            _make_check('Other', 'pending', run_id=None),
+        ])
+        session = mock_sync.app.db.getSession.return_value.__enter__.return_value
+        session.getPullRequest.return_value = pr_mock
+
+        task = ApproveWorkflowRunsTask(42)
+        task.run(mock_sync)
+
+        mock_sync.post.assert_called_once_with(
+            f'repos/{REPO}/actions/runs/555/approve', {})
+        assert mock_sync.submitTask.call_count == 1
+        followup = mock_sync.submitTask.call_args[0][0]
+        assert isinstance(followup, SyncPullRequestChecksTask)
+        assert followup.pr_id == PR_ID
+        assert followup.repository_name == REPO
+
+    def test_no_pending_runs_does_nothing(self, mock_sync):
+        """No action_required checks means no API calls at all."""
+        pr_mock = _make_approve_task_pr([
+            _make_check('CI', 'success'),
+        ])
+        session = mock_sync.app.db.getSession.return_value.__enter__.return_value
+        session.getPullRequest.return_value = pr_mock
+
+        task = ApproveWorkflowRunsTask(42)
+        task.run(mock_sync)
+
+        mock_sync.post.assert_not_called()
+        mock_sync.submitTask.assert_not_called()
+
+    def test_missing_pr_does_nothing(self, mock_sync):
+        """A PR that no longer exists locally is a no-op, not an error."""
+        session = mock_sync.app.db.getSession.return_value.__enter__.return_value
+        session.getPullRequest.return_value = None
+
+        task = ApproveWorkflowRunsTask(42)
+        task.run(mock_sync)
+
+        mock_sync.post.assert_not_called()
+        mock_sync.submitTask.assert_not_called()
+
+    def test_continues_on_partial_failure(self, mock_sync):
+        """A failed approval doesn't prevent remaining runs from being approved."""
+        pr_mock = _make_approve_task_pr([
+            _make_check('CI', 'action_required', run_id=111),
+            _make_check('E2E', 'action_required', run_id=222),
+        ])
+        session = mock_sync.app.db.getSession.return_value.__enter__.return_value
+        session.getPullRequest.return_value = pr_mock
+
+        # First call fails, second succeeds.
+        mock_sync.post.side_effect = [
+            Exception('403 Forbidden'),
+            None,
+        ]
+
+        task = ApproveWorkflowRunsTask(42)
+        task.run(mock_sync)
+
+        assert mock_sync.post.call_count == 2
+        # A refresh task is still submitted because one approval succeeded.
+        assert mock_sync.submitTask.call_count == 1
+        followup = mock_sync.submitTask.call_args[0][0]
+        assert isinstance(followup, SyncPullRequestChecksTask)
+
+    def test_no_refresh_when_all_approvals_fail(self, mock_sync):
+        """When every approval POST fails, no refresh task is submitted."""
+        pr_mock = _make_approve_task_pr([
+            _make_check('CI', 'action_required', run_id=111),
+            _make_check('E2E', 'action_required', run_id=222),
+        ])
+        session = mock_sync.app.db.getSession.return_value.__enter__.return_value
+        session.getPullRequest.return_value = pr_mock
+
+        mock_sync.post.side_effect = Exception('403 Forbidden')
+
+        task = ApproveWorkflowRunsTask(42)
+        task.run(mock_sync)
+
+        assert mock_sync.post.call_count == 2
+        mock_sync.submitTask.assert_not_called()

@@ -31,7 +31,7 @@ import alembic
 import alembic.config
 import alembic.migration
 import sqlalchemy
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, Text, UniqueConstraint
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, BigInteger, String, Boolean, DateTime, Text, UniqueConstraint
 from sqlalchemy.schema import ForeignKey
 from sqlalchemy.orm import registry, sessionmaker, relationship, scoped_session, joinedload
 from sqlalchemy.orm.session import Session
@@ -194,6 +194,8 @@ check_table = Table(
     'check', metadata,
     Column('key', Integer, primary_key=True),
     Column('commit_key', Integer, ForeignKey("commit.key"), index=True),
+    # 16 chars fits all known GitHub states; 'action_required' is
+    # the longest at 15.
     Column('state', String(16), nullable=False),
     Column('name', String(255), index=True),
     Column('url', Text),
@@ -202,6 +204,9 @@ check_table = Table(
     Column('finished', DateTime),
     Column('created', DateTime, nullable=False),
     Column('updated', DateTime, nullable=False),
+    # Only set for synthetic 'action_required' checks; used to
+    # approve the workflow run via the Actions API.
+    Column('run_id', BigInteger),
     )
 label_table = Table(
     'label', metadata,
@@ -674,12 +679,13 @@ class Server:
         pass
 
 class Check:
-    def __init__(self, commit, name, state, created, updated):
+    def __init__(self, commit, name, state, created, updated, run_id=None):
         self.commit_key = commit.key
         self.name = name
         self.state = state
         self.created = created
         self.updated = updated
+        self.run_id = run_id
 
 mapper.map_imperatively(Account, account_table)
 mapper.map_imperatively(Repository, repository_table, properties=dict(

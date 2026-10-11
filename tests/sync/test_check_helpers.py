@@ -26,6 +26,7 @@ from hubtty.sync.tasks.check_helpers import (
     check_result_from_status,
     fetch_checks,
     fetch_merge_queue_rule,
+    fetch_pending_workflow_approvals,
     has_pending_checks,
     update_checks,
 )
@@ -330,6 +331,8 @@ class TestFetchChecks:
                  'started_at': '2024-01-01T10:00:00Z',
                  'completed_at': '2024-01-01T10:03:00Z'},
             ],
+            # pending workflow-run approvals response (none)
+            {'total_count': 0, 'workflow_runs': []},
         ]
         result = fetch_checks(sync, 'owner/repo', 'abc123')
         assert len(result) == 2
@@ -339,11 +342,14 @@ class TestFetchChecks:
         assert result[1]['state'] == 'failure'
 
         # Verify API calls
-        assert sync.get.call_count == 2
+        assert sync.get.call_count == 3
         sync.get.assert_any_call(
             'repos/owner/repo/commits/abc123/status', use_etag=True)
         sync.get.assert_any_call(
             'repos/owner/repo/commits/abc123/check-runs?per_page=100',
+            use_etag=True)
+        sync.get.assert_any_call(
+            'repos/owner/repo/actions/runs?head_sha=abc123&per_page=100',
             use_etag=True)
 
     def test_empty_statuses_and_check_runs(self):
@@ -352,6 +358,7 @@ class TestFetchChecks:
         sync.get.side_effect = [
             {'statuses': []},
             [],  # check runs (unwrapped by get())
+            {'total_count': 0, 'workflow_runs': []},
         ]
         result = fetch_checks(sync, 'owner/repo', 'abc123')
         assert result == []
@@ -367,6 +374,7 @@ class TestFetchChecks:
                  'updated_at': '2024-01-01T10:00:00Z'},
             ]},
             [],  # check runs (unwrapped by get())
+            {'total_count': 0, 'workflow_runs': []},
         ]
         result = fetch_checks(sync, 'owner/repo', 'abc123')
         assert len(result) == 1
@@ -388,6 +396,7 @@ class TestFetchChecks:
                  'started_at': '2024-01-01T10:00:00Z',
                  'completed_at': '2024-01-01T10:05:00Z'},
             ],
+            {'total_count': 0, 'workflow_runs': []},
         ]
         result = fetch_checks(sync, 'owner/repo', 'abc123')
         assert len(result) == 1
@@ -425,6 +434,7 @@ class TestFetchChecks:
                  'started_at': '2024-01-01T10:00:00Z',
                  'completed_at': '2024-01-01T10:02:00Z'},
             ],
+            {'total_count': 0, 'workflow_runs': []},
         ]
         result = fetch_checks(sync, 'owner/repo', 'abc123')
         names = [c['name'] for c in result]
@@ -476,10 +486,12 @@ class TestUpdateChecks:
             'ci/new', 'success',
             dateutil.parser.parse('2024-01-01T10:00:00Z'),
             dateutil.parser.parse('2024-01-01T10:00:00Z'),
+            run_id=None,
         )
         assert new_check.state == 'success'
         assert new_check.url == 'http://x'
         assert new_check.message == 'Job succeeded'
+        assert new_check.run_id is None
 
     def test_updates_existing_check(self):
         """Existing check is updated with new state."""
@@ -613,6 +625,86 @@ class TestUpdateChecks:
         commit.createCheck.assert_called_once()
         assert created_check.state == 'success'
         assert created_check.url == 'http://new'
+
+
+
+class TestFetchPendingWorkflowApprovals:
+    """Tests for fetch_pending_workflow_approvals."""
+
+    def test_no_runs(self):
+        """No workflow runs at all for this commit."""
+        sync = Mock()
+        sync.get.return_value = {'total_count': 0, 'workflow_runs': []}
+        result = fetch_pending_workflow_approvals(sync, 'owner/repo', 'abc123')
+        assert result == []
+        sync.get.assert_called_once_with(
+            'repos/owner/repo/actions/runs?head_sha=abc123&per_page=100',
+            use_etag=True,
+        )
+
+    def test_ignores_non_action_required_runs(self):
+        """Runs that aren't awaiting approval are not surfaced."""
+        sync = Mock()
+        sync.get.return_value = {
+            'total_count': 2,
+            'workflow_runs': [
+                {'id': 1, 'name': 'CI', 'html_url': 'http://x/1',
+                 'status': 'completed', 'conclusion': 'success',
+                 'created_at': '2024-01-01T10:00:00Z',
+                 'updated_at': '2024-01-01T10:05:00Z'},
+                {'id': 2, 'name': 'Lint', 'html_url': 'http://x/2',
+                 'status': 'in_progress', 'conclusion': None,
+                 'created_at': '2024-01-01T10:00:00Z',
+                 'updated_at': '2024-01-01T10:05:00Z'},
+            ],
+        }
+        result = fetch_pending_workflow_approvals(sync, 'owner/repo', 'abc123')
+        assert result == []
+
+    def test_surfaces_action_required_status_runs(self):
+        """Runs with status == 'action_required' are surfaced."""
+        sync = Mock()
+        sync.get.return_value = {
+            'total_count': 1,
+            'workflow_runs': [
+                {'id': 42, 'name': 'CI', 'html_url': 'http://x/42',
+                 'status': 'action_required', 'conclusion': None,
+                 'created_at': '2024-01-01T10:00:00Z',
+                 'updated_at': '2024-01-01T10:05:00Z'},
+            ],
+        }
+        result = fetch_pending_workflow_approvals(sync, 'owner/repo', 'abc123')
+        assert len(result) == 1
+        assert result[0]['name'] == 'workflow-approval: CI'
+        assert result[0]['state'] == 'action_required'
+        assert result[0]['run_id'] == 42
+        assert result[0]['url'] == 'http://x/42'
+
+    def test_surfaces_action_required_conclusion_runs(self):
+        """Runs with conclusion == 'action_required' are surfaced."""
+        sync = Mock()
+        sync.get.return_value = {
+            'total_count': 1,
+            'workflow_runs': [
+                {'id': 43, 'name': 'functional-compute',
+                 'html_url': 'http://x/43',
+                 'status': 'completed', 'conclusion': 'action_required',
+                 'created_at': '2024-01-01T10:00:00Z',
+                 'updated_at': '2024-01-01T10:05:00Z'},
+            ],
+        }
+        result = fetch_pending_workflow_approvals(sync, 'owner/repo', 'abc123')
+        assert len(result) == 1
+        assert result[0]['name'] == 'workflow-approval: functional-compute'
+        assert result[0]['state'] == 'action_required'
+        assert result[0]['run_id'] == 43
+
+    def test_swallows_errors(self):
+        """API failures return an empty list."""
+        sync = Mock()
+        sync.get.side_effect = Exception('boom')
+        result = fetch_pending_workflow_approvals(sync, 'owner/repo', 'abc123')
+        assert result == []
 
 
 class TestFetchMergeQueueRule:
