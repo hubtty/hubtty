@@ -17,7 +17,11 @@
 from unittest.mock import Mock, MagicMock
 
 from hubtty.sync.http import SearchResult
-from hubtty.sync.tasks.repository import SyncRepositoryTask
+from hubtty.sync.tasks.repository import (
+    SyncRepositoryBranchesTask,
+    SyncRepositoryListTask,
+    SyncRepositoryTask,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -157,3 +161,136 @@ class TestSyncRepositoryTaskTruncation:
         task.run(mock_sync)
 
         mock_sync.query.assert_called_once()
+
+
+class TestSyncRepositoryListTaskMergeFlags:
+    """Tests for the allow_*_merge null-coalescing in SyncRepositoryListTask."""
+
+    def _run_with_remote_repo(self, mock_sync, remote_repo):
+        """Run SyncRepositoryListTask with a single remote repo and return
+        the repository object its attributes were written to."""
+        repository = Mock()
+        session = MagicMock()
+        session.getRepositoryByName = Mock(return_value=repository)
+        session.getRepositories = Mock(return_value=[])
+        mock_sync.app.db.getSession.return_value.__enter__ = Mock(
+            return_value=session)
+        mock_sync.app.config.additional_repositories = []
+        mock_sync.get = Mock(return_value=[remote_repo])
+
+        task = SyncRepositoryListTask()
+        task.run(mock_sync)
+        return repository
+
+    def test_null_bulk_merge_flags_coalesce_to_defaults(self, mock_sync):
+        """GitHub's bulk listing returns these as null; defaults are used."""
+        repository = self._run_with_remote_repo(mock_sync, {
+            'full_name': 'org/repo',
+            'description': '',
+            'permissions': {'push': True},
+            'allow_merge_commit': None,
+            'allow_squash_merge': None,
+            'allow_rebase_merge': None,
+            'allow_auto_merge': None,
+        })
+        assert repository.allow_merge_commit is True
+        assert repository.allow_squash_merge is True
+        assert repository.allow_rebase_merge is True
+        assert repository.allow_auto_merge is False
+
+    def test_non_null_bulk_merge_flags_are_preserved(self, mock_sync):
+        """Non-null values (even if inaccurate) are passed through as-is."""
+        repository = self._run_with_remote_repo(mock_sync, {
+            'full_name': 'org/repo',
+            'description': '',
+            'permissions': {'push': True},
+            'allow_merge_commit': False,
+            'allow_squash_merge': False,
+            'allow_rebase_merge': False,
+            'allow_auto_merge': True,
+        })
+        assert repository.allow_merge_commit is False
+        assert repository.allow_squash_merge is False
+        assert repository.allow_rebase_merge is False
+        assert repository.allow_auto_merge is True
+
+
+class TestSyncRepositoryBranchesTaskMergeSettings:
+    """Tests for merge-settings sync folded into SyncRepositoryBranchesTask."""
+
+    def _setup(self, mock_sync, remote_repo, remote_branches=None):
+        """Configure mock_sync for a SyncRepositoryBranchesTask run.
+
+        Returns the mock repository object whose attributes are set by
+        the task.
+        """
+        if remote_branches is None:
+            remote_branches = []
+
+        repository = Mock()
+        repository.branches = []
+        repository.pull_requests = []
+        session = MagicMock()
+        session.getRepositoryByName = Mock(return_value=repository)
+        mock_sync.app.db.getSession.return_value.__enter__ = Mock(
+            return_value=session)
+
+        # get() is called twice: once for the repo, once for branches.
+        mock_sync.get = Mock(side_effect=[
+            remote_repo,
+            remote_branches,
+        ])
+        return repository
+
+    def test_persists_real_values_from_single_repo_endpoint(self, mock_sync):
+        repository = self._setup(mock_sync, {
+            'allow_merge_commit': False,
+            'allow_squash_merge': True,
+            'allow_rebase_merge': False,
+            'allow_auto_merge': True,
+        })
+
+        task = SyncRepositoryBranchesTask('org/repo')
+        task.run(mock_sync)
+
+        # First get() call should be the repo endpoint.
+        assert mock_sync.get.call_args_list[0] == \
+            (('repos/org/repo',), {'use_etag': True})
+        assert repository.allow_merge_commit is False
+        assert repository.allow_squash_merge is True
+        assert repository.allow_rebase_merge is False
+        assert repository.allow_auto_merge is True
+
+    def test_missing_keys_use_defaults(self, mock_sync):
+        # Non-empty (truthy) response, but missing the merge-flag keys.
+        repository = self._setup(mock_sync, {'full_name': 'org/repo'})
+
+        task = SyncRepositoryBranchesTask('org/repo')
+        task.run(mock_sync)
+
+        assert repository.allow_merge_commit is True
+        assert repository.allow_squash_merge is True
+        assert repository.allow_rebase_merge is True
+        assert repository.allow_auto_merge is False
+
+    def test_falsy_repo_response_skips_merge_settings(self, mock_sync):
+        """A falsy repo response (304 Not Modified) skips merge-settings
+        update but still processes branches."""
+        repository = self._setup(
+            mock_sync, None,
+            remote_branches=[{'name': 'main'}],
+        )
+
+        task = SyncRepositoryBranchesTask('org/repo')
+        task.run(mock_sync)
+
+        # Merge-settings attributes should not have been set.
+        # Mock.__setattr__ calls are tracked via the property mock;
+        # verify none of the allow_* attrs were assigned.
+        set_attrs = {name for name, _ in repository._mock_children.items()}
+        for attr in ('allow_merge_commit', 'allow_squash_merge',
+                     'allow_rebase_merge', 'allow_auto_merge'):
+            assert attr not in set_attrs, \
+                f'{attr} should not have been set on a falsy repo response'
+        # Branch should still have been created.
+        repository.createBranch.assert_called_once_with('main')

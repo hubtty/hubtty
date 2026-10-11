@@ -167,3 +167,4 @@ class TestRateLimitBackoff:
         backoff = sync_instance._calculate_rate_limit_backoff(error)
         assert backoff == 60  # Back to first attempt
         assert sync_instance.consecutive_rate_limit_errors == 1
+

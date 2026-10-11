@@ -12,11 +12,16 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-"""Tests for UploadReviewTask — empty-body guard against GitHub 422."""
+"""Tests for UploadReviewTask and SendMergeTask."""
 
+import pytest
 from unittest.mock import Mock, MagicMock, patch
 
-from hubtty.sync.tasks.upload import UploadReviewTask
+from hubtty.sync.tasks.upload import (
+    ENQUEUE_PULL_REQUEST_MUTATION,
+    SendMergeTask,
+    UploadReviewTask,
+)
 
 
 PR_ID = 'owner/repo/pulls/1'
@@ -178,3 +183,125 @@ class TestUploadReviewTaskEmptyBody:
         sync.post.assert_called_once()
         data = sync.post.call_args[0][1]
         assert data['comments'][0]['side'] == 'LEFT'
+
+
+def _make_merge_env(merge_method, commit_title=None, commit_message=None,
+                     node_id='NODE123'):
+    """Build mock app, sync, session, and PendingMerge for SendMergeTask.
+
+    Returns (mock_sync, mock_session, pending_merge, pull_request).
+    """
+    pr = Mock()
+    pr.pr_id = PR_ID
+    pr.node_id = node_id
+
+    pending_merge = Mock()
+    pending_merge.merge_method = merge_method
+    pending_merge.sha = SHA
+    pending_merge.commit_title = commit_title
+    pending_merge.commit_message = commit_message
+    pending_merge.pull_request = pr
+
+    session = MagicMock()
+    session.getPendingMerge = Mock(return_value=pending_merge)
+    session.getPullRequestByPullRequestID = Mock(return_value=None)
+
+    app = Mock()
+    app.db.getSession.return_value.__enter__ = Mock(return_value=session)
+    app.db.getSession.return_value.__exit__ = Mock(return_value=False)
+
+    sync = Mock()
+    sync.app = app
+    sync.put = Mock()
+    sync.graphql = Mock(return_value={})
+    sync.submitTask = Mock()
+
+    return sync, session, pending_merge, pr
+
+
+def _run_merge(sync, pending_merge_key=1):
+    """Run SendMergeTask with SyncPullRequestTask patched out."""
+    task = SendMergeTask(pending_merge_key=pending_merge_key)
+    with patch('hubtty.sync.tasks.pull_request.SyncPullRequestTask') as mock_cls:
+        mock_cls.return_value.run = Mock()
+        mock_cls.return_value.results = []
+        task.run(sync)
+    return task
+
+
+class TestSendMergeTaskDirectMerge(object):
+    """merge_method of 'merge'/'squash'/'rebase' uses the REST merge endpoint."""
+
+    def test_puts_to_merge_endpoint(self):
+        sync, session, pm, pr = _make_merge_env('squash')
+        _run_merge(sync)
+
+        sync.put.assert_called_once_with(
+            f'repos/{PR_ID}/merge',
+            {'sha': SHA, 'merge_method': 'squash'})
+        sync.graphql.assert_not_called()
+        session.delete.assert_called_once_with(pm)
+
+    def test_includes_optional_commit_title_and_message(self):
+        sync, session, pm, pr = _make_merge_env(
+            'merge', commit_title='Title', commit_message='Message')
+        _run_merge(sync)
+
+        sync.put.assert_called_once_with(
+            f'repos/{PR_ID}/merge',
+            {'sha': SHA, 'merge_method': 'merge',
+             'commit_title': 'Title', 'commit_message': 'Message'})
+
+    def test_omits_blank_commit_title_and_message(self):
+        sync, session, pm, pr = _make_merge_env('rebase')
+        _run_merge(sync)
+
+        sent_data = sync.put.call_args[0][1]
+        assert 'commit_title' not in sent_data
+        assert 'commit_message' not in sent_data
+
+    def test_submits_followup_sync_pull_request_task(self):
+        sync, session, pm, pr = _make_merge_env('merge')
+        with patch('hubtty.sync.tasks.pull_request.SyncPullRequestTask') as mock_cls:
+            mock_cls.return_value.run = Mock()
+            mock_cls.return_value.results = []
+            task = SendMergeTask(pending_merge_key=1)
+            task.run(sync)
+        sync.submitTask.assert_called_once()
+        assert mock_cls.call_args[0][0] == PR_ID
+
+
+class TestSendMergeTaskQueueMerge(object):
+    """merge_method 'queue' uses the GraphQL enqueuePullRequest mutation."""
+
+    def test_calls_graphql_enqueue_with_node_id(self):
+        sync, session, pm, pr = _make_merge_env('queue', node_id='NODE123')
+        _run_merge(sync)
+
+        sync.graphql.assert_called_once_with(
+            ENQUEUE_PULL_REQUEST_MUTATION, {'id': 'NODE123'})
+        sync.put.assert_not_called()
+        session.delete.assert_called_once_with(pm)
+
+    def test_missing_node_id_syncs_then_enqueues(self):
+        sync, session, pm, pr = _make_merge_env('queue', node_id=None)
+        refreshed_pr = Mock()
+        refreshed_pr.node_id = 'REFRESHED'
+        session.getPullRequestByPullRequestID = Mock(return_value=refreshed_pr)
+
+        _run_merge(sync)
+
+        sync.graphql.assert_called_once_with(
+            ENQUEUE_PULL_REQUEST_MUTATION, {'id': 'REFRESHED'})
+
+    def test_still_missing_node_id_after_sync_raises(self):
+        sync, session, pm, pr = _make_merge_env('queue', node_id=None)
+        session.getPullRequestByPullRequestID = Mock(return_value=None)
+
+        task = SendMergeTask(pending_merge_key=1)
+        with patch('hubtty.sync.tasks.pull_request.SyncPullRequestTask') as mock_cls:
+            mock_cls.return_value.run = Mock()
+            mock_cls.return_value.results = []
+            with pytest.raises(Exception, match='node id'):
+                task.run(sync)
+        sync.graphql.assert_not_called()
