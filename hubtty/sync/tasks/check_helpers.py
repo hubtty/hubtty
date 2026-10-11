@@ -178,6 +178,57 @@ def fetch_checks(sync: 'Sync', repository_name: str,
     return list(checks_by_name.values())
 
 
+def fetch_merge_queue_rule(sync: 'Sync', repository_name: str,
+                           branch_name: str) -> Dict[str, Any]:
+    """Fetch the effective merge-queue rule (if any) for a branch.
+
+    Uses ``GET /repos/{owner}/{repo}/rules/branches/{branch}``, which
+    returns the *effective* rules for the branch merged from classic
+    branch protection and any applicable rulesets. Requires at least
+    read access; tokens without sufficient permission (or repos with
+    no rules configured) may get a 403/404, which is treated as "no
+    merge queue" rather than a sync failure.
+
+    Args:
+        sync: The Sync instance to use for API calls.
+        repository_name: Full repository name (e.g. 'owner/repo').
+        branch_name: The base branch name (e.g. 'main').
+
+    Returns:
+        A dict with ``required`` (bool) and ``merge_method``
+        (str or None).
+    """
+    result = {'required': False, 'merge_method': None}
+
+    def ignore_permission_errors(response):
+        if response.status_code in (403, 404):
+            return
+        # `sync` (the Sync orchestrator) subclasses HTTPClient directly,
+        # so its own checkResponse() handles the normal validation.
+        sync.checkResponse(response)
+
+    try:
+        rules = sync.get(
+            f'repos/{repository_name}/rules/branches/{branch_name}',
+            use_etag=True,
+            response_callback=ignore_permission_errors,
+        )
+    except Exception:
+        log.exception(
+            "Unable to fetch branch rules for %s@%s, assuming no merge queue",
+            repository_name, branch_name,
+        )
+        return result
+
+    for rule in rules or []:
+        if rule.get('type') == 'merge_queue':
+            result['required'] = True
+            result['merge_method'] = (rule.get('parameters') or {}).get('merge_method')
+            break
+
+    return result
+
+
 def has_pending_checks(checks_data: List[Dict[str, Any]],
                        ignore_names: frozenset = frozenset()) -> bool:
     """Check if any checks are still in pending state.

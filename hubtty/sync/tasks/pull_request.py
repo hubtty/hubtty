@@ -197,6 +197,7 @@ class SyncPullRequestTask(Task):
                     remote_pr['merged'],
                     (remote_pr['mergeable'] or False),
                     remote_pr['draft'],
+                    node_id=remote_pr.get('node_id'),
                 )
                 self.log.info(
                     "Created new pull request %s in local DB.",
@@ -219,6 +220,7 @@ class SyncPullRequestTask(Task):
             pr.merged = remote_pr['merged']
             pr.mergeable = remote_pr.get('mergeable') or False
             pr.draft = remote_pr['draft']
+            pr.node_id = remote_pr.get('node_id')
 
             for label in remote_pr['labels']:
                 l = session.getLabel(label['id'])

@@ -22,9 +22,16 @@ from typing import List, TYPE_CHECKING
 from ..task import Task
 from ..events import RepositoryAddedEvent
 from ..exceptions import OfflineError
+from .check_helpers import fetch_merge_queue_rule
 
 if TYPE_CHECKING:
     from ..sync import Sync
+
+
+def _coalesce(d, key, default):
+    """Return ``d[key]`` if present and not None, else *default*."""
+    v = d.get(key)
+    return v if v is not None else default
 
 
 @dataclass
@@ -78,6 +85,17 @@ class SyncRepositoryListTask(Task):
                     self.results.append(RepositoryAddedEvent(repository.key))
                 repository.description = repo_desc
                 repository.can_push = remote_repo['permissions']['push']
+                # GitHub's bulk listing returns these as null; coalesce
+                # to defaults. Real values are fetched per-repo in
+                # SyncRepositoryBranchesTask for subscribed repos.
+                repository.allow_merge_commit = _coalesce(
+                    remote_repo, 'allow_merge_commit', True)
+                repository.allow_squash_merge = _coalesce(
+                    remote_repo, 'allow_squash_merge', True)
+                repository.allow_rebase_merge = _coalesce(
+                    remote_repo, 'allow_rebase_merge', True)
+                repository.allow_auto_merge = _coalesce(
+                    remote_repo, 'allow_auto_merge', False)
 
             for p in session.getRepositories():
                 if p.name not in remote_repos_names:
@@ -104,25 +122,51 @@ class SyncSubscribedRepositoryBranchesTask(Task):
 
 @dataclass
 class SyncRepositoryBranchesTask(Task):
-    """Sync branches for a specific repository."""
+    """Sync branches and merge settings for a specific repository.
+
+    This task also fetches the repository's merge-method flags
+    (allow_merge_commit/allow_squash_merge/allow_rebase_merge/
+    allow_auto_merge) from the single-repo endpoint, because the bulk
+    ``GET /user/repos`` listing always returns them as ``null``.
+    Combining this with the branch sync avoids a separate task and
+    keeps merge-method and merge-queue data in sync.
+    """
 
     repository_name: str
 
     def run(self, sync: 'Sync') -> None:
-        """Sync branches for the repository.
+        """Sync branches and merge settings for the repository.
 
         Args:
             sync: The Sync instance to use for API calls.
         """
         app = sync.app
+
+        # Fetch merge-method settings from the single-repo endpoint.
+        remote_repo = sync.get(f'repos/{self.repository_name}',
+                               use_etag=True)
+
         remote = sync.get(f'repos/{self.repository_name}/branches?per_page=100',
                          use_etag=True)
+        remote = remote or []
         remote_branches = set()
         for b in remote:
             remote_branches.add(b['name'])
         with app.db.getSession() as session:
-            local = {}
             repository = session.getRepositoryByName(self.repository_name)
+
+            # Update merge-method flags (empty dict on 304 Not Modified).
+            if remote_repo and repository:
+                repository.allow_merge_commit = _coalesce(
+                    remote_repo, 'allow_merge_commit', True)
+                repository.allow_squash_merge = _coalesce(
+                    remote_repo, 'allow_squash_merge', True)
+                repository.allow_rebase_merge = _coalesce(
+                    remote_repo, 'allow_rebase_merge', True)
+                repository.allow_auto_merge = _coalesce(
+                    remote_repo, 'allow_auto_merge', False)
+
+            local = {}
             for branch in repository.branches:
                 local[branch.name] = branch
             local_branches = set(local.keys())
@@ -140,6 +184,36 @@ class SyncRepositoryBranchesTask(Task):
                     "Added branch %s to repository %s in local DB.",
                     name, repository.name
                 )
+
+            # Refresh to include newly created branches.
+            local = {b.name: b for b in repository.branches}
+
+            # Only check branches that are the base of an open PR
+            # to avoid exhausting the API rate limit.
+            pr_base_branches = {
+                pr.branch for pr in repository.pull_requests
+                if pr.state == 'open'
+            }
+            branches_to_check = [
+                name for name in local if name in pr_base_branches
+            ]
+
+        # Fetch merge-queue rules outside the db session.
+        merge_queue_rules = {}
+        for name in branches_to_check:
+            merge_queue_rules[name] = fetch_merge_queue_rule(
+                sync, self.repository_name, name)
+
+        if merge_queue_rules:
+            with app.db.getSession() as session:
+                repository = session.getRepositoryByName(
+                    self.repository_name)
+                local = {b.name: b for b in repository.branches}
+                for name, rule in merge_queue_rules.items():
+                    branch = local.get(name)
+                    if branch:
+                        branch.merge_queue_required = rule['required']
+                        branch.merge_queue_method = rule['merge_method']
 
 
 @dataclass
