@@ -92,7 +92,7 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             commit = session.getCommit(self.commit_key)
             pr = commit.pull_request
             buttons = [('pack', save_button)]
-            if commit.pull_request.canMerge():
+            if commit.pull_request.canMerge() or commit.pull_request.canEnqueue():
                 buttons.append(('pack', merge_button))
             buttons.append(('pack', cancel_button))
             buttons = urwid.Columns(buttons, dividechars=2)
@@ -160,7 +160,11 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
     signals = ['merge', 'cancel']
     def __init__(self, app, pr, title='', message=''):
         self.app = app
-        merge_button = mywid.FixedButton('Merge')
+        self.queue_mode = pr.canEnqueue()
+        methods = pr.availableMergeMethods()
+
+        merge_button_label = 'Add to merge queue' if self.queue_mode else 'Merge'
+        merge_button = mywid.FixedButton(merge_button_label)
         cancel_button = mywid.FixedButton('Cancel')
         urwid.connect_signal(merge_button, 'click',
             lambda button:self._emit('merge'))
@@ -168,47 +172,82 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             lambda button:self._emit('cancel'))
 
         rows = []
-        merge_method = {
-            'merge': 'Create a merge commit',
-            'squash': 'Squash and merge',
-            'rebase': 'Rebase and merge'
-        }
         self.button_group = []
         buttons = []
-        if pr.canMerge():
+        # In queue mode the enqueue API enforces its own method.
+        if pr.canEnqueue() or (pr.canMerge() and methods):
             buttons.append(('pack', merge_button))
         buttons.append(('pack', cancel_button))
         buttons = urwid.Columns(buttons, dividechars=2)
-        default = 'merge'
-        rows.append(urwid.Text('Merge method:'))
-        for method in merge_method:
-            b = urwid.RadioButton(self.button_group, merge_method[method], state=(method == default))
-            b._value = method
-            rows.append(b)
-        rows.append(urwid.Divider())
-        self.commit_title = mywid.MyEdit("Commit title (Optional): \n", edit_text=title,
-                                    multiline=False, ring=app.ring)
-        rows.append(self.commit_title)
-        self.commit_message = mywid.MyEdit("Commit message (Optional): \n", edit_text=message,
-                                    multiline=True, ring=app.ring)
-        rows.append(self.commit_message)
-        rows.append(urwid.Divider())
+
+        if self.queue_mode:
+            # Show the queue's enforced merge method for information.
+            if methods:
+                rows.append(urwid.Text(
+                    'This branch requires a merge queue.'))
+                rows.append(urwid.Text(
+                    'Queue merge method: %s' % methods[0][1]))
+            else:
+                rows.append(urwid.Text(
+                    'This branch requires a merge queue, but its '
+                    'configured merge method is unknown.'))
+                rows.append(urwid.Text(
+                    '(Hubtty could not read branch rules; try again '
+                    'after the next sync.)'))
+            rows.append(urwid.Divider())
+            # Enqueue API takes no commit title/message.
+            self.commit_title = None
+            self.commit_message = None
+        elif methods and pr.canMerge():
+            default = methods[0][0]
+            rows.append(urwid.Text('Merge method:'))
+            for value, label in methods:
+                b = urwid.RadioButton(self.button_group, label, state=(value == default))
+                b._value = value
+                rows.append(b)
+            rows.append(urwid.Divider())
+            self.commit_title = mywid.MyEdit("Commit title (Optional): \n", edit_text=title,
+                                        multiline=False, ring=app.ring)
+            rows.append(self.commit_title)
+            self.commit_message = mywid.MyEdit("Commit message (Optional): \n", edit_text=message,
+                                        multiline=True, ring=app.ring)
+            rows.append(self.commit_message)
+            rows.append(urwid.Divider())
+        elif methods:
+            rows.append(urwid.Text(
+                'You do not have permission to merge this '
+                'pull request.'))
+            rows.append(urwid.Divider())
+            self.commit_title = None
+            self.commit_message = None
+        else:
+            rows.append(urwid.Text(
+                'This repository does not allow any merge method '
+                '(merge commit, squash, or rebase) for Hubtty to use.'))
+            rows.append(urwid.Divider())
+            self.commit_title = None
+            self.commit_message = None
+
         rows.append(buttons)
         pile = urwid.Pile(rows)
         fill = urwid.Filler(pile, valign='top')
         super().__init__(urwid.LineBox(fill, 'Merge pull request'))
 
     def getValues(self):
+        if self.queue_mode:
+            return ('queue', None, None)
         strategy = ''
         for button in self.button_group:
             if button.state:
                 strategy = button._value
-        title = self.commit_title.edit_text.strip()
-        if title == '':
-            title = None
-        message = self.commit_message.edit_text.strip()
-        if message == '':
-            message = None
+        title = ''
+        if self.commit_title is not None:
+            title = self.commit_title.edit_text.strip()
+        title = title or None
+        message = ''
+        if self.commit_message is not None:
+            message = self.commit_message.edit_text.strip()
+        message = message or None
         return (strategy, title, message)
 
     def keypress(self, size, key):
@@ -1458,10 +1497,14 @@ class PullRequestView(urwid.WidgetWrap):
 
         strategy, title, message = dialog.getValues()
 
+        if not strategy:
+            self.app.backScreen()
+            return
+
         with self.app.db.getSession() as session:
             pr = session.getPullRequest(self.pr_key)
 
-            if not pr.canMerge():
+            if not (pr.canMerge() or pr.canEnqueue()):
                 error_dialog = mywid.MessageDialog('Error', 'You cannot merge this pull request.')
                 urwid.connect_signal(error_dialog, 'close',
                     lambda button: self.app.backScreen())
