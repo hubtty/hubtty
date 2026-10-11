@@ -20,6 +20,8 @@ from typing import Any, Dict, List, TYPE_CHECKING
 
 import dateutil.parser
 
+from ..exceptions import OfflineError, RateLimitError
+
 if TYPE_CHECKING:
     from ..sync import Sync
 
@@ -189,22 +191,43 @@ def fetch_merge_queue_rule(sync: 'Sync', repository_name: str,
     no rules configured) may get a 403/404, which is treated as "no
     merge queue" rather than a sync failure.
 
+    This only catches merge queues configured via *rulesets*. GitHub
+    also lets repos require a merge queue via the older, classic
+    "Require merge queue" branch-protection checkbox, and that setting
+    is not exposed on the branch-protection-rule object by either REST
+    or GraphQL (a documented GitHub API gap -- see
+    https://github.com/orgs/community/discussions/170601). The only
+    way to detect *that* case is indirectly, via GraphQL's
+    ``repository.mergeQueue(branch:)``: it returns a real object (with
+    the queue's configuration) if a queue is active for the branch,
+    and ``null`` otherwise. So that's used here as a fallback when the
+    REST rules lookup finds nothing.
+
     Args:
         sync: The Sync instance to use for API calls.
         repository_name: Full repository name (e.g. 'owner/repo').
         branch_name: The base branch name (e.g. 'main').
 
     Returns:
-        A dict with ``required`` (bool) and ``merge_method``
-        (str or None).
+        A dict with ``required`` (bool) and ``merge_method`` (one of
+        ``'merge'``/``'squash'``/``'rebase'``, or None if unknown).
     """
     result = {'required': False, 'merge_method': None}
 
+    class _PermissionDenied(Exception):
+        """Raised when the branch-rules endpoint returns 403/404."""
+
     def ignore_permission_errors(response):
-        if response.status_code in (403, 404):
-            return
-        # `sync` (the Sync orchestrator) subclasses HTTPClient directly,
-        # so its own checkResponse() handles the normal validation.
+        if response.status_code == 403:
+            # Catch secondary/abuse rate limits that bypass the
+            # primary handler (no X-RateLimit-Remaining header).
+            body = response.text.lower()
+            if 'rate limit' in body or 'abuse' in body:
+                raise RateLimitError(
+                    "Rate limit exceeded (status %d)" % response.status_code)
+            raise _PermissionDenied(response.status_code)
+        if response.status_code == 404:
+            raise _PermissionDenied(response.status_code)
         sync.checkResponse(response)
 
     try:
@@ -213,8 +236,18 @@ def fetch_merge_queue_rule(sync: 'Sync', repository_name: str,
             use_etag=True,
             response_callback=ignore_permission_errors,
         )
+    except _PermissionDenied:
+        log.debug(
+            "Permission denied fetching branch rules for %s@%s, "
+            "falling back to GraphQL",
+            repository_name, branch_name,
+        )
+        return _fetch_classic_merge_queue_via_graphql(
+            sync, repository_name, branch_name, result)
+    except (OfflineError, RateLimitError):
+        raise
     except Exception:
-        log.exception(
+        log.warning(
             "Unable to fetch branch rules for %s@%s, assuming no merge queue",
             repository_name, branch_name,
         )
@@ -223,10 +256,59 @@ def fetch_merge_queue_rule(sync: 'Sync', repository_name: str,
     for rule in rules or []:
         if rule.get('type') == 'merge_queue':
             result['required'] = True
-            result['merge_method'] = (rule.get('parameters') or {}).get('merge_method')
+            # Normalize to lowercase to match Hubtty's convention.
+            method = (rule.get('parameters') or {}).get('merge_method')
+            result['merge_method'] = method.lower() if method else None
             break
 
+    if not result['required']:
+        result = _fetch_classic_merge_queue_via_graphql(
+            sync, repository_name, branch_name, result)
+
     return result
+
+
+def _fetch_classic_merge_queue_via_graphql(sync, repository_name, branch_name,
+                                           default_result):
+    """Fallback merge-queue check for classic branch protection.
+
+    See fetch_merge_queue_rule()'s docstring for why this is needed.
+    """
+    if '/' not in repository_name:
+        return default_result
+    owner, name = repository_name.split('/', 1)
+    query = """
+    query($owner: String!, $name: String!, $branch: String!) {
+      repository(owner: $owner, name: $name) {
+        mergeQueue(branch: $branch) {
+          configuration { mergeMethod }
+        }
+      }
+    }
+    """
+    try:
+        data = sync.graphql(query, {
+            'owner': owner, 'name': name, 'branch': branch_name,
+        })
+    except (OfflineError, RateLimitError):
+        raise
+    except Exception:
+        log.warning(
+            "Unable to check classic merge-queue status for %s@%s via "
+            "GraphQL, assuming no merge queue",
+            repository_name, branch_name,
+        )
+        return default_result
+
+    merge_queue = (data.get('repository') or {}).get('mergeQueue')
+    if not merge_queue:
+        return default_result
+
+    method = (merge_queue.get('configuration') or {}).get('mergeMethod')
+    return {
+        'required': True,
+        'merge_method': method.lower() if method else None,
+    }
 
 
 def has_pending_checks(checks_data: List[Dict[str, Any]],
