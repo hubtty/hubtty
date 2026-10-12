@@ -429,8 +429,9 @@ class HTTPClient:
                     self._wait_for_rate_limit(r, url)
                     continue  # Retry
                 else:
-                    # Last attempt, let it raise
+                    # Last attempt, let it raise.
                     response_callback(r)
+                    break
 
             # Validate response
             response_callback(r)
