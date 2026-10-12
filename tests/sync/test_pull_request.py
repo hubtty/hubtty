@@ -464,7 +464,7 @@ class TestSyncPullRequestChecksScheduling:
             f"Expected no check re-poll task for closed PR, got {len(submitted)}"
 
 
-def _make_checks_task_pr(state='open'):
+def _make_checks_task_pr(state='open', author_association=None):
     """Create a minimal mock PR for SyncPullRequestChecksTask tests."""
     commit = Mock()
     commit.sha = SHA_A
@@ -472,6 +472,7 @@ def _make_checks_task_pr(state='open'):
     pr.pr_id = PR_ID
     pr.key = 100
     pr.state = state
+    pr.author_association = author_association
     pr.commits = [commit]
     pr.repository = Mock(key=1)
     return pr
@@ -569,6 +570,27 @@ class TestSyncPullRequestChecksTaskRun:
 
         assert task.followup is None, \
             "Expected no followup for a closed PR"
+
+    @patch('hubtty.sync.tasks.pull_request.update_checks')
+    @patch('hubtty.sync.tasks.pull_request.fetch_checks')
+    def test_passes_author_association_to_fetch_checks(
+            self, mock_fetch, mock_update, mock_sync):
+        """author_association from the PR is forwarded to fetch_checks."""
+        mock_fetch.return_value = [
+            {'name': 'ci/test', 'state': 'success',
+             'url': '', 'description': '', 'started_at': None,
+             'completed_at': None},
+        ]
+        pr_mock = _make_checks_task_pr(
+            state='open', author_association='MEMBER')
+        _setup_checks_task_sync(mock_sync, pr_mock)
+
+        task = SyncPullRequestChecksTask(PR_ID, REPO, attempt=0)
+        task.run(mock_sync)
+
+        mock_fetch.assert_called_once_with(
+            mock_sync, REPO, SHA_A,
+            author_association='MEMBER')
 
 
 def _make_check(name, state, run_id=None):

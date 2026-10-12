@@ -446,6 +446,42 @@ class TestFetchChecks:
         assert by_name['ci/b']['state'] == 'success'
         assert by_name['ci/b']['url'] == 'http://b'
 
+    def test_skips_workflow_approvals_for_trusted_author(self):
+        """Trusted authors (MEMBER/COLLABORATOR/OWNER) skip the
+        workflow-runs API call entirely."""
+        for association in ('MEMBER', 'COLLABORATOR', 'OWNER'):
+            sync = Mock()
+            sync.get.side_effect = [
+                {'statuses': []},
+                [],  # check runs
+            ]
+            result = fetch_checks(sync, 'owner/repo', 'abc123',
+                                  author_association=association)
+            assert result == []
+            # Only 2 API calls (status + check-runs), no workflow-runs
+            assert sync.get.call_count == 2, (
+                f"Expected 2 API calls for {association}, "
+                f"got {sync.get.call_count}"
+            )
+
+    def test_checks_workflow_approvals_for_untrusted_author(self):
+        """Untrusted authors still get the workflow-runs API call."""
+        for association in ('CONTRIBUTOR', 'FIRST_TIME_CONTRIBUTOR',
+                           'FIRST_TIMER', 'NONE', None):
+            sync = Mock()
+            sync.get.side_effect = [
+                {'statuses': []},
+                [],  # check runs
+                {'total_count': 0, 'workflow_runs': []},
+            ]
+            result = fetch_checks(sync, 'owner/repo', 'abc123',
+                                  author_association=association)
+            assert result == []
+            assert sync.get.call_count == 3, (
+                f"Expected 3 API calls for {association!r}, "
+                f"got {sync.get.call_count}"
+            )
+
 
 class TestUpdateChecks:
     """Tests for update_checks."""

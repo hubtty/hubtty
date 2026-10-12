@@ -27,6 +27,11 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
+# Author associations whose workflows always auto-run (org insiders).
+# CONTRIBUTOR is excluded because repos using "Require approval for
+# all outside collaborators" still gate them.
+_TRUSTED_AUTHOR_ASSOCIATIONS = frozenset({'MEMBER', 'COLLABORATOR', 'OWNER'})
+
 
 def check_result_from_check_run(remote_check: Dict[str, Any]) -> Dict[str, Any]:
     """Convert a GitHub check run to internal format.
@@ -138,7 +143,8 @@ def update_checks(session, commit, remote_checks_data: List[Dict[str, Any]]) -> 
 
 def fetch_checks(sync: 'Sync', repository_name: str,
                  commit_sha: str,
-                 use_etag: bool = True) -> List[Dict[str, Any]]:
+                 use_etag: bool = True,
+                 author_association: str = None) -> List[Dict[str, Any]]:
     """Fetch CI checks for a commit from GitHub.
 
     Fetches both commit statuses and check runs, normalizing them
@@ -180,9 +186,11 @@ def fetch_checks(sync: 'Sync', repository_name: str,
             checks_by_name[result['name']] = result
 
     # Pending-approval workflow runs aren't in either API above.
-    for result in fetch_pending_workflow_approvals(sync, repository_name, commit_sha,
-                                                   use_etag=use_etag):
-        checks_by_name[result['name']] = result
+    # Skip for trusted authors whose workflows always auto-run.
+    if author_association not in _TRUSTED_AUTHOR_ASSOCIATIONS:
+        for result in fetch_pending_workflow_approvals(
+                sync, repository_name, commit_sha, use_etag=use_etag):
+            checks_by_name[result['name']] = result
 
     return list(checks_by_name.values())
 

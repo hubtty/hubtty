@@ -108,6 +108,7 @@ pull_request_table = Table(
     Column('mergeable', Boolean, index=True, nullable=False),
     Column('draft', Boolean, index=True, nullable=False),
     Column('node_id', String(255), index=True),
+    Column('author_association', String(32)),
     )
 commit_table = Table(
     'commit', metadata,
@@ -351,7 +352,8 @@ class PullRequest:
                  reviewed=False, starred=False, held=False,
                  pending_rebase=False, pending_edit=False,
                  pending_edit_message=None, pending_labels=False,
-                 outdated=False, node_id=None):
+                 outdated=False, node_id=None,
+                 author_association=None):
         self.repository_key = repository.key
         self.account_key = author.key
         self.id = id
@@ -379,6 +381,7 @@ class PullRequest:
         self.merged = merged
         self.mergeable = mergeable
         self.node_id = node_id
+        self.author_association = author_association
 
     def getReviewState(self):
         last_commit = self.commits[-1].sha

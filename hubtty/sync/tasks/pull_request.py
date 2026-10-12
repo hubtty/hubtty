@@ -141,7 +141,8 @@ class SyncPullRequestTask(Task):
         if len(remote_commits) > 0:
             last_commit = remote_commits[-1]
             last_commit['_hubtty_checks'] = fetch_checks(
-                sync, repository_name, last_commit['sha']
+                sync, repository_name, last_commit['sha'],
+                author_association=remote_pr.get('author_association'),
             )
 
         fetches = defaultdict(list)
@@ -221,6 +222,7 @@ class SyncPullRequestTask(Task):
             pr.mergeable = remote_pr.get('mergeable') or False
             pr.draft = remote_pr['draft']
             pr.node_id = remote_pr.get('node_id')
+            pr.author_association = remote_pr.get('author_association')
 
             for label in remote_pr['labels']:
                 l = session.getLabel(label['id'])
@@ -505,9 +507,11 @@ class SyncPullRequestChecksTask(Task):
             pr_key = pr.key
             pr_state = pr.state
             repository_key = pr.repository.key
+            author_association = pr.author_association
 
         # Fetch checks from GitHub (outside the DB session)
-        checks_data = fetch_checks(sync, self.repository_name, commit_sha)
+        checks_data = fetch_checks(sync, self.repository_name, commit_sha,
+                                   author_association=author_association)
 
         # Write back into the DB
         with app.db.getSession() as session:
