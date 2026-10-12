@@ -19,7 +19,7 @@ from unittest.mock import Mock, patch
 import json
 
 from hubtty.sync.http import HTTPClient, SearchResult
-from hubtty.sync.exceptions import OfflineError, RateLimitError, RestrictedError
+from hubtty.sync.exceptions import GraphQLError, OfflineError, RateLimitError, RestrictedError
 
 
 @pytest.fixture
@@ -602,6 +602,209 @@ class TestHTTPDelete:
         call_kwargs = mock_delete.call_args.kwargs
         sent_data = json.loads(call_kwargs['data'])
         assert sent_data == {'key': 'value'}
+
+
+class TestGraphQLURL:
+    """Tests for graphql_url()'s github.com vs. GHES handling."""
+
+    def test_github_com(self, http_client):
+        """github.com's API URL maps to the public GraphQL endpoint."""
+        assert http_client.graphql_url() == 'https://api.github.com/graphql'
+
+    def test_github_enterprise_server(self, mock_app):
+        """GHES's REST 'api/v3/' prefix maps to 'api/graphql' (no v3)."""
+        mock_app.config.api_url = 'https://ghe.example.com/api/v3/'
+        client = HTTPClient(mock_app, "TestAgent/1.0", "2022-11-28")
+        assert client.graphql_url() == 'https://ghe.example.com/api/graphql'
+
+    def test_github_enterprise_server_no_trailing_slash(self, mock_app):
+        """GHES URL without trailing slash still maps correctly."""
+        mock_app.config.api_url = 'https://ghe.example.com/api/v3'
+        client = HTTPClient(mock_app, "TestAgent/1.0", "2022-11-28")
+        assert client.graphql_url() == 'https://ghe.example.com/api/graphql'
+
+    def test_github_com_no_trailing_slash(self, mock_app):
+        """github.com URL without trailing slash still works."""
+        mock_app.config.api_url = 'https://api.github.com'
+        client = HTTPClient(mock_app, "TestAgent/1.0", "2022-11-28")
+        assert client.graphql_url() == 'https://api.github.com/graphql'
+
+
+class TestHTTPGraphQL:
+    """Tests for the graphql() method."""
+
+    def test_sends_query_and_variables(self, http_client):
+        """POSTs the query/variables as a JSON body to the GraphQL URL."""
+        response = Mock()
+        response.status_code = 200
+        response.headers = {'X-RateLimit-Remaining': '100'}
+        response.text = json.dumps({'data': {'repository': {'id': '1'}}})
+
+        with patch.object(http_client.session, 'post',
+                          return_value=response) as mock_post:
+            result = http_client.graphql(
+                'query($id: ID!) { node(id: $id) { id } }',
+                {'id': 'abc'})
+
+        assert mock_post.call_args.args[0] == http_client.graphql_url()
+        sent_body = json.loads(mock_post.call_args.kwargs['data'])
+        assert sent_body['query'] == 'query($id: ID!) { node(id: $id) { id } }'
+        assert sent_body['variables'] == {'id': 'abc'}
+        assert result == {'repository': {'id': '1'}}
+
+    def test_includes_content_type_header(self, http_client):
+        """Sends a JSON content-type header."""
+        response = Mock()
+        response.status_code = 200
+        response.headers = {'X-RateLimit-Remaining': '100'}
+        response.text = json.dumps({'data': {}})
+
+        with patch.object(http_client.session, 'post',
+                          return_value=response) as mock_post:
+            http_client.graphql('query { viewer { login } }')
+
+        headers = mock_post.call_args.kwargs['headers']
+        assert headers['Content-Type'] == 'application/json;charset=UTF-8'
+
+    def test_omits_variables_key_when_not_given(self, http_client):
+        """No 'variables' key is sent when none are passed."""
+        response = Mock()
+        response.status_code = 200
+        response.headers = {'X-RateLimit-Remaining': '100'}
+        response.text = json.dumps({'data': {}})
+
+        with patch.object(http_client.session, 'post',
+                          return_value=response) as mock_post:
+            http_client.graphql('query { viewer { login } }')
+
+        sent_body = json.loads(mock_post.call_args.kwargs['data'])
+        assert 'variables' not in sent_body
+
+    def test_missing_data_key_returns_empty_dict(self, http_client):
+        """A response with no top-level 'data' returns {} rather than None."""
+        response = Mock()
+        response.status_code = 200
+        response.headers = {'X-RateLimit-Remaining': '100'}
+        response.text = json.dumps({})
+
+        with patch.object(http_client.session, 'post', return_value=response):
+            result = http_client.graphql('query { viewer { login } }')
+
+        assert result == {}
+
+    def test_raises_on_top_level_errors(self, http_client):
+        """A GraphQL 'errors' array raises, even on a 200 HTTP response."""
+        response = Mock()
+        response.status_code = 200
+        response.headers = {'X-RateLimit-Remaining': '100'}
+        response.text = json.dumps({'errors': [{'message': 'not found'}]})
+
+        with patch.object(http_client.session, 'post', return_value=response):
+            with pytest.raises(Exception, match='not found'):
+                http_client.graphql('query { viewer { login } }')
+
+    def test_uses_custom_response_callback(self, http_client):
+        """A custom response_callback is used instead of checkResponse."""
+        response = Mock()
+        response.status_code = 200
+        response.headers = {'X-RateLimit-Remaining': '100'}
+        response.text = json.dumps({'data': {'viewer': {'login': 'x'}}})
+        callback = Mock()
+
+        with patch.object(http_client.session, 'post', return_value=response):
+            result = http_client.graphql(
+                'query { viewer { login } }', response_callback=callback)
+
+        callback.assert_called_once_with(response)
+        assert result == {'viewer': {'login': 'x'}}
+
+    def test_retries_on_rate_limit(self, http_client):
+        """A proactive rate-limit response triggers a wait and retry."""
+        import time
+
+        reset_time = int(time.time()) + 1
+        r1 = Mock()
+        r1.status_code = 200
+        r1.headers = {'X-RateLimit-Remaining': '0',
+                      'X-RateLimit-Reset': str(reset_time)}
+        r1.text = json.dumps({'data': {}})
+
+        r2 = Mock()
+        r2.status_code = 200
+        r2.headers = {'X-RateLimit-Remaining': '100'}
+        r2.text = json.dumps({'data': {'viewer': {'login': 'x'}}})
+
+        with patch.object(http_client.session, 'post', side_effect=[r1, r2]):
+            with patch('hubtty.sync.http.time.sleep') as mock_sleep:
+                result = http_client.graphql('query { viewer { login } }')
+
+        assert mock_sleep.called
+        assert result == {'viewer': {'login': 'x'}}
+
+    def test_retries_on_rate_limit_multiple_attempts(self, http_client):
+        """GraphQL retries up to 3 times on consecutive rate limits."""
+        import time
+
+        reset_time = int(time.time()) + 1
+
+        def make_rate_limited():
+            r = Mock()
+            r.status_code = 200
+            r.headers = {'X-RateLimit-Remaining': '0',
+                         'X-RateLimit-Reset': str(reset_time)}
+            r.text = json.dumps({'data': {}})
+            return r
+
+        r1 = make_rate_limited()
+        r2 = make_rate_limited()
+        r3 = Mock()
+        r3.status_code = 200
+        r3.headers = {'X-RateLimit-Remaining': '100'}
+        r3.text = json.dumps({'data': {'viewer': {'login': 'ok'}}})
+
+        with patch.object(http_client.session, 'post', side_effect=[r1, r2, r3]):
+            with patch('hubtty.sync.http.time.sleep') as mock_sleep:
+                result = http_client.graphql('query { viewer { login } }')
+
+        assert mock_sleep.call_count == 2
+        assert result == {'viewer': {'login': 'ok'}}
+
+    def test_rate_limit_max_retries_falls_through(self, http_client):
+        """GraphQL falls through to response_callback after max retries."""
+        import time
+
+        reset_time = int(time.time()) + 1
+
+        def make_rate_limited():
+            r = Mock()
+            r.status_code = 403
+            r.headers = {'X-RateLimit-Remaining': '0',
+                         'X-RateLimit-Reset': str(reset_time)}
+            r.text = '{"message": "API rate limit exceeded"}'
+            r.url = 'https://api.github.com/graphql'
+            return r
+
+        responses = [make_rate_limited() for _ in range(3)]
+
+        with patch.object(http_client.session, 'post', side_effect=responses):
+            with patch('hubtty.sync.http.time.sleep'):
+                with pytest.raises(RateLimitError):
+                    http_client.graphql('query { viewer { login } }')
+
+    def test_non_200_with_custom_callback_raises_graphql_error(self, http_client):
+        """A non-200 response not caught by a custom callback raises GraphQLError."""
+        response = Mock()
+        response.status_code = 500
+        response.headers = {'X-RateLimit-Remaining': '100'}
+        response.text = 'Internal Server Error'
+        # A no-op callback that doesn't raise on 500
+        callback = Mock()
+
+        with patch.object(http_client.session, 'post', return_value=response):
+            with pytest.raises(GraphQLError, match='HTTP 500'):
+                http_client.graphql(
+                    'query { viewer { login } }',
+                    response_callback=callback)
 
 
 class TestQuery:

@@ -25,7 +25,7 @@ from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 import requests
 
 from .constants import TIMEOUT
-from .exceptions import OfflineError, RestrictedError, RateLimitError
+from .exceptions import GraphQLError, OfflineError, RestrictedError, RateLimitError
 
 if TYPE_CHECKING:
     from hubtty.app import App
@@ -67,6 +67,23 @@ class HTTPClient:
             Full URL including the API base.
         """
         return self.app.config.api_url + path
+
+    def graphql_url(self) -> str:
+        """Return the GraphQL endpoint URL for the configured server.
+
+        On github.com, ``api_url`` is ``https://api.github.com/`` and the
+        GraphQL endpoint is simply ``.../graphql``. On GitHub Enterprise
+        Server, the REST ``api_url`` is ``https://HOST/api/v3/`` but the
+        GraphQL endpoint lives at ``https://HOST/api/graphql`` (no
+        ``v3``), so that prefix is special-cased here.
+
+        Returns:
+            Full URL to the GraphQL endpoint.
+        """
+        api_url = self.app.config.api_url.rstrip('/')
+        if api_url.endswith('/api/v3'):
+            return api_url[:-len('/v3')] + '/graphql'
+        return api_url + '/graphql'
 
     def _base_headers(self) -> Dict[str, str]:
         """Return base headers for all requests."""
@@ -523,6 +540,89 @@ class HTTPClient:
             response_callback: Custom response validator.
         """
         self._mutating_request('delete', path, data, headers, response_callback)
+
+    def graphql(
+        self,
+        query: str,
+        variables: Optional[Dict[str, Any]] = None,
+        response_callback: Optional[Callable[[requests.Response], None]] = None,
+    ) -> Dict[str, Any]:
+        """Execute a single GraphQL query/mutation.
+
+        This is intentionally minimal -- Hubtty's sync layer is REST-based
+        and this exists only to reach the handful of GitHub features that
+        have no REST equivalent (e.g. merge-queue enqueue/dequeue, PR
+        auto-merge). No GraphQL-specific pagination, batching, or schema
+        introspection is supported.
+
+        Args:
+            query: The GraphQL query or mutation document.
+            variables: Optional dict of GraphQL variables.
+            response_callback: Custom response validator (defaults to
+                checkResponse).
+
+        Returns:
+            The parsed ``data`` object from the GraphQL response.
+
+        Raises:
+            Exception: If the response contains a top-level ``errors``
+                array, or the HTTP response itself is an error.
+        """
+        if not response_callback:
+            response_callback = self.checkResponse
+
+        url = self.graphql_url()
+        headers = {
+            **self._base_headers(),
+            'Content-Type': 'application/json;charset=UTF-8',
+        }
+        body = {'query': query}
+        if variables is not None:
+            body['variables'] = variables
+
+        self.log.debug('GRAPHQL: %s', url)
+        self.log.debug('body: %s', body)
+
+        # Retry loop for rate limiting, matching _mutating_request().
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            r = self.session.post(
+                url,
+                data=json.dumps(body).encode('utf8'),
+                timeout=TIMEOUT,
+                headers=headers,
+            )
+
+            if self._should_handle_rate_limit(r):
+                if attempt < max_attempts - 1:
+                    self._wait_for_rate_limit(r, url)
+                    continue  # Retry
+                else:
+                    # Last attempt, let it raise.
+                    response_callback(r)
+                    break
+            else:
+                response_callback(r)
+
+            # GraphQL returns HTTP 200 on success; reject anything else.
+            if r.status_code != 200:
+                raise GraphQLError(
+                    f"GraphQL request failed with HTTP {r.status_code}: "
+                    f"{r.text[:200]}")
+
+            try:
+                result = json.loads(r.text)
+            except json.JSONDecodeError as e:
+                raise GraphQLError(
+                    f"GraphQL endpoint returned non-JSON response "
+                    f"(HTTP {r.status_code}): {r.text[:200]}"
+                ) from e
+            if result.get('errors'):
+                raise GraphQLError(f"GraphQL error: {result['errors']}")
+            return result.get('data') or {}
+
+        # Unreachable: the loop always returns or raises.
+        raise GraphQLError("GraphQL request failed after exhausting rate-limit retries")
 
     def query(self, query: str) -> SearchResult:
         """Execute a GitHub search query.
