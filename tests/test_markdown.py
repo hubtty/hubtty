@@ -174,12 +174,41 @@ class TestRenderBasic:
         flat = _flatten(result)
         assert 'item1' in flat
         assert 'item2' in flat
+        # Styled bullet character
+        bullets = _find_attr(result, 'md-list-bullet')
+        assert any('\u2022' in b for b in bullets)
+
+    def test_unordered_list_nested(self):
+        result = self.r.render('- outer\n  - inner')
+        flat = _flatten(result)
+        assert 'outer' in flat
+        assert 'inner' in flat
+        bullets = _find_attr(result, 'md-list-bullet')
+        assert any('\u2022' in b for b in bullets)  # outer
+        assert any('\u25e6' in b for b in bullets)  # inner
 
     def test_ordered_list(self):
         result = self.r.render('1. first\n2. second')
         flat = _flatten(result)
         assert 'first' in flat
         assert 'second' in flat
+        nums = _find_attr(result, 'md-list-bullet')
+        assert any('1.' in n for n in nums)
+        assert any('2.' in n for n in nums)
+
+    def test_task_list_unchecked(self):
+        result = self.r.render('- [ ] todo')
+        flat = _flatten(result)
+        assert 'todo' in flat
+        cb = _find_attr(result, 'md-checkbox')
+        assert any('\u2610' in c for c in cb)
+
+    def test_task_list_checked(self):
+        result = self.r.render('- [x] done')
+        flat = _flatten(result)
+        assert 'done' in flat
+        cb = _find_attr(result, 'md-checkbox')
+        assert any('\u2611' in c for c in cb)
 
     def test_link(self):
         result = self.r.render('[click](https://example.com)')
@@ -191,6 +220,40 @@ class TestRenderBasic:
         result = self.r.render('> quoted text')
         attrs = _find_attr(result, 'md-blockquote')
         assert any('quoted' in a for a in attrs)
+
+    def test_blockquote_multiline_prefix(self):
+        """Each line in a multi-paragraph blockquote gets '│ ' prefix."""
+        md = '> para one\n>\n> para two\n'
+        result = self.r.render(md)
+        flat = _flatten(result)
+        # Count '│ ' occurrences — at least one per paragraph.
+        assert flat.count('│ ') >= 2
+        assert 'para one' in flat
+        assert 'para two' in flat
+
+    def test_blockquote_heading_then_paragraph(self):
+        md = '> ## Title\n>\n> Body text\n'
+        result = self.r.render(md)
+        flat = _flatten(result)
+        assert flat.count('│ ') >= 2
+        assert 'Title' in flat
+        assert 'Body text' in flat
+
+    def test_blockquote_nested(self):
+        """Nested blockquotes get '| | ' on each line."""
+        md = '> > inner quote\n'
+        result = self.r.render(md)
+        flat = _flatten(result)
+        assert '│ │ ' in flat
+        assert 'inner quote' in flat
+
+    def test_blockquote_with_list(self):
+        md = '> - item1\n> - item2\n'
+        result = self.r.render(md)
+        flat = _flatten(result)
+        assert 'item1' in flat
+        assert 'item2' in flat
+        assert flat.startswith('│ ')
 
     def test_strikethrough(self):
         result = self.r.render('~~removed~~')
@@ -506,6 +569,93 @@ class TestRenderStructured:
         flat = _flatten([s[1] for s in texts])
         assert 'Before' in flat
         assert 'After' in flat
+
+    def test_details_inside_blockquote_collapsible(self):
+        """<details> inside a blockquote should become a proper
+        collapsible details segment, not inline text."""
+        md = (
+            '> Some intro\n'
+            '>\n'
+            '> <details>\n'
+            '> <summary>Run configuration</summary>\n'
+            '>\n'
+            '> **Profile**: CHILL\n'
+            '>\n'
+            '> </details>\n'
+            '>\n'
+            '> After text.\n'
+        )
+        segments = self.r.render_structured(md)
+        types = [s[0] for s in segments]
+        assert 'details' in types
+
+        details = [s for s in segments if s[0] == 'details']
+        assert len(details) == 1
+        assert details[0][1] == 'Run configuration'
+        assert 'CHILL' in _flatten(details[0][2])
+
+        # Surrounding text should be in text segments.
+        texts = [s for s in segments if s[0] == 'text']
+        all_text = ''.join(_flatten(s[1]) for s in texts)
+        assert 'Some intro' in all_text
+        assert 'After text' in all_text
+
+    def test_details_inside_blockquote_with_emoji(self):
+        md = (
+            '> <details>\n'
+            '> <summary>\u2699\ufe0f Run configuration</summary>\n'
+            '>\n'
+            '> **Plan**: Enterprise\n'
+            '>\n'
+            '> </details>\n'
+        )
+        segments = self.r.render_structured(md)
+        details = [s for s in segments if s[0] == 'details']
+        assert len(details) == 1
+        assert 'Run configuration' in details[0][1]
+        assert 'Enterprise' in _flatten(details[0][2])
+
+    def test_coderabbit_blockquoted_details(self):
+        """Simulate the CodeRabbit comment with blockquoted <details>."""
+        md = (
+            '> [!IMPORTANT]\n'
+            '> ## Review skipped\n'
+            '>\n'
+            '> Auto reviews are disabled.\n'
+            '>\n'
+            '> <details>\n'
+            '> <summary>\u2699\ufe0f Run configuration</summary>\n'
+            '>\n'
+            '> **Configuration used**: Repo config\n'
+            '>\n'
+            '> **Review profile**: CHILL\n'
+            '>\n'
+            '> </details>\n'
+            '>\n'
+            '> You can disable this status message.\n'
+        )
+        segments = self.r.render_structured(md)
+
+        # The details section should be a collapsible segment.
+        details = [s for s in segments if s[0] == 'details']
+        assert len(details) == 1
+        assert 'Run configuration' in details[0][1]
+        body = _flatten(details[0][2])
+        assert 'Configuration used' in body
+        assert 'CHILL' in body
+
+        # Text before and after should be in text segments.
+        texts = [s for s in segments if s[0] == 'text']
+        all_text = ''.join(_flatten(s[1]) for s in texts)
+        assert 'Review skipped' in all_text
+        assert 'disable this status' in all_text
+
+    def test_blockquote_without_details_unchanged(self):
+        """A plain blockquote without <details> renders normally."""
+        md = '> Just a quote\n'
+        result = self.r.render(md)
+        bq = _find_attr(result, 'md-blockquote')
+        assert any('Just a quote' in b for b in bq)
 
     def test_block_html_inside_details_not_dropped(self):
         """Non-<details> block HTML inside a <details> section should
