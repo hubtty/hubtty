@@ -28,6 +28,11 @@ class RestrictedError(Exception):
     pass
 
 
+class GraphQLError(Exception):
+    """Raised when a GraphQL request returns errors in the response body."""
+    pass
+
+
 class RateLimitError(Exception):
     """Raised when GitHub API rate limit is hit.
 

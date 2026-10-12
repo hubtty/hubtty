@@ -17,11 +17,15 @@
 from unittest.mock import Mock
 
 import dateutil.parser
+import pytest
 
+from hubtty.sync.exceptions import OfflineError, RateLimitError
 from hubtty.sync.tasks.check_helpers import (
+    _fetch_classic_merge_queue_via_graphql,
     check_result_from_check_run,
     check_result_from_status,
     fetch_checks,
+    fetch_merge_queue_rule,
     has_pending_checks,
     update_checks,
 )
@@ -609,3 +613,215 @@ class TestUpdateChecks:
         commit.createCheck.assert_called_once()
         assert created_check.state == 'success'
         assert created_check.url == 'http://new'
+
+
+class TestFetchMergeQueueRule:
+    """Tests for fetch_merge_queue_rule."""
+
+    def test_ruleset_merge_queue_rule_found(self):
+        """A merge_queue rule in the rules/branches response is used."""
+        sync = Mock()
+        sync.get.return_value = [
+            {'type': 'merge_queue',
+             'parameters': {'merge_method': 'SQUASH'}},
+        ]
+        result = fetch_merge_queue_rule(sync, 'owner/repo', 'main')
+        assert result == {'required': True, 'merge_method': 'squash'}
+        sync.graphql.assert_not_called()
+
+    def test_ruleset_without_merge_method_parameter(self):
+        """A merge_queue rule with no merge_method parameter is still required."""
+        sync = Mock()
+        sync.get.return_value = [
+            {'type': 'merge_queue', 'parameters': {}},
+        ]
+        result = fetch_merge_queue_rule(sync, 'owner/repo', 'main')
+        assert result == {'required': True, 'merge_method': None}
+
+    def test_ignores_non_merge_queue_rules(self):
+        """Other rule types don't set required."""
+        sync = Mock()
+        sync.get.return_value = [
+            {'type': 'pull_request', 'parameters': {}},
+        ]
+        sync.graphql.return_value = {}
+        result = fetch_merge_queue_rule(sync, 'owner/repo', 'main')
+        assert result == {'required': False, 'merge_method': None}
+
+    def test_no_rules_falls_back_to_graphql(self):
+        """No merge_queue ruleset: fall back to the classic-protection check."""
+        sync = Mock()
+        sync.get.return_value = []
+        sync.graphql.return_value = {
+            'repository': {
+                'mergeQueue': {'configuration': {'mergeMethod': 'REBASE'}},
+            },
+        }
+        result = fetch_merge_queue_rule(sync, 'owner/repo', 'main')
+        assert result == {'required': True, 'merge_method': 'rebase'}
+        sync.graphql.assert_called_once()
+
+    def test_none_response_falls_back_to_graphql(self):
+        """A None rules response (e.g. 403/404) is treated like an empty list."""
+        sync = Mock()
+        sync.get.return_value = None
+        sync.graphql.return_value = {}
+        result = fetch_merge_queue_rule(sync, 'owner/repo', 'main')
+        assert result == {'required': False, 'merge_method': None}
+        sync.graphql.assert_called_once()
+
+    def test_get_exception_returns_default(self):
+        """An exception fetching branch rules is treated as no merge queue."""
+        sync = Mock()
+        sync.get.side_effect = Exception('boom')
+        result = fetch_merge_queue_rule(sync, 'owner/repo', 'main')
+        assert result == {'required': False, 'merge_method': None}
+        sync.graphql.assert_not_called()
+
+    def test_propagates_offline_error(self):
+        """OfflineError from branch rules fetch is not swallowed."""
+        sync = Mock()
+        sync.get.side_effect = OfflineError('Received 503 status code')
+        with pytest.raises(OfflineError):
+            fetch_merge_queue_rule(sync, 'owner/repo', 'main')
+
+    def test_propagates_rate_limit_error(self):
+        """RateLimitError from branch rules fetch is not swallowed."""
+        sync = Mock()
+        sync.get.side_effect = RateLimitError('Rate limit exceeded')
+        with pytest.raises(RateLimitError):
+            fetch_merge_queue_rule(sync, 'owner/repo', 'main')
+
+    def test_permission_denied_403_falls_back_to_graphql(self):
+        """A non-rate-limit 403 triggers _PermissionDenied and GraphQL fallback."""
+        sync = Mock()
+
+        # Make sync.get invoke the response_callback with a 403
+        # response, which triggers the internal _PermissionDenied
+        # exception and the GraphQL fallback path.
+        forbidden = Mock()
+        forbidden.status_code = 403
+        forbidden.text = 'Resource not accessible by integration'
+        forbidden.headers = {}
+
+        def get_side_effect(path, **kwargs):
+            cb = kwargs.get('response_callback')
+            if cb:
+                cb(forbidden)
+            return None
+
+        sync.get.side_effect = get_side_effect
+        sync.graphql.return_value = {
+            'repository': {
+                'mergeQueue': {'configuration': {'mergeMethod': 'SQUASH'}},
+            },
+        }
+        result = fetch_merge_queue_rule(sync, 'owner/repo', 'main')
+        assert result == {'required': True, 'merge_method': 'squash'}
+        sync.graphql.assert_called_once()
+
+    def test_permission_denied_404_falls_back_to_graphql(self):
+        """A 404 response triggers _PermissionDenied and GraphQL fallback."""
+        sync = Mock()
+
+        not_found = Mock()
+        not_found.status_code = 404
+        not_found.text = 'Not Found'
+        not_found.headers = {}
+
+        def get_side_effect(path, **kwargs):
+            cb = kwargs.get('response_callback')
+            if cb:
+                cb(not_found)
+            return None
+
+        sync.get.side_effect = get_side_effect
+        sync.graphql.return_value = {}
+        result = fetch_merge_queue_rule(sync, 'owner/repo', 'main')
+        assert result == {'required': False, 'merge_method': None}
+        sync.graphql.assert_called_once()
+
+
+class TestFetchClassicMergeQueueViaGraphql:
+    """Tests for _fetch_classic_merge_queue_via_graphql."""
+
+    def test_no_slash_in_repository_name_returns_default(self):
+        """A malformed repository name skips the GraphQL call entirely."""
+        sync = Mock()
+        default = {'required': False, 'merge_method': None}
+        result = _fetch_classic_merge_queue_via_graphql(
+            sync, 'not-a-full-name', 'main', default)
+        assert result is default
+        sync.graphql.assert_not_called()
+
+    def test_merge_queue_present_normalizes_method(self):
+        """An active queue returns required=True with a lowercased method."""
+        sync = Mock()
+        sync.graphql.return_value = {
+            'repository': {
+                'mergeQueue': {'configuration': {'mergeMethod': 'MERGE'}},
+            },
+        }
+        default = {'required': False, 'merge_method': None}
+        result = _fetch_classic_merge_queue_via_graphql(
+            sync, 'owner/repo', 'main', default)
+        assert result == {'required': True, 'merge_method': 'merge'}
+        sync.graphql.assert_called_once()
+        variables = sync.graphql.call_args[0][1]
+        assert variables == {'owner': 'owner', 'name': 'repo', 'branch': 'main'}
+
+    def test_merge_queue_present_without_configuration(self):
+        """An active queue with no configuration still reports required=True."""
+        sync = Mock()
+        sync.graphql.return_value = {
+            'repository': {'mergeQueue': {'configuration': None}},
+        }
+        default = {'required': False, 'merge_method': None}
+        result = _fetch_classic_merge_queue_via_graphql(
+            sync, 'owner/repo', 'main', default)
+        assert result == {'required': True, 'merge_method': None}
+
+    def test_no_merge_queue_returns_default(self):
+        """A null mergeQueue means no classic branch-protection queue."""
+        sync = Mock()
+        sync.graphql.return_value = {'repository': {'mergeQueue': None}}
+        default = {'required': False, 'merge_method': None}
+        result = _fetch_classic_merge_queue_via_graphql(
+            sync, 'owner/repo', 'main', default)
+        assert result is default
+
+    def test_missing_repository_returns_default(self):
+        """A response with no repository key is handled gracefully."""
+        sync = Mock()
+        sync.graphql.return_value = {}
+        default = {'required': False, 'merge_method': None}
+        result = _fetch_classic_merge_queue_via_graphql(
+            sync, 'owner/repo', 'main', default)
+        assert result is default
+
+    def test_graphql_exception_returns_default(self):
+        """An exception from the GraphQL call is treated as no merge queue."""
+        sync = Mock()
+        sync.graphql.side_effect = Exception('boom')
+        default = {'required': False, 'merge_method': None}
+        result = _fetch_classic_merge_queue_via_graphql(
+            sync, 'owner/repo', 'main', default)
+        assert result is default
+
+    def test_propagates_offline_error(self):
+        """OfflineError from GraphQL call is not swallowed."""
+        sync = Mock()
+        sync.graphql.side_effect = OfflineError('Received 502 status code')
+        default = {'required': False, 'merge_method': None}
+        with pytest.raises(OfflineError):
+            _fetch_classic_merge_queue_via_graphql(
+                sync, 'owner/repo', 'main', default)
+
+    def test_propagates_rate_limit_error(self):
+        """RateLimitError from GraphQL call is not swallowed."""
+        sync = Mock()
+        sync.graphql.side_effect = RateLimitError('Rate limit exceeded')
+        default = {'required': False, 'merge_method': None}
+        with pytest.raises(RateLimitError):
+            _fetch_classic_merge_queue_via_graphql(
+                sync, 'owner/repo', 'main', default)

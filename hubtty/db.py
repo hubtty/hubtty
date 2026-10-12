@@ -18,6 +18,15 @@ import time
 import logging
 import threading
 
+log = logging.getLogger('hubtty.db')
+
+# Merge method keys to human-readable labels.
+MERGE_METHOD_LABELS = {
+    'merge': 'Create a merge commit',
+    'squash': 'Squash and merge',
+    'rebase': 'Rebase and merge',
+}
+
 import alembic
 import alembic.config
 import alembic.migration
@@ -41,12 +50,18 @@ repository_table = Table(
     Column('description', Text, nullable=False, default=''),
     Column('can_push', Boolean, default=False),
     Column('updated', DateTime),
+    Column('allow_merge_commit', Boolean, nullable=False, default=True),
+    Column('allow_squash_merge', Boolean, nullable=False, default=True),
+    Column('allow_rebase_merge', Boolean, nullable=False, default=True),
+    Column('allow_auto_merge', Boolean, nullable=False, default=False),
     )
 branch_table = Table(
     'branch', metadata,
     Column('key', Integer, primary_key=True),
     Column('repository_key', Integer, ForeignKey("repository.key"), index=True),
     Column('name', String(255), index=True, nullable=False),
+    Column('merge_queue_required', Boolean, nullable=False, default=False),
+    Column('merge_queue_method', String(32)),
     )
 topic_table = Table(
     'topic', metadata,
@@ -92,6 +107,7 @@ pull_request_table = Table(
     Column('merged', Boolean, index=True, nullable=False),
     Column('mergeable', Boolean, index=True, nullable=False),
     Column('draft', Boolean, index=True, nullable=False),
+    Column('node_id', String(255), index=True),
     )
 commit_table = Table(
     'commit', metadata,
@@ -213,11 +229,38 @@ class Account:
         self.email = email
 
 class Repository:
-    def __init__(self, name, subscribed=False, description='', can_push=False):
+    def __init__(self, name, subscribed=False, description='', can_push=False,
+                 allow_merge_commit=True, allow_squash_merge=True,
+                 allow_rebase_merge=True, allow_auto_merge=False):
         self.name = name
         self.subscribed = subscribed
         self.description = description
         self.can_push = can_push
+        self.allow_merge_commit = allow_merge_commit
+        self.allow_squash_merge = allow_squash_merge
+        self.allow_rebase_merge = allow_rebase_merge
+        self.allow_auto_merge = allow_auto_merge
+
+    def availableMergeMethods(self):
+        """Return the list of (method, label) tuples allowed by this repo.
+
+        May return an empty list if all merge methods are disabled.
+        """
+        methods = []
+        if self.allow_merge_commit:
+            methods.append(('merge', MERGE_METHOD_LABELS['merge']))
+        if self.allow_squash_merge:
+            methods.append(('squash', MERGE_METHOD_LABELS['squash']))
+        if self.allow_rebase_merge:
+            methods.append(('rebase', MERGE_METHOD_LABELS['rebase']))
+        if not methods:
+            log.debug(
+                'Repository %s has no merge methods enabled '
+                '(merge_commit=%s, squash=%s, rebase=%s)',
+                self.name, self.allow_merge_commit,
+                self.allow_squash_merge, self.allow_rebase_merge,
+            )
+        return methods
 
     def createPullRequest(self, *args, **kw):
         session = Session.object_session(self)
@@ -247,9 +290,12 @@ class Repository:
         return l
 
 class Branch:
-    def __init__(self, repository, name):
+    def __init__(self, repository, name, merge_queue_required=False,
+                 merge_queue_method=None):
         self.repository_key = repository.key
         self.name = name
+        self.merge_queue_required = merge_queue_required
+        self.merge_queue_method = merge_queue_method
 
 class RepositoryTopic:
     def __init__(self, repository, topic, sequence):
@@ -300,7 +346,7 @@ class PullRequest:
                  reviewed=False, starred=False, held=False,
                  pending_rebase=False, pending_edit=False,
                  pending_edit_message=None, pending_labels=False,
-                 outdated=False):
+                 outdated=False, node_id=None):
         self.repository_key = repository.key
         self.account_key = author.key
         self.id = id
@@ -327,6 +373,7 @@ class PullRequest:
         self.outdated = outdated
         self.merged = merged
         self.mergeable = mergeable
+        self.node_id = node_id
 
     def getReviewState(self):
         last_commit = self.commits[-1].sha
@@ -409,6 +456,44 @@ class PullRequest:
 
     def canMerge(self):
         return self.mergeable and self.repository.can_push
+
+    def _target_branch(self):
+        """Return the Branch object matching this PR's base branch name.
+
+        Returns None if the branch is not (yet) synced locally.
+        """
+        for b in self.repository.branches:
+            if b.name == self.branch:
+                return b
+        return None
+
+    def canEnqueue(self):
+        """Whether this PR can be added to a merge queue.
+
+        Merge-queue PRs may have ``mergeable=False`` because GitHub
+        only considers them mergeable through the queue, so the
+        normal ``canMerge()`` check is too strict.
+        """
+        branch = self._target_branch()
+        return (branch is not None
+                and branch.merge_queue_required
+                and self.repository.can_push)
+
+    def availableMergeMethods(self):
+        """Merge methods selectable for this PR.
+
+        When the base branch requires a merge queue, the method is fixed
+        by the queue's configuration (if known) rather than selectable by
+        the user.
+        """
+        branch = self._target_branch()
+        if branch and branch.merge_queue_required:
+            if branch.merge_queue_method:
+                label = MERGE_METHOD_LABELS.get(
+                    branch.merge_queue_method, branch.merge_queue_method)
+                return [(branch.merge_queue_method, label)]
+            return []
+        return self.repository.availableMergeMethods()
 
     @property
     def author_name(self):

@@ -269,14 +269,29 @@ class UploadReviewTask(Task):
         sync.submitTask(SyncPullRequestTask(pr_id, priority=self.priority))
 
 
+ENQUEUE_PULL_REQUEST_MUTATION = """
+mutation($id: ID!) {
+  enqueuePullRequest(input: {pullRequestId: $id}) {
+    mergeQueueEntry { id state position }
+  }
+}
+"""
+
+
 @dataclass
 class SendMergeTask(Task):
-    """Merge a pull request."""
+    """Merge a pull request, either directly or via the merge queue."""
 
     pending_merge_key: int
 
     def run(self, sync: 'Sync') -> None:
-        """Request GitHub to merge the PR.
+        """Request GitHub to merge (or enqueue) the PR.
+
+        A *merge_method* of ``'queue'`` means the PR's base branch
+        requires a merge queue; GitHub only exposes adding a PR to the
+        queue via GraphQL (``enqueuePullRequest``), there is no REST
+        equivalent. Any other *merge_method* (``merge``/``squash``/
+        ``rebase``) uses the normal REST merge endpoint.
 
         Args:
             sync: The Sync instance to use for API calls.
@@ -285,17 +300,57 @@ class SendMergeTask(Task):
         from .pull_request import SyncPullRequestTask
 
         app = sync.app
-        pr_id = None
+
         with app.db.getSession() as session:
             pm = session.getPendingMerge(self.pending_merge_key)
-            data = dict(sha=pm.sha, merge_method=pm.merge_method)
-            if pm.commit_title:
-                data['commit_title'] = pm.commit_title
-            if pm.commit_message:
-                data['commit_message'] = pm.commit_message
-            pr_id = pm.pull_request.pr_id
+            pr = pm.pull_request
+            pr_id = pr.pr_id
+            merge_method = pm.merge_method
+            node_id = sha = commit_title = commit_message = None
+            if merge_method == 'queue':
+                node_id = pr.node_id
+            else:
+                sha = pm.sha
+                commit_title = pm.commit_title
+                commit_message = pm.commit_message
+
+        # Sync node_id if needed (outside the session to avoid
+        # deadlocking on the non-reentrant db lock).
+        if merge_method == 'queue' and not node_id:
+            self.log.warning(
+                "Pull request %s has no node_id yet, syncing "
+                "before enqueueing", pr_id
+            )
+            t = SyncPullRequestTask(pr_id)
+            t.run(sync)
+            self.results += t.results
+            with app.db.getSession() as session:
+                pr = session.getPullRequestByPullRequestID(pr_id)
+                node_id = pr.node_id if pr else None
+
+        if merge_method == 'queue' and not node_id:
+            raise Exception(
+                f"Unable to determine GraphQL node id for {pr_id}, "
+                "cannot add it to the merge queue"
+            )
+
+        # Delete pending merge and call API (inside session for
+        # rollback).
+        with app.db.getSession() as session:
+            pm = session.getPendingMerge(self.pending_merge_key)
+            if pm is None:
+                return
             session.delete(pm)
-            # Inside db session for rollback
-            sync.put(f'repos/{pr_id}/merge', data)
+            if merge_method == 'queue':
+                # Inside db session for rollback
+                sync.graphql(ENQUEUE_PULL_REQUEST_MUTATION, {'id': node_id})
+            else:
+                data = dict(sha=sha, merge_method=merge_method)
+                if commit_title:
+                    data['commit_title'] = commit_title
+                if commit_message:
+                    data['commit_message'] = commit_message
+                # Inside db session for rollback
+                sync.put(f'repos/{pr_id}/merge', data)
 
         sync.submitTask(SyncPullRequestTask(pr_id, priority=self.priority))

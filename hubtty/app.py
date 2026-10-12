@@ -1074,10 +1074,27 @@ class App:
             pr.reviewed = True
             self.repository_cache.clear(pr.repository)
         if merge:
-            sha = pr.commits[-1].sha
-            pending_merge = pr.createPendingMerge(sha,'merge')
-            self.sync.submitTask(
-                    sync.SendMergeTask(pending_merge.key, priority=sync.HIGH_PRIORITY))
+            if pr.canEnqueue():
+                # Queue takes precedence over direct merge.
+                merge_method = 'queue'
+                # sha is unused for queue merges but PendingMerge.sha
+                # is NOT NULL.
+                sha = pr.commits[-1].sha if pr.commits else ''
+            else:
+                sha = pr.commits[-1].sha
+                # No strategy prompt; use the first allowed method.
+                methods = pr.availableMergeMethods()
+                if methods:
+                    merge_method = methods[0][0]
+                else:
+                    self.log.warning(
+                        'PR %s has no available merge methods; '
+                        'skipping merge', pr.title)
+                    merge = False
+            if merge:
+                pending_merge = pr.createPendingMerge(sha, merge_method)
+                self.sync.submitTask(
+                        sync.SendMergeTask(pending_merge.key, priority=sync.HIGH_PRIORITY))
         return message_key
 
 
