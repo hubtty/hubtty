@@ -91,8 +91,10 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         with self.app.db.getSession() as session:
             commit = session.getCommit(self.commit_key)
             pr = commit.pull_request
+            self.can_merge = (commit.pull_request.canMerge() or
+                               commit.pull_request.canEnqueue())
             buttons = [('pack', save_button)]
-            if commit.pull_request.canMerge() or commit.pull_request.canEnqueue():
+            if self.can_merge:
                 buttons.append(('pack', merge_button))
             buttons.append(('pack', cancel_button))
             buttons = urwid.Columns(buttons, dividechars=2)
@@ -131,12 +133,12 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                     message = m.message
         self.message = mywid.MyEdit("Message: \n", edit_text=message,
                                     multiline=True, ring=app.ring)
-        rows.append(self.message)
+        rows.append(mywid.GrowingEditBox(self.app, self.message,
+                                         md=markdown.Renderer(self.app)))
         rows.append(urwid.Divider())
         rows.append(buttons)
         pile = urwid.Pile(rows)
-        fill = urwid.Filler(pile, valign='top')
-        super().__init__(urwid.LineBox(fill, 'Review'))
+        super().__init__(urwid.LineBox(pile, 'Review'))
 
     def getValues(self):
         approval = ''
@@ -154,7 +156,18 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         if keymap.PREV_SCREEN in commands:
             self._emit('cancel')
             return None
+        if keymap.MERGE_PR in commands and self.can_merge:
+            # Equivalent to "Save and Merge" without leaving the review dialog.
+            self._emit('merge')
+            return None
         return key
+
+# Merge methods that create a brand new commit on the base branch,
+# and for which GitHub's merge API honours a custom commit
+# title/message. 'rebase' replays the existing commits verbatim and
+# creates no new commit, so GitHub ignores commit_title/commit_message
+# for it.
+MERGE_METHODS_WITH_COMMIT_MESSAGE = ('merge', 'squash')
 
 class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
     signals = ['merge', 'cancel']
@@ -180,6 +193,12 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         buttons.append(('pack', cancel_button))
         buttons = urwid.Columns(buttons, dividechars=2)
 
+        self.commit_title = None
+        self.commit_message = None
+        self.commit_fields_section = None
+        self.commit_fields_pile = None
+        self.current_method = None
+
         if self.queue_mode:
             # Show the queue's enforced merge method for information.
             if methods:
@@ -195,24 +214,36 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                     '(Hubtty could not read branch rules; try again '
                     'after the next sync.)'))
             rows.append(urwid.Divider())
-            # Enqueue API takes no commit title/message.
-            self.commit_title = None
-            self.commit_message = None
+            # GitHub's enqueue API takes no commit title/message, so
+            # there's nothing else to configure here.
         elif methods and pr.canMerge():
             default = methods[0][0]
+            self.current_method = default
             rows.append(urwid.Text('Merge method:'))
             for value, label in methods:
-                b = urwid.RadioButton(self.button_group, label, state=(value == default))
+                b = urwid.RadioButton(self.button_group, label, state=(value == default),
+                                      on_state_change=self._onMethodChange,
+                                      user_data=value)
                 b._value = value
                 rows.append(b)
             rows.append(urwid.Divider())
+
+            # Collapsed by default since most merges don't need to
+            # override GitHub's auto-generated commit title/message.
             self.commit_title = mywid.MyEdit("Commit title (Optional): \n", edit_text=title,
                                         multiline=False, ring=app.ring)
-            rows.append(self.commit_title)
             self.commit_message = mywid.MyEdit("Commit message (Optional): \n", edit_text=message,
                                         multiline=True, ring=app.ring)
-            rows.append(self.commit_message)
-            rows.append(urwid.Divider())
+            self._commit_title_field = mywid.highlightEdit(self.commit_title)
+            self._commit_message_field = mywid.GrowingEditBox(
+                self.app, self.commit_message, md=markdown.Renderer(self.app))
+            self.commit_fields_section = mywid.CollapsibleSection(
+                'Customize commit title/message',
+                urwid.Pile([self._commit_title_field, self._commit_message_field]),
+                expanded=bool(title.strip() or message.strip()))
+            self.commit_fields_pile = urwid.Pile([])
+            self._updateCommitFields()
+            rows.append(self.commit_fields_pile)
         elif methods:
             rows.append(urwid.Text(
                 'You do not have permission to merge this '
@@ -225,13 +256,33 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                 'This repository does not allow any merge method '
                 '(merge commit, squash, or rebase) for Hubtty to use.'))
             rows.append(urwid.Divider())
-            self.commit_title = None
-            self.commit_message = None
 
         rows.append(buttons)
         pile = urwid.Pile(rows)
-        fill = urwid.Filler(pile, valign='top')
-        super().__init__(urwid.LineBox(fill, 'Merge pull request'))
+        super().__init__(urwid.LineBox(pile, 'Merge pull request'))
+
+    def _onMethodChange(self, radiobutton, new_state, value):
+        if not new_state:
+            # Each selection change fires this once for the button
+            # losing selection (new_state=False) and once for the one
+            # gaining it; only react to the latter.
+            return
+        self.current_method = value
+        self._updateCommitFields()
+
+    def _updateCommitFields(self):
+        """Show or hide the collapsible commit title/message section.
+
+        It's only shown when the selected merge method actually
+        creates a new commit (GitHub ignores commit_title and
+        commit_message for 'rebase'); its own expanded/collapsed
+        state is otherwise left alone.
+        """
+        contents = []
+        if self.current_method in MERGE_METHODS_WITH_COMMIT_MESSAGE:
+            contents.append((self.commit_fields_section, ('pack', None)))
+            contents.append((urwid.Divider(), ('pack', None)))
+        self.commit_fields_pile.contents = contents
 
     def getValues(self):
         if self.queue_mode:
@@ -241,11 +292,13 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             if button.state:
                 strategy = button._value
         title = ''
-        if self.commit_title is not None:
+        if (self.commit_title is not None and
+                strategy in MERGE_METHODS_WITH_COMMIT_MESSAGE):
             title = self.commit_title.edit_text.strip()
         title = title or None
         message = ''
-        if self.commit_message is not None:
+        if (self.commit_message is not None and
+                strategy in MERGE_METHODS_WITH_COMMIT_MESSAGE):
             message = self.commit_message.edit_text.strip()
         message = message or None
         return (strategy, title, message)
@@ -279,12 +332,13 @@ class EditPullRequestDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         self.pr_title = mywid.MyEdit(edit_text=pr.title, multiline=False,
                 ring=app.ring)
         rows.append(urwid.Text("Title:"))
-        rows.append(self.pr_title)
+        rows.append(mywid.highlightEdit(self.pr_title))
         rows.append(urwid.Divider())
         self.pr_description = mywid.MyEdit(edit_text=pr.body,
                 multiline=True, ring=app.ring)
         rows.append(urwid.Text("Description:"))
-        rows.append(self.pr_description)
+        rows.append(mywid.GrowingEditBox(self.app, self.pr_description,
+                                         md=markdown.Renderer(self.app)))
         rows.append(urwid.Divider())
         rows.append(button_columns)
         pile = urwid.Pile(rows)
@@ -437,8 +491,8 @@ class ReviewButton(mywid.FixedButton):
         urwid.connect_signal(self.dialog, 'cancel',
             lambda button: self.closeReview(upload=False, merge=False))
         self.pr_view.app.popup(self.dialog,
-                               relative_width=50, relative_height=75,
-                               min_width=60, min_height=20)
+                               relative_width=60, min_width=60,
+                               height='pack')
 
     def closeReview(self, upload=False, merge=False):
         approval, message = self.dialog.getValues()
@@ -1414,7 +1468,8 @@ class PullRequestView(urwid.WidgetWrap):
     def closePullRequest(self):
         dialog = mywid.TextEditDialog('Close pull request', 'Message:',
                                       'Close pull request',
-                                      self.pending_edit_message)
+                                      self.pending_edit_message,
+                                      app=self.app, md=self.md)
         urwid.connect_signal(dialog, 'cancel', lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'save', lambda button:
                                  self.doCloseReopenPullRequest(dialog, 'closed'))
@@ -1423,7 +1478,8 @@ class PullRequestView(urwid.WidgetWrap):
     def reopenPullRequest(self):
         dialog = mywid.TextEditDialog('Reopen pull request', 'Message:',
                                       'Reopen pull request',
-                                      self.pending_edit_message)
+                                      self.pending_edit_message,
+                                      app=self.app, md=self.md)
         urwid.connect_signal(dialog, 'cancel', lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'save', lambda button:
                                  self.doCloseReopenPullRequest(dialog, 'open'))
@@ -1494,8 +1550,8 @@ class PullRequestView(urwid.WidgetWrap):
         urwid.connect_signal(dialog, 'merge', lambda button:
                                  self.doMergePullRequest(dialog))
         self.app.popup(dialog,
-                       relative_width=50, relative_height=75,
-                       min_width=60, min_height=20)
+                       relative_width=60, min_width=60,
+                       height='pack')
 
     def doMergePullRequest(self, dialog):
         pending_merge = None
