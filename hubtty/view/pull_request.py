@@ -91,8 +91,10 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         with self.app.db.getSession() as session:
             commit = session.getCommit(self.commit_key)
             pr = commit.pull_request
+            self.can_merge = (commit.pull_request.canMerge() or
+                               commit.pull_request.canEnqueue())
             buttons = [('pack', save_button)]
-            if commit.pull_request.canMerge() or commit.pull_request.canEnqueue():
+            if self.can_merge:
                 buttons.append(('pack', merge_button))
             buttons.append(('pack', cancel_button))
             buttons = urwid.Columns(buttons, dividechars=2)
@@ -152,6 +154,10 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         commands = self.app.config.keymap.getCommands(keys)
         if keymap.PREV_SCREEN in commands:
             self._emit('cancel')
+            return None
+        if keymap.MERGE_PR in commands and self.can_merge:
+            # Equivalent to "Save and Merge" without leaving the review dialog.
+            self._emit('merge')
             return None
         return key
 

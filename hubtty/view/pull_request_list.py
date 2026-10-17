@@ -325,6 +325,8 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
              refresh_help),
             (keymap.REVIEW,
              "Leave reviews for the marked pull requests"),
+            (keymap.MERGE_PR,
+             "Merge the marked or currently selected pull request"),
             (keymap.SORT_BY_NUMBER,
              "Sort pull requests by number"),
             (keymap.SORT_BY_UPDATED,
@@ -677,6 +679,9 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
                 rows = [self.listbox.body[pos]]
             self.openReview(rows)
             return True
+        if keymap.MERGE_PR in commands:
+            self.mergePullRequest()
+            return True
         if keymap.SORT_BY_NUMBER in commands:
             if not len(self.listbox.body):
                 return True
@@ -746,13 +751,75 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
             approval = 'COMMENT'
         commit_keys = [row.current_commit_key for row in rows]
         message_keys = self.app.saveReviews(commit_keys, approval,
-                                            message, upload, merge)
+                                            message, upload, False)
         if upload:
             for message_key in message_keys:
                 self.app.sync.submitTask(
                     sync.UploadReviewTask(message_key, priority=sync.HIGH_PRIORITY))
         self.refresh()
         self.app.backScreen()
+        if merge:
+            if len(rows) == 1:
+                self.openMergeDialog(rows[0].pr_key)
+            else:
+                self.app.error(
+                    'Mark exactly one pull request to save and merge.')
+
+    def mergePullRequest(self):
+        marked_rows = [row for row in self.pr_rows.values() if row.mark]
+        if len(marked_rows) > 1:
+            self.app.error('Mark exactly one pull request to merge.')
+            return
+        if marked_rows:
+            row = marked_rows[0]
+        else:
+            if not len(self.listbox.body):
+                return
+            pos = self.listbox.focus_position
+            row = self.listbox.body[pos]
+        self.openMergeDialog(row.pr_key)
+
+    def openMergeDialog(self, pr_key):
+        with self.app.db.getSession() as session:
+            pr = session.getPullRequest(pr_key)
+            dialog = view_pr.MergeDialog(self.app, pr)
+        urwid.connect_signal(dialog, 'cancel',
+                    lambda button: self.app.backScreen())
+        urwid.connect_signal(dialog, 'merge', lambda button:
+                                 self.doMergePullRequest(dialog, pr_key))
+        self.app.popup(dialog,
+                       relative_width=60, min_width=60,
+                       height='pack')
+
+    def doMergePullRequest(self, dialog, pr_key):
+        pending_merge = None
+
+        strategy, title, message = dialog.getValues()
+
+        if not strategy:
+            self.app.backScreen()
+            return
+
+        with self.app.db.getSession() as session:
+            pr = session.getPullRequest(pr_key)
+
+            if not (pr.canMerge() or pr.canEnqueue()):
+                error_dialog = mywid.MessageDialog('Error', 'You cannot merge this pull request.')
+                urwid.connect_signal(error_dialog, 'close',
+                    lambda button: self.app.backScreen())
+                self.app.popup(error_dialog)
+                return
+
+            sha = pr.commits[-1].sha
+            pending_merge = pr.createPendingMerge(sha, strategy,
+                    commit_title=title, commit_message=message)
+
+        if pending_merge:
+            self.app.sync.submitTask(
+                    sync.SendMergeTask(pending_merge.key, priority=sync.HIGH_PRIORITY))
+
+        self.app.backScreen()
+        self.refresh()
 
     def closePullRequest(self):
         dialog = mywid.TextEditDialog('Close pull request', 'Message:',
