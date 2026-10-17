@@ -24,7 +24,8 @@ from hubtty.view.diff import build_comment_widget
 LN_COL_WIDTH = 5
 
 class SideDiffCommentEdit(BaseDiffCommentEdit):
-    def __init__(self, app, context, old_key=None, new_key=None, old='', new=''):
+    def __init__(self, app, context, old_key=None, new_key=None, old='', new='',
+                md=None):
         super().__init__([])
         self.app = app
         self.context = context
@@ -35,12 +36,20 @@ class SideDiffCommentEdit(BaseDiffCommentEdit):
         self.new = mywid.MyEdit(edit_text=new, multiline=True, ring=app.ring)
         self.contents.append((urwid.Text(''), ('given', LN_COL_WIDTH, False)))
         if context.old_file_key and (context.old_ln is not None or context.header):
-            self.contents.append((urwid.AttrMap(self.old, 'draft-comment'), ('weight', 1, False)))
+            self.contents.append((mywid.GrowingEditBox(
+                                      app, self.old, md=md,
+                                      attr='draft-comment',
+                                      focus_attr='draft-comment'),
+                                  ('weight', 1, False)))
         else:
             self.contents.append((urwid.Text(''), ('weight', 1, False)))
         self.contents.append((urwid.Text(''), ('given', LN_COL_WIDTH, False)))
         if context.new_file_key and (context.new_ln is not None or context.header):
-            self.contents.append((urwid.AttrMap(self.new, 'draft-comment'), ('weight', 1, False)))
+            self.contents.append((mywid.GrowingEditBox(
+                                      app, self.new, md=md,
+                                      attr='draft-comment',
+                                      focus_attr='draft-comment'),
+                                  ('weight', 1, False)))
             new_editable = True
         else:
             self.contents.append((urwid.Text(''), ('weight', 1, False)))
@@ -198,7 +207,8 @@ class SideDiffView(BaseDiffView):
                 lines.append(SideDiffCommentEdit(self.app, context,
                                                  old_comment_key,
                                                  new_comment_key,
-                                                 old_comment, new_comment))
+                                                 old_comment, new_comment,
+                                                 md=self._md))
         return lines
 
     def makeFileReminder(self):
@@ -240,11 +250,12 @@ class SideDiffView(BaseDiffView):
             lines.append(SideDiffCommentEdit(self.app, context,
                                              old_comment_key,
                                              new_comment_key,
-                                             old_comment, new_comment))
+                                             old_comment, new_comment,
+                                             md=self._md))
         return lines
 
     def makeCommentEdit(self, edit):
-        return SideDiffCommentEdit(self.app, edit.context)
+        return SideDiffCommentEdit(self.app, edit.context, md=self._md)
 
     def cleanupEdit(self, edit):
         if edit.old_key:
