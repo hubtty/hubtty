@@ -20,6 +20,7 @@ import os
 import urwid
 
 from hubtty import keymap
+from hubtty import markdown
 from hubtty import mywid
 from hubtty import sync
 from hubtty.view import pull_request as view_pr
@@ -823,7 +824,9 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
 
     def closePullRequest(self):
         dialog = mywid.TextEditDialog('Close pull request', 'Message:',
-                                      'Close pull request', '')
+                                      'Close pull request', '',
+                                      app=self.app,
+                                      md=markdown.Renderer(self.app))
         urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
         urwid.connect_signal(dialog, 'save', lambda button:
                                  self.doCloseReopenPullRequest(dialog, 'closed'))
@@ -831,7 +834,9 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
 
     def reopenPullRequest(self):
         dialog = mywid.TextEditDialog('Reopen pull request', 'Message:',
-                                      'Reopen pull request', '')
+                                      'Reopen pull request', '',
+                                      app=self.app,
+                                      md=markdown.Renderer(self.app))
         urwid.connect_signal(dialog, 'cancel', self.app.backScreen)
         urwid.connect_signal(dialog, 'save', lambda button:
                              self.doCloseReopenPullRequest(dialog, 'open'))

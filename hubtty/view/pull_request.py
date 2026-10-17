@@ -133,7 +133,8 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                     message = m.message
         self.message = mywid.MyEdit("Message: \n", edit_text=message,
                                     multiline=True, ring=app.ring)
-        rows.append(mywid.GrowingEditBox(self.app, self.message))
+        rows.append(mywid.GrowingEditBox(self.app, self.message,
+                                         md=markdown.Renderer(self.app)))
         rows.append(urwid.Divider())
         rows.append(buttons)
         pile = urwid.Pile(rows)
@@ -234,7 +235,8 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             self.commit_message = mywid.MyEdit("Commit message (Optional): \n", edit_text=message,
                                         multiline=True, ring=app.ring)
             self._commit_title_field = mywid.highlightEdit(self.commit_title)
-            self._commit_message_field = mywid.GrowingEditBox(self.app, self.commit_message)
+            self._commit_message_field = mywid.GrowingEditBox(
+                self.app, self.commit_message, md=markdown.Renderer(self.app))
             self.commit_fields_section = mywid.CollapsibleSection(
                 'Customize commit title/message',
                 urwid.Pile([self._commit_title_field, self._commit_message_field]),
@@ -335,7 +337,8 @@ class EditPullRequestDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         self.pr_description = mywid.MyEdit(edit_text=pr.body,
                 multiline=True, ring=app.ring)
         rows.append(urwid.Text("Description:"))
-        rows.append(mywid.highlightEdit(self.pr_description))
+        rows.append(mywid.GrowingEditBox(self.app, self.pr_description,
+                                         md=markdown.Renderer(self.app)))
         rows.append(urwid.Divider())
         rows.append(button_columns)
         pile = urwid.Pile(rows)
@@ -1465,7 +1468,8 @@ class PullRequestView(urwid.WidgetWrap):
     def closePullRequest(self):
         dialog = mywid.TextEditDialog('Close pull request', 'Message:',
                                       'Close pull request',
-                                      self.pending_edit_message)
+                                      self.pending_edit_message,
+                                      app=self.app, md=self.md)
         urwid.connect_signal(dialog, 'cancel', lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'save', lambda button:
                                  self.doCloseReopenPullRequest(dialog, 'closed'))
@@ -1474,7 +1478,8 @@ class PullRequestView(urwid.WidgetWrap):
     def reopenPullRequest(self):
         dialog = mywid.TextEditDialog('Reopen pull request', 'Message:',
                                       'Reopen pull request',
-                                      self.pending_edit_message)
+                                      self.pending_edit_message,
+                                      app=self.app, md=self.md)
         urwid.connect_signal(dialog, 'cancel', lambda button: self.app.backScreen())
         urwid.connect_signal(dialog, 'save', lambda button:
                                  self.doCloseReopenPullRequest(dialog, 'open'))

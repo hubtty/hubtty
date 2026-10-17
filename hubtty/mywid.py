@@ -165,22 +165,66 @@ class GrowingEditBox(urwid.WidgetWrap):
 
     This keeps short messages compact (sized with 'pack') while still
     preventing a large paste from growing the dialog past a sane
-    fraction of the screen."""
-    def __init__(self, app, widget, min_height=5):
+    fraction of the screen.
+
+    If *md* (an object with a ``render(text)`` method returning urwid
+    text markup, e.g. a ``markdown.Renderer``) is given, the box shows
+    a live markdown-rendered, syntax-highlighted preview of the text
+    instead of the raw editable widget whenever it does not have
+    keyboard focus, switching back to raw editable text as soon as it
+    regains focus. The switch is driven entirely by the ``focus`` flag
+    urwid already passes to ``rows()``/``render()``, so no extra event
+    wiring is needed. If the wrapped widget has a caption (e.g. a
+    "Message: " label), the caption is kept in front of the rendered
+    preview so it does not disappear while the box is unfocused.
+
+    *attr*/*focus_attr* override the default unfocused/focused
+    highlight styles (e.g. so diff inline comments can keep their own
+    permanent 'draft-comment' tint instead of the focus-only default).
+    """
+    def __init__(self, app, widget, md=None, min_height=5,
+                attr=EDIT_FIELD_ATTR, focus_attr=FOCUSED_EDIT_FIELD_ATTR):
         self.app = app
         self.edit_widget = widget
+        self.md = md
         self.min_height = min_height
         self.box_adapter = urwid.BoxAdapter(urwid.ListBox([widget]), min_height)
-        attrmap = urwid.AttrMap(self.box_adapter, EDIT_FIELD_ATTR,
-                                focus_map=FOCUSED_EDIT_FIELD_ATTR)
-        super().__init__(attrmap)
+        self._edit_attrmap = urwid.AttrMap(self.box_adapter, attr,
+                                           focus_map=focus_attr)
+        if md is not None:
+            self.preview_widget = urwid.Text('')
+            self.preview_adapter = urwid.BoxAdapter(
+                urwid.ListBox([self.preview_widget]), min_height)
+            self._preview_attrmap = urwid.AttrMap(self.preview_adapter, attr)
+        else:
+            self.preview_widget = None
+        super().__init__(self._edit_attrmap)
+
+    def _activeContent(self, focus):
+        """Return (box_adapter, content_widget, attrmap) for *focus*.
+
+        While focused (or when no markdown renderer was given), the
+        raw editable widget is active. Otherwise, the rendered
+        markdown preview is refreshed and made active instead.
+        """
+        if self.md is not None and not focus:
+            rendered = self.md.render(self.edit_widget.edit_text)
+            caption = self.edit_widget.caption
+            if caption:
+                rendered = [caption] + rendered
+            self.preview_widget.set_text(rendered)
+            return (self.preview_adapter, self.preview_widget,
+                    self._preview_attrmap)
+        return self.box_adapter, self.edit_widget, self._edit_attrmap
 
     def _updateHeight(self, maxcol, focus=False):
-        natural = self.edit_widget.rows((maxcol,), focus)
+        box_adapter, content_widget, attrmap = self._activeContent(focus)
+        natural = content_widget.rows((maxcol,), focus)
         screen_rows = self.app.loop.screen.get_cols_rows()[1]
         max_height = max(self.min_height, screen_rows - GROWING_EDIT_RESERVED_ROWS)
         height = min(max(natural, self.min_height), max_height)
-        self.box_adapter.height = height
+        box_adapter.height = height
+        self._w = attrmap
         return height
 
     def rows(self, size, focus=False):
@@ -256,7 +300,8 @@ class LineEditDialog(ButtonDialog):
 
 class TextEditDialog(urwid.WidgetWrap, LineBoxTitlePropertyMixin):
     signals = ['save', 'cancel']
-    def __init__(self, title, prompt, button, text, ring=None):
+    def __init__(self, title, prompt, button, text, ring=None,
+                app=None, md=None):
         save_button = FixedButton(button)
         cancel_button = FixedButton('Cancel')
         urwid.connect_signal(save_button, 'click',
@@ -269,7 +314,10 @@ class TextEditDialog(urwid.WidgetWrap, LineBoxTitlePropertyMixin):
         rows = []
         self.entry = MyEdit(edit_text=text, multiline=True, ring=ring)
         rows.append(urwid.Text(prompt))
-        rows.append(highlightEdit(self.entry))
+        if app is not None:
+            rows.append(GrowingEditBox(app, self.entry, md=md))
+        else:
+            rows.append(highlightEdit(self.entry))
         rows.append(urwid.Divider())
         rows.append(button_columns)
         pile = urwid.Pile(rows)
