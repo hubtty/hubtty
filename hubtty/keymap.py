@@ -60,6 +60,7 @@ REFRESH = 'refresh'
 EDIT_LABELS = 'edit labels'
 EDIT_PULL_REQUEST = 'edit pull request'
 MERGE_PR = 'merge pull request'
+APPROVE_WORKFLOW_RUNS = 'approve workflow runs'
 SORT_BY_NUMBER = 'sort by number'
 SORT_BY_UPDATED = 'sort by updated'
 SORT_BY_LAST_SEEN = 'sort by last seen'
@@ -129,6 +130,7 @@ DEFAULT_KEYMAP = {
     EDIT_LABELS: 'meta l',
     EDIT_PULL_REQUEST: 'ctrl d',
     MERGE_PR: 'meta m',
+    APPROVE_WORKFLOW_RUNS: 'meta a',
     SORT_BY_NUMBER: [['S', 'n']],
     SORT_BY_UPDATED: [['S', 'u']],
     SORT_BY_LAST_SEEN: [['S', 's']],

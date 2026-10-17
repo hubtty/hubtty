@@ -60,6 +60,7 @@ from .tasks.pull_request import (
     SyncPullRequestTask,
     SyncPullRequestChecksTask,
     SyncOutdatedPullRequestsTask,
+    ApproveWorkflowRunsTask,
 )
 
 # Upload tasks
@@ -117,6 +118,7 @@ __all__ = [
     'SyncPullRequestTask',
     'SyncPullRequestChecksTask',
     'SyncOutdatedPullRequestsTask',
+    'ApproveWorkflowRunsTask',
     # Upload tasks
     'UploadReviewsTask',
     'SetLabelsTask',

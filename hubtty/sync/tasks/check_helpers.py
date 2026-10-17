@@ -27,6 +27,11 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
+# Author associations whose workflows always auto-run (org insiders).
+# CONTRIBUTOR is excluded because repos using "Require approval for
+# all outside collaborators" still gate them.
+_TRUSTED_AUTHOR_ASSOCIATIONS = frozenset({'MEMBER', 'COLLABORATOR', 'OWNER'})
+
 
 def check_result_from_check_run(remote_check: Dict[str, Any]) -> Dict[str, Any]:
     """Convert a GitHub check run to internal format.
@@ -118,13 +123,15 @@ def update_checks(session, commit, remote_checks_data: List[Dict[str, Any]]) -> 
             )
             check = commit.createCheck(
                 check_data['name'],
-                check_data['state'], created, created
+                check_data['state'], created, created,
+                run_id=check_data.get('run_id'),
             )
             local_checks[check_data['name']] = check
         check.updated = dateutil.parser.parse(check_data['updated'])
         check.state = check_data['state']
         check.url = check_data['url']
         check.message = check_data['message']
+        check.run_id = check_data.get('run_id')
 
         started = check_data.get('started')
         if started:
@@ -136,7 +143,8 @@ def update_checks(session, commit, remote_checks_data: List[Dict[str, Any]]) -> 
 
 def fetch_checks(sync: 'Sync', repository_name: str,
                  commit_sha: str,
-                 use_etag: bool = True) -> List[Dict[str, Any]]:
+                 use_etag: bool = True,
+                 author_association: str = None) -> List[Dict[str, Any]]:
     """Fetch CI checks for a commit from GitHub.
 
     Fetches both commit statuses and check runs, normalizing them
@@ -177,7 +185,57 @@ def fetch_checks(sync: 'Sync', repository_name: str,
             result = check_result_from_check_run(check)
             checks_by_name[result['name']] = result
 
+    # Pending-approval workflow runs aren't in either API above.
+    # Skip for trusted authors whose workflows always auto-run.
+    if author_association not in _TRUSTED_AUTHOR_ASSOCIATIONS:
+        for result in fetch_pending_workflow_approvals(
+                sync, repository_name, commit_sha, use_etag=use_etag):
+            checks_by_name[result['name']] = result
+
     return list(checks_by_name.values())
+
+
+def fetch_pending_workflow_approvals(sync: 'Sync', repository_name: str,
+                                     commit_sha: str,
+                                     use_etag: bool = True) -> List[Dict[str, Any]]:
+    """Find workflow runs awaiting approval for a commit.
+
+    Returns synthetic check dicts with state 'action_required' and
+    run_id set, one per pending run.
+    """
+    try:
+        runs = sync.get(
+            f'repos/{repository_name}/actions/runs'
+            f'?head_sha={commit_sha}&per_page=100',
+            use_etag=use_etag,
+        )
+    except Exception:
+        log.exception(
+            "Unable to fetch workflow runs for %s@%s, assuming none "
+            "pending approval",
+            repository_name, commit_sha,
+        )
+        return []
+
+    results = []
+    for run in (runs or {}).get('workflow_runs', []):
+        # GitHub flags pending approval via status or conclusion
+        # being 'action_required'; check both since the docs are
+        # ambiguous about which applies when.
+        if 'action_required' not in {run.get('status'), run.get('conclusion')}:
+            continue
+        results.append({
+            'name': 'workflow-approval: %s' % (
+                run.get('name') or f'workflow run {run["id"]}'),
+            'url': run.get('html_url', ''),
+            'state': 'action_required',
+            'message': 'Waiting for a maintainer to approve this '
+                       'workflow run',
+            'created': run['created_at'],
+            'updated': run['updated_at'],
+            'run_id': run['id'],
+        })
+    return results
 
 
 def fetch_merge_queue_rule(sync: 'Sync', repository_name: str,

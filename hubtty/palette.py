@@ -79,6 +79,7 @@ DEFAULT_PALETTE={
     'check-pending': ['dark magenta', ''],
     'check-skipped': ['dark gray', ''],
     'check-cancelled': ['dark gray', ''],
+    'check-action_required': ['yellow,bold', ''],
     'state-draft': ['yellow', ''],
     'generated-filename': ['dark gray', ''],
     # repository list

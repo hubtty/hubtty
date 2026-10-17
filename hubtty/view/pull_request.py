@@ -850,6 +850,8 @@ class PullRequestView(urwid.WidgetWrap):
              "Edit the labels of this pull request"),
             (keymap.MERGE_PR,
              "Merge this pull request"),
+            (keymap.APPROVE_WORKFLOW_RUNS,
+             "Approve pending GitHub Actions workflow runs"),
             ]
 
     def help(self):
@@ -1356,6 +1358,9 @@ class PullRequestView(urwid.WidgetWrap):
         if keymap.MERGE_PR in commands:
             self.mergePullRequest()
             return None
+        if keymap.APPROVE_WORKFLOW_RUNS in commands:
+            self.approveWorkflowRuns()
+            return None
         if keymap.EDIT_LABELS in commands:
             self.editLabels()
             return None
@@ -1519,6 +1524,43 @@ class PullRequestView(urwid.WidgetWrap):
             self.app.sync.submitTask(
                     sync.SendMergeTask(pending_merge.key, priority=sync.HIGH_PRIORITY))
 
+        self.app.backScreen()
+        self.refresh()
+
+    def approveWorkflowRuns(self):
+        with self.app.db.getSession() as session:
+            pr = session.getPullRequest(self.pr_key)
+            if not pr.commits:
+                return
+            pending = [c for c in pr.commits[-1].checks
+                      if c.state == 'action_required' and c.run_id]
+            count = len(pending)
+            max_shown = 3
+            if count > max_shown:
+                names = ', '.join(c.name for c in pending[:max_shown])
+                names += ', and %d more' % (count - max_shown)
+            else:
+                names = ', '.join(c.name for c in pending)
+
+        if not count:
+            info_dialog = mywid.MessageDialog(
+                'Approve workflow runs',
+                'No workflow runs pending approval.')
+            urwid.connect_signal(info_dialog, 'close',
+                lambda button: self.app.backScreen())
+            self.app.popup(info_dialog)
+            return
+
+        dialog = mywid.YesNoDialog(
+            'Approve workflow runs',
+            'Approve %d pending workflow run(s) (%s)?' % (count, names))
+        urwid.connect_signal(dialog, 'no', self.app.backScreen)
+        urwid.connect_signal(dialog, 'yes', self.doApproveWorkflowRuns)
+        self.app.popup(dialog)
+
+    def doApproveWorkflowRuns(self, button=None):
+        self.app.sync.submitTask(
+            sync.ApproveWorkflowRunsTask(self.pr_key, priority=sync.HIGH_PRIORITY))
         self.app.backScreen()
         self.refresh()
 
