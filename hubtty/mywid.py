@@ -192,7 +192,7 @@ class GrowingEditBox(urwid.WidgetWrap):
         self._edit_attrmap = urwid.AttrMap(self.box_adapter, attr,
                                            focus_map=focus_attr)
         if md is not None:
-            self.preview_widget = urwid.Text('')
+            self.preview_widget = HyperText('')
             self.preview_adapter = urwid.BoxAdapter(
                 urwid.ListBox([self.preview_widget]), min_height)
             self._preview_attrmap = urwid.AttrMap(self.preview_adapter, attr)

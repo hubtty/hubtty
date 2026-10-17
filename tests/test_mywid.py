@@ -16,6 +16,7 @@
 
 import urwid
 
+from hubtty import markdown
 from hubtty import mywid
 
 
@@ -115,6 +116,24 @@ class TestGrowingEditBoxPreview:
         box = mywid.GrowingEditBox(app, edit, attr='draft-comment',
                                    focus_attr='draft-comment')
         assert box._edit_attrmap.get_attr_map() == {None: 'draft-comment'}
+
+
+class TestGrowingEditBoxMarkdownLinks:
+    """Regression test: the preview widget must be able to display
+    markdown links (rendered as mywid.Link objects) without raising.
+    A plain urwid.Text cannot hold a Link object in its markup."""
+
+    def test_markdown_link_in_preview_does_not_raise(self):
+        app = FakeApp()
+        renderer = markdown.Renderer(app)
+        edit = make_edit('See [the docs](https://example.com) for details')
+        box = mywid.GrowingEditBox(app, edit, md=renderer)
+
+        box.rows((60,), focus=False)
+
+        flattened = box.preview_widget.get_text()[0]
+        assert 'the docs' in flattened
+        assert isinstance(box.preview_widget, mywid.HyperText)
 
 
 class FakeRowsWidget(urwid.Text):
