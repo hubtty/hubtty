@@ -137,6 +137,8 @@ DEFAULT_PALETTE={
     # Collapsible sections
     'collapsible-title': ['dark cyan', ''],
     'focused-collapsible-title': ['light cyan,standout', ''],
+    'edit-field': ['default', ''],
+    'focused-edit-field': ['default', 'dark gray'],
     }
 
 # A delta from the default palette
@@ -177,6 +179,8 @@ LIGHT_PALETTE = {
     'md-thematicbreak': ['dark gray', ''],
     'md-list-bullet': ['dark blue', ''],
     'md-checkbox': ['dark green', ''],
+    'edit-field': ['default', ''],
+    'focused-edit-field': ['default', 'light gray'],
     }
 
 class Palette:

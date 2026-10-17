@@ -131,7 +131,7 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                     message = m.message
         self.message = mywid.MyEdit("Message: \n", edit_text=message,
                                     multiline=True, ring=app.ring)
-        rows.append(self.message)
+        rows.append(mywid.highlightEdit(self.message))
         rows.append(urwid.Divider())
         rows.append(buttons)
         pile = urwid.Pile(rows)
@@ -208,10 +208,10 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             rows.append(urwid.Divider())
             self.commit_title = mywid.MyEdit("Commit title (Optional): \n", edit_text=title,
                                         multiline=False, ring=app.ring)
-            rows.append(self.commit_title)
+            rows.append(mywid.highlightEdit(self.commit_title))
             self.commit_message = mywid.MyEdit("Commit message (Optional): \n", edit_text=message,
                                         multiline=True, ring=app.ring)
-            rows.append(self.commit_message)
+            rows.append(mywid.highlightEdit(self.commit_message))
             rows.append(urwid.Divider())
         elif methods:
             rows.append(urwid.Text(
@@ -279,12 +279,12 @@ class EditPullRequestDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
         self.pr_title = mywid.MyEdit(edit_text=pr.title, multiline=False,
                 ring=app.ring)
         rows.append(urwid.Text("Title:"))
-        rows.append(self.pr_title)
+        rows.append(mywid.highlightEdit(self.pr_title))
         rows.append(urwid.Divider())
         self.pr_description = mywid.MyEdit(edit_text=pr.body,
                 multiline=True, ring=app.ring)
         rows.append(urwid.Text("Description:"))
-        rows.append(self.pr_description)
+        rows.append(mywid.highlightEdit(self.pr_description))
         rows.append(urwid.Divider())
         rows.append(button_columns)
         pile = urwid.Pile(rows)

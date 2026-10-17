@@ -140,6 +140,16 @@ class MyEdit(urwid.Edit):
             self.ring.kill(text)
         return super().keypress(size, key)
 
+EDIT_FIELD_ATTR = 'edit-field'
+FOCUSED_EDIT_FIELD_ATTR = 'focused-edit-field'
+
+def highlightEdit(widget):
+    """Wrap an editable text widget with an AttrMap so it is visually
+    distinguishable from surrounding static text (used for MyEdit
+    instances embedded in dialogs)."""
+    return urwid.AttrMap(widget, EDIT_FIELD_ATTR,
+                         focus_map=FOCUSED_EDIT_FIELD_ATTR)
+
 class LineBoxTitlePropertyMixin:
 
     @property
@@ -167,7 +177,7 @@ class ButtonDialog(urwid.WidgetWrap, LineBoxTitlePropertyMixin):
         rows.append(urwid.Text(message))
         if entry_prompt:
             self.entry = MyEdit(entry_prompt, edit_text=entry_text, ring=ring)
-            rows.append(self.entry)
+            rows.append(highlightEdit(self.entry))
         else:
             self.entry = None
         rows.append(urwid.Divider())
@@ -217,7 +227,7 @@ class TextEditDialog(urwid.WidgetWrap, LineBoxTitlePropertyMixin):
         rows = []
         self.entry = MyEdit(edit_text=text, multiline=True, ring=ring)
         rows.append(urwid.Text(prompt))
-        rows.append(self.entry)
+        rows.append(highlightEdit(self.entry))
         rows.append(urwid.Divider())
         rows.append(button_columns)
         pile = urwid.Pile(rows)
