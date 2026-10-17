@@ -131,12 +131,11 @@ class ReviewDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
                     message = m.message
         self.message = mywid.MyEdit("Message: \n", edit_text=message,
                                     multiline=True, ring=app.ring)
-        rows.append(mywid.highlightEdit(self.message))
+        rows.append(mywid.GrowingEditBox(self.app, self.message))
         rows.append(urwid.Divider())
         rows.append(buttons)
         pile = urwid.Pile(rows)
-        fill = urwid.Filler(pile, valign='top')
-        super().__init__(urwid.LineBox(fill, 'Review'))
+        super().__init__(urwid.LineBox(pile, 'Review'))
 
     def getValues(self):
         approval = ''
@@ -211,7 +210,7 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
             rows.append(mywid.highlightEdit(self.commit_title))
             self.commit_message = mywid.MyEdit("Commit message (Optional): \n", edit_text=message,
                                         multiline=True, ring=app.ring)
-            rows.append(mywid.highlightEdit(self.commit_message))
+            rows.append(mywid.GrowingEditBox(self.app, self.commit_message))
             rows.append(urwid.Divider())
         elif methods:
             rows.append(urwid.Text(
@@ -230,8 +229,7 @@ class MergeDialog(urwid.WidgetWrap, mywid.LineBoxTitlePropertyMixin):
 
         rows.append(buttons)
         pile = urwid.Pile(rows)
-        fill = urwid.Filler(pile, valign='top')
-        super().__init__(urwid.LineBox(fill, 'Merge pull request'))
+        super().__init__(urwid.LineBox(pile, 'Merge pull request'))
 
     def getValues(self):
         if self.queue_mode:
@@ -437,8 +435,8 @@ class ReviewButton(mywid.FixedButton):
         urwid.connect_signal(self.dialog, 'cancel',
             lambda button: self.closeReview(upload=False, merge=False))
         self.pr_view.app.popup(self.dialog,
-                               relative_width=50, relative_height=75,
-                               min_width=60, min_height=20)
+                               relative_width=60, min_width=60,
+                               height='pack')
 
     def closeReview(self, upload=False, merge=False):
         approval, message = self.dialog.getValues()
@@ -1494,8 +1492,8 @@ class PullRequestView(urwid.WidgetWrap):
         urwid.connect_signal(dialog, 'merge', lambda button:
                                  self.doMergePullRequest(dialog))
         self.app.popup(dialog,
-                       relative_width=50, relative_height=75,
-                       min_width=60, min_height=20)
+                       relative_width=60, min_width=60,
+                       height='pack')
 
     def doMergePullRequest(self, dialog):
         pending_merge = None

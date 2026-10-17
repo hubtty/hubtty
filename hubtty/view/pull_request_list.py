@@ -732,8 +732,8 @@ class PullRequestListView(urwid.WidgetWrap, mywid.Searchable):
         urwid.connect_signal(dialog, 'cancel',
             lambda button: self.closeReview(dialog, rows, False, False))
         self.app.popup(dialog,
-                       relative_width=50, relative_height=75,
-                       min_width=60, min_height=20)
+                       relative_width=60, min_width=60,
+                       height='pack')
 
     def closeReview(self, dialog, rows, upload, merge):
         approval, message = dialog.getValues()

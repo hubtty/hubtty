@@ -150,6 +150,48 @@ def highlightEdit(widget):
     return urwid.AttrMap(widget, EDIT_FIELD_ATTR,
                          focus_map=FOCUSED_EDIT_FIELD_ATTR)
 
+# Number of terminal rows reserved for a dialog's chrome (title,
+# other fields, divider, buttons, popup border) when computing how
+# tall a GrowingEditBox is allowed to grow.  This is an approximation
+# shared by all dialogs that use GrowingEditBox; it only needs to be
+# roughly right since the box still scrolls internally past its cap.
+GROWING_EDIT_RESERVED_ROWS = 12
+
+class GrowingEditBox(urwid.WidgetWrap):
+    """Wrap a (typically multiline) editable text widget so it grows
+    to fit its content, up to a limit based on the terminal's current
+    size, scrolling internally if the text overflows that limit, and
+    is highlighted as an editable field.
+
+    This keeps short messages compact (sized with 'pack') while still
+    preventing a large paste from growing the dialog past a sane
+    fraction of the screen."""
+    def __init__(self, app, widget, min_height=5):
+        self.app = app
+        self.edit_widget = widget
+        self.min_height = min_height
+        self.box_adapter = urwid.BoxAdapter(urwid.ListBox([widget]), min_height)
+        attrmap = urwid.AttrMap(self.box_adapter, EDIT_FIELD_ATTR,
+                                focus_map=FOCUSED_EDIT_FIELD_ATTR)
+        super().__init__(attrmap)
+
+    def _updateHeight(self, maxcol, focus=False):
+        natural = self.edit_widget.rows((maxcol,), focus)
+        screen_rows = self.app.loop.screen.get_cols_rows()[1]
+        max_height = max(self.min_height, screen_rows - GROWING_EDIT_RESERVED_ROWS)
+        height = min(max(natural, self.min_height), max_height)
+        self.box_adapter.height = height
+        return height
+
+    def rows(self, size, focus=False):
+        (maxcol,) = size
+        return self._updateHeight(maxcol, focus)
+
+    def render(self, size, focus=False):
+        (maxcol,) = size
+        self._updateHeight(maxcol, focus)
+        return super().render(size, focus)
+
 class LineBoxTitlePropertyMixin:
 
     @property
