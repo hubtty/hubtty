@@ -20,6 +20,7 @@ import urwid
 from urwid.str_util import calc_width
 
 from hubtty import mywid
+from hubtty import syntax
 
 
 class Renderer:
@@ -259,7 +260,21 @@ class Renderer:
                     if info is None:
                         info = ""
                     raw_code = element.get('raw', '')
-                    text.append(('md-blockcode', ["```%s\n" % info, raw_code, "```\n"]))
+                    language = info.split()[0] if info.split() else ''
+                    highlighted = {}
+                    if language and self.app.config.syntax_highlighting:
+                        highlighted = syntax.highlight_code(
+                            raw_code, language,
+                            max_file_size=self.app.config.max_highlight_size)
+                    if highlighted:
+                        text.append(('md-blockcode', "```%s\n" % info))
+                        lines = raw_code.splitlines()
+                        for i, line in enumerate(lines, start=1):
+                            text.append(highlighted.get(i, line))
+                            text.append("\n")
+                        text.append(('md-blockcode', "```\n"))
+                    else:
+                        text.append(('md-blockcode', ["```%s\n" % info, raw_code, "```\n"]))
                 case 'table':
                     if self.needsNewLine(text):
                         text.append("\n")
