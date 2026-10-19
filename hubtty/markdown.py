@@ -20,6 +20,7 @@ import urwid
 from urwid.str_util import calc_width
 
 from hubtty import mywid
+from hubtty.gitrepo import expand_tabs
 from hubtty.syntax import highlight_code
 
 
@@ -435,16 +436,16 @@ class Renderer:
         are returned (suitable for wrapping in ``md-blockcode``
         by the caller).
         """
-        # urwid renders literal tabs as '?'; expand to spaces.
-        raw_code = raw_code.expandtabs(4)
         highlighted = None
         if info and self.app.config.syntax_highlighting:
             highlighted = highlight_code(info, raw_code)
         if highlighted is not None:
             body = highlighted if isinstance(highlighted, list) \
                 else [highlighted]
+            body = expand_tabs(body, tabstop=4, tab_marker='')
             return [('syn-comment-on-md-blockcode', "```%s\n" % info)] \
                 + body + [('syn-comment-on-md-blockcode', "```\n")]
+        raw_code = expand_tabs(raw_code, tabstop=4, tab_marker='')
         return [('syn-comment-on-md-blockcode', "```%s\n" % info),
                 raw_code,
                 ('syn-comment-on-md-blockcode', "```\n")]

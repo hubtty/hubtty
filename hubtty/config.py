@@ -133,6 +133,7 @@ class ConfigSchema:
                            'diff-view': str,
                            'syntax-highlighting': bool,
                            'max-highlight-size': int,
+                           'tab-marker': str,
                            'hide-comments': self.hide_comments,
                            # 'thread-prs': bool,
                            'display-times-in-utc': bool,
@@ -253,6 +254,7 @@ class Config:
         self.syntax_highlighting = self.config.get('syntax-highlighting', True)
         self.max_highlight_size = self.config.get('max-highlight-size',
                                                    512 * 1024)
+        self.tab_marker = self.config.get('tab-marker', '»')
 
         self.dashboards = collections.OrderedDict()
         for d in self.config.get('dashboards', []):

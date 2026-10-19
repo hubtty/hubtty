@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.10"
 
 [[package]]
@@ -266,7 +266,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=3.1.0" },
     { name = "requests", specifier = ">=2.5.3,<3.0.0" },
     { name = "sqlalchemy", specifier = ">=1.4.0" },
-    { name = "urwid", specifier = ">=4.0.13" },
+    { name = "urwid", specifier = ">=4.2.0" },
     { name = "voluptuous", specifier = ">=0.7" },
 ]
 

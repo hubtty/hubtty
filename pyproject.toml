@@ -28,7 +28,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "urwid>=4.0.13",
+    "urwid>=4.2.0",
     "SQLAlchemy>=1.4.0",
     "GitPython>=0.3.7",
     "python-dateutil",

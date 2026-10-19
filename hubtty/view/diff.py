@@ -547,7 +547,8 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         diffs = repo.diff(self.base_sha, self.sha,
                           show_old_commit=show_old_commit,
                           syntax_highlighting=self.app.config.syntax_highlighting,
-                          max_highlight_size=self.app.config.max_highlight_size)
+                          max_highlight_size=self.app.config.max_highlight_size,
+                          tab_marker=self.app.config.tab_marker)
         # Filter out synthetic /COMMIT_MSG entries that can appear in
         # combined (multi-commit) diffs.  Harmless for single-commit
         # diffs since git does not produce these entries.
@@ -563,7 +564,8 @@ class BaseDiffView(urwid.WidgetWrap, mywid.Searchable):
         for filename in comment_filenames:
             diff = repo.getFile(self.base_sha, self.sha, filename,
                                 syntax_highlighting=self.app.config.syntax_highlighting,
-                                max_highlight_size=self.app.config.max_highlight_size)
+                                max_highlight_size=self.app.config.max_highlight_size,
+                                tab_marker=self.app.config.tab_marker)
             if diff:
                 diffs.append(diff)
             else:
