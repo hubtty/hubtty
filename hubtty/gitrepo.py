@@ -174,10 +174,67 @@ class DiffContextChunk(DiffChunk):
 class DiffChangedChunk(DiffChunk):
     context = False
 
-class DiffFile:
-    log = logging.getLogger('hubtty.gitrepo')
+log = logging.getLogger('hubtty.gitrepo')
 
-    def __init__(self):
+
+def expand_tabs(markup, tabstop=8, tab_marker='»', _offset=None):
+    """Replace tab characters in urwid text markup.
+
+    Handles plain strings, ``(attr, text)`` tuples, and lists
+    containing a mix of both.  Column position is tracked across
+    segments so that tab stops align correctly even when markup
+    is split across multiple elements (e.g. syntax-highlighted
+    tokens).
+
+    Args:
+        markup:     A plain string, an ``(attr, text)`` tuple, or
+                    a list of such elements.
+        tabstop:    Number of columns between tab stops (default 8).
+        tab_marker: Character used to visualise the tab.  The marker
+                    occupies the first column of the tab stop and the
+                    remaining columns are filled with spaces.  When
+                    empty or ``None``, the tab is replaced with plain
+                    spaces.
+        _offset:    Internal state for cross-segment column tracking;
+                    callers should not pass this.
+    """
+    if _offset is None:
+        _offset = {'start': 0, 'prevstart': 0}
+
+    def replace(match):
+        _offset['start'] += match.start(0) - _offset['prevstart']
+        _offset['prevstart'] = match.start(0)
+        total = tabstop - _offset['start'] % tabstop
+        if tab_marker:
+            result = tab_marker + ' ' * (total - 1)
+        else:
+            result = ' ' * total
+        _offset['start'] += total - 1
+        return result
+
+    try:
+        if isinstance(markup, str):
+            result = re.sub(r'\t', replace, markup)
+            _offset['start'] += len(markup) - _offset['prevstart']
+            _offset['prevstart'] = 0
+            return result
+        elif isinstance(markup, list):
+            return [expand_tabs(e, tabstop, tab_marker, _offset)
+                    for e in markup]
+        else:
+            (a, b) = markup
+            result = (a, re.sub(r'\t', replace, b))
+            _offset['start'] += len(b) - _offset['prevstart']
+            _offset['prevstart'] = 0
+            return result
+    except Exception:
+        log.exception("Error expanding tabs")
+        return markup
+
+
+class DiffFile:
+
+    def __init__(self, tab_marker='»'):
         self.newname = 'Unknown File'
         self.oldname = 'Unknown File'
         self.old_empty = False
@@ -189,14 +246,15 @@ class DiffFile:
         self.offset = 0
         self.old_syntax = {}
         self.new_syntax = {}
+        self.tab_marker = tab_marker
 
     def finalize(self):
         if not self.current_chunk:
             return
-        oldlines = [(n, d, self.expand_tabs(l)) for (n, d, l)
-                        in self.current_chunk.oldlines]
-        newlines = [(n, d, self.expand_tabs(l)) for (n, d, l)
-                        in self.current_chunk.newlines]
+        oldlines = [(n, d, expand_tabs(l, tab_marker=self.tab_marker))
+                    for (n, d, l) in self.current_chunk.oldlines]
+        newlines = [(n, d, expand_tabs(l, tab_marker=self.tab_marker))
+                    for (n, d, l) in self.current_chunk.newlines]
         self.current_chunk.lines = list(
                 zip(oldlines, newlines))
         if not self.chunks:
@@ -207,40 +265,6 @@ class DiffFile:
         self.current_chunk.calcRange()
         self.chunks.append(self.current_chunk)
         self.current_chunk = None
-
-    def expand_tabs(self, l, tabstop=8, _offset=None):
-        if _offset is None:
-            _offset = {'start': 0, 'prevstart': 0}
-
-        def replace(match):
-            _offset['start'] += match.start(0) - _offset['prevstart']
-            _offset['prevstart'] = match.start(0)
-            cnt = tabstop - _offset['start'] % tabstop - 1
-            _offset['start'] += cnt
-            return "»" + " " * cnt
-
-        try:
-            if isinstance(l, str):
-                result = re.sub(r'\t', replace, l)
-                # Advance column past any characters after the last tab
-                # so the next segment (if any) starts at the right column.
-                _offset['start'] += len(l) - _offset['prevstart']
-                _offset['prevstart'] = 0
-                return result
-            elif isinstance(l, list):
-                # Share _offset across all elements so column tracking
-                # persists across markup segments (e.g. syntax-highlighted
-                # tuples).
-                return [self.expand_tabs(e, tabstop, _offset) for e in l]
-            else:
-                (a, b) = l
-                result = (a, re.sub(r'\t', replace, b))
-                _offset['start'] += len(b) - _offset['prevstart']
-                _offset['prevstart'] = 0
-                return result
-        except Exception:
-            self.log.exception("Error expanding tabs")
-            return l
 
     def addDiffLines(self, old, new):
         if (self.current_chunk and
@@ -461,7 +485,8 @@ class Repo:
             return {}
 
     def diff(self, old, new, context=10000, show_old_commit=False,
-             syntax_highlighting=True, max_highlight_size=None):
+             syntax_highlighting=True, max_highlight_size=None,
+             tab_marker='»'):
         """Create a diff from old to new.
 
         Note that the commit message is also diffed, and listed as /COMMIT_MSG.
@@ -481,7 +506,7 @@ class Repo:
                 newc, color='never', create_patch=True, unified=context))
         for diff_context in contexts:
             # Each iteration of this is a file
-            f = DiffFile()
+            f = DiffFile(tab_marker=tab_marker)
             f.oldname = diff_context.a_path
             f.newname = diff_context.b_path
             if diff_context.new_file:
@@ -600,8 +625,8 @@ class Repo:
         return files
 
     def getFile(self, old, new, path, syntax_highlighting=True,
-                 max_highlight_size=None):
-        f = DiffFile()
+                 max_highlight_size=None, tab_marker='»'):
+        f = DiffFile(tab_marker=tab_marker)
         f.oldname = path
         f.newname = path
         f.old_lineno = 1
