@@ -209,6 +209,12 @@ commentlinks:
 # Default is 524288 (512 KiB).
 # max-highlight-size: 524288
 
+# Character used to mark tab stops in diff views.  The marker
+# occupies the first column of each tab stop; the remaining
+# columns are filled with spaces.  Set to an empty string to
+# render tabs as plain whitespace.
+# tab-marker: '»'
+
 # Generated files are collapsed by default in diff views: the filename
 # and a [generated] marker are shown but the diff chunks are hidden.
 # In the pull request view, generated files are grouped into a single
