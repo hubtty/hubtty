@@ -18,8 +18,9 @@ import functools
 import logging
 
 from pygments import lex
-from pygments.lexers import get_lexer_for_filename, TextLexer
+from pygments.lexers import get_lexer_by_name, get_lexer_for_filename, TextLexer
 from pygments.token import Token
+from pygments.util import ClassNotFound
 
 log = logging.getLogger('hubtty.syntax')
 
@@ -110,32 +111,14 @@ def _token_to_attr(token_type):
     return None
 
 
-def highlight_file(filename, content, max_file_size=DEFAULT_MAX_FILE_SIZE):
-    """Highlight *content* and return per-line urwid markup.
-
-    Args:
-        filename:      Used to select a Pygments lexer.
-        content:       Full file text (``str``).
-        max_file_size: Skip files larger than this (bytes).
+def _highlight_with_lexer(lexer, content):
+    """Tokenize *content* with *lexer* and return per-line urwid markup.
 
     Returns:
         ``dict[int, markup]`` — 1-based line number → urwid text
         markup.  Lines that contain no styled tokens are omitted so
         the caller can fall back to the original plain string.
     """
-    if not content or len(content) > max_file_size:
-        return {}
-
-    content = content.replace('\r\n', '\n').replace('\r', '\n')
-
-    try:
-        lexer = get_lexer_for_filename(filename, stripall=False)
-    except Exception:
-        return {}
-
-    if isinstance(lexer, TextLexer):
-        return {}
-
     lines = {}
     current_line = 1
     current_markup = []
@@ -164,6 +147,68 @@ def highlight_file(filename, content, max_file_size=DEFAULT_MAX_FILE_SIZE):
             lines[current_line] = markup
 
     return lines
+
+
+def highlight_file(filename, content, max_file_size=DEFAULT_MAX_FILE_SIZE):
+    """Highlight *content* and return per-line urwid markup.
+
+    Args:
+        filename:      Used to select a Pygments lexer.
+        content:       Full file text (``str``).
+        max_file_size: Skip files larger than this (bytes).
+
+    Returns:
+        ``dict[int, markup]`` — 1-based line number → urwid text
+        markup.  Lines that contain no styled tokens are omitted so
+        the caller can fall back to the original plain string.
+    """
+    if not content or len(content) > max_file_size:
+        return {}
+
+    content = content.replace('\r\n', '\n').replace('\r', '\n')
+
+    try:
+        lexer = get_lexer_for_filename(filename, stripall=False)
+    except Exception:
+        return {}
+
+    if isinstance(lexer, TextLexer):
+        return {}
+
+    return _highlight_with_lexer(lexer, content)
+
+
+def highlight_code(content, language, max_file_size=DEFAULT_MAX_FILE_SIZE):
+    """Highlight *content* by explicit *language* name.
+
+    Used for markdown fenced code blocks (e.g. ```` ```python ````),
+    where the language is given directly rather than inferred from a
+    filename.
+
+    Args:
+        content:       Code text (``str``).
+        language:      Pygments lexer name/alias (e.g. ``'python'``).
+        max_file_size: Skip content larger than this (bytes).
+
+    Returns:
+        ``dict[int, markup]`` — 1-based line number → urwid text
+        markup.  Empty if *language* is blank/unrecognized, or the
+        resolved lexer is a plain-text lexer.
+    """
+    if not content or not language or len(content) > max_file_size:
+        return {}
+
+    content = content.replace('\r\n', '\n').replace('\r', '\n')
+
+    try:
+        lexer = get_lexer_by_name(language, stripall=False)
+    except ClassNotFound:
+        return {}
+
+    if isinstance(lexer, TextLexer):
+        return {}
+
+    return _highlight_with_lexer(lexer, content)
 
 
 def _simplify_markup(markup):

@@ -25,7 +25,7 @@ from hubtty.view.diff import build_comment_widget
 LN_COL_WIDTH = 5
 
 class UnifiedDiffCommentEdit(BaseDiffCommentEdit):
-    def __init__(self, app, context, oldnew, key=None, comment=''):
+    def __init__(self, app, context, oldnew, key=None, comment='', md=None):
         super().__init__([])
         self.context = context
         self.oldnew = oldnew
@@ -34,7 +34,10 @@ class UnifiedDiffCommentEdit(BaseDiffCommentEdit):
         self.comment = mywid.MyEdit(edit_text=comment, multiline=True,
                                     ring=app.ring)
         self.contents.append((urwid.Text(''), ('given', 8, False)))
-        self.contents.append((urwid.AttrMap(self.comment, 'draft-comment'),
+        self.contents.append((mywid.GrowingEditBox(
+                                  app, self.comment, md=md,
+                                  attr='draft-comment',
+                                  focus_attr='draft-comment'),
                               ('weight', 1, False)))
         self.focus_position = 1
 
@@ -171,7 +174,8 @@ class UnifiedDiffView(BaseDiffView):
                                                     context,
                                                     gitrepo.OLD,
                                                     old_comment_key,
-                                                    old_comment))
+                                                    old_comment,
+                                                    md=self._md))
             # new line
             if context.new_ln is not None and new[1] != ' ':
                 if old_cache:
@@ -201,13 +205,15 @@ class UnifiedDiffView(BaseDiffView):
                                                             context,
                                                             gitrepo.NEW,
                                                             new_comment_key,
-                                                            new_comment))
+                                                            new_comment,
+                                                            md=self._md))
                 else:
                     lines.append(UnifiedDiffCommentEdit(self.app,
                                                         context,
                                                         gitrepo.NEW,
                                                         new_comment_key,
-                                                        new_comment))
+                                                        new_comment,
+                                                        md=self._md))
         else:
             if old_cache:
                 lines.extend(old_cache)
@@ -241,7 +247,8 @@ class UnifiedDiffView(BaseDiffView):
                                                 context,
                                                 gitrepo.OLD,
                                                 old_comment_key,
-                                                old_comment))
+                                                old_comment,
+                                                md=self._md))
         # new line
         lines.append(UnifiedFileHeader(self.app, context, gitrepo.NEW,
                                        diff.oldname, diff.newname,
@@ -264,13 +271,15 @@ class UnifiedDiffView(BaseDiffView):
                                                 context,
                                                 gitrepo.NEW,
                                                 new_comment_key,
-                                                new_comment))
+                                                new_comment,
+                                                md=self._md))
         return lines
 
     def makeCommentEdit(self, edit):
         return UnifiedDiffCommentEdit(self.app,
                                       edit.context,
-                                      edit.oldnew)
+                                      edit.oldnew,
+                                      md=self._md)
 
     def cleanupEdit(self, edit):
         if edit.key:

@@ -30,6 +30,8 @@ from hubtty.view.pull_request import PullRequestMessageBox
 def _mock_app():
     app = Mock()
     app.openURL = Mock()
+    app.config.syntax_highlighting = True
+    app.config.max_highlight_size = 512 * 1024
     return app
 
 
@@ -159,10 +161,32 @@ class TestRenderBasic:
 
     def test_code_block_with_lang(self):
         result = self.r.render('```python\nprint(1)\n```')
+        # Fence markers stay in the plain 'md-blockcode' style.
+        attrs = _find_attr(result, 'md-blockcode')
+        joined = ''.join(attrs)
+        assert 'python' in joined
+        # The code itself is syntax-highlighted rather than wrapped
+        # in 'md-blockcode', but the text is still present.
+        assert 'print(1)' in _flatten(result)
+        assert any('print' in a for a in _find_attr(result, 'syn-builtin'))
+        assert any('1' in a for a in _find_attr(result, 'syn-number'))
+
+    def test_code_block_with_unknown_lang(self):
+        result = self.r.render('```not-a-real-language\nsome text\n```')
+        # Falls back to the plain, fully-highlighted block.
+        attrs = _find_attr(result, 'md-blockcode')
+        joined = ''.join(attrs)
+        assert 'not-a-real-language' in joined
+        assert 'some text' in joined
+
+    def test_code_block_highlighting_disabled(self):
+        self.r.app.config.syntax_highlighting = False
+        result = self.r.render('```python\nprint(1)\n```')
         attrs = _find_attr(result, 'md-blockcode')
         joined = ''.join(attrs)
         assert 'python' in joined
         assert 'print(1)' in joined
+        assert _find_attr(result, 'syn-builtin') == []
 
     def test_inline_code(self):
         result = self.r.render('Use `foo()` here')
