@@ -16,6 +16,8 @@
 
 from unittest.mock import Mock, MagicMock, patch
 
+import pytest
+
 from hubtty.sync.tasks.pull_request import (
     SyncPullRequestTask,
     SyncPullRequestChecksTask,
@@ -300,6 +302,109 @@ class TestSyncPullRequestCommitDetailSkip:
             "Known commit SHA_A should not be fetched"
         assert f'repos/{REPO}/commits/{SHA_B}' in detail_urls, \
             "New commit SHA_B should be fetched"
+
+
+class TestSyncPullRequestReviewedFlag:
+    """Invalidate the local reviewed flag only when the head changes."""
+
+    @pytest.mark.parametrize(
+        'local_shas,remote_shas,reviewed,expected_reviewed', [
+            pytest.param([SHA_A], [SHA_A, SHA_B], True, False,
+                         id='new-commit'),
+            pytest.param([SHA_A], [SHA_B], True, False,
+                         id='force-push'),
+            pytest.param([SHA_A, SHA_B], [SHA_A], True, False,
+                         id='remove-head'),
+            pytest.param([], [SHA_A], True, False,
+                         id='previously-empty'),
+            pytest.param([SHA_A], [], True, False,
+                         id='now-empty'),
+            pytest.param([], [], True, True,
+                         id='still-empty'),
+            pytest.param([SHA_A], [SHA_A], True, True,
+                         id='unchanged-head'),
+            pytest.param([SHA_A, SHA_B], [SHA_B], True, True,
+                         id='unchanged-head-different-history'),
+            pytest.param([SHA_A], [SHA_B], False, False,
+                         id='already-unreviewed'),
+        ])
+    @patch('hubtty.sync.tasks.pull_request.gitrepo')
+    def test_head_change(self, mock_gitrepo, mock_sync, local_shas,
+                         remote_shas, reviewed, expected_reviewed):
+        local_pr = MagicMock()
+        local_pr.pr_id = PR_ID
+        local_pr.number = 1
+        local_pr.state = 'open'
+        local_pr.reviewed = reviewed
+        local_pr.labels = []
+        local_pr.repository.name = REPO
+        local_pr.commits = [MagicMock(sha=sha) for sha in local_shas]
+        local_pr.getCommitBySha.side_effect = lambda sha: next(
+            (c for c in local_pr.commits if c.sha == sha), None)
+
+        def create_commit(message, sha, parent):
+            commit = MagicMock(sha=sha)
+            local_pr.commits.append(commit)
+            return commit
+
+        local_pr.createCommit.side_effect = create_commit
+        _setup_sync(
+            mock_sync, _make_remote_pr(), _make_remote_commits(*remote_shas),
+            {sha: _make_commit_detail(sha) for sha in remote_shas},
+            local_pr=local_pr, local_commits_with_files=set(local_shas),
+        )
+
+        task = SyncPullRequestTask(PR_ID)
+        task.run(mock_sync)
+
+        assert local_pr.reviewed is expected_reviewed
+        assert task.results[0].review_flag_changed is (
+            reviewed != expected_reviewed)
+        mock_sync.app.repository_cache.clear.assert_called_once_with(
+            local_pr.repository)
+
+    @pytest.mark.parametrize('update', ['metadata', 'ci'])
+    @patch('hubtty.sync.tasks.pull_request.gitrepo')
+    def test_unchanged_head_updates(self, mock_gitrepo, mock_sync, update):
+        local_pr = MagicMock()
+        local_pr.pr_id = PR_ID
+        local_pr.number = 1
+        local_pr.state = 'open'
+        local_pr.reviewed = True
+        local_pr.labels = []
+        local_pr.repository.name = REPO
+        commit = MagicMock(sha=SHA_A)
+        local_pr.commits = [commit]
+        local_pr.getCommitBySha.return_value = commit
+        remote_pr = _make_remote_pr()
+        statuses = []
+        if update == 'metadata':
+            remote_pr.update(title='Updated title', body='Updated body',
+                             updated_at='2025-01-03T00:00:00Z')
+        else:
+            statuses = [{
+                'context': 'ci/test', 'state': 'success',
+                'target_url': 'https://example.com',
+                'description': 'Job succeeded',
+                'created_at': '2025-01-01T00:00:00Z',
+                'updated_at': '2025-01-03T00:00:00Z',
+            }]
+        _setup_sync(
+            mock_sync, remote_pr, _make_remote_commits(SHA_A), {},
+            local_pr=local_pr, local_commits_with_files={SHA_A},
+            statuses=statuses,
+        )
+
+        task = SyncPullRequestTask(PR_ID)
+        task.run(mock_sync)
+
+        assert local_pr.reviewed is True
+        assert task.results[0].review_flag_changed is False
+        if update == 'metadata':
+            assert local_pr.title == 'Updated title'
+            assert local_pr.body == 'Updated body'
+        else:
+            commit.createCheck.assert_called_once()
 
 
 class TestSyncPullRequestParentlessCommit:

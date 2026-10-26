@@ -207,6 +207,12 @@ class SyncPullRequestTask(Task):
                 result = PullRequestAddedEvent(pr.repository.key, pr.key)
             else:
                 result = PullRequestUpdatedEvent(pr.repository.key, pr.key)
+                # Compare heads before adding or deleting local commits.
+                old_head = pr.commits[-1].sha if pr.commits else None
+                new_head = remote_commits[-1]['sha'] if remote_commits else None
+                if pr.reviewed and old_head != new_head:
+                    pr.reviewed = False
+                    result.review_flag_changed = True
             app.repository_cache.clear(pr.repository)
             self.results.append(result)
             pr.author = account
