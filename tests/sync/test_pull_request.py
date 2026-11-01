@@ -16,11 +16,14 @@
 
 from unittest.mock import Mock, MagicMock, patch
 
+import pytest
+
 from hubtty.sync.tasks.pull_request import (
     SyncPullRequestTask,
     SyncPullRequestChecksTask,
     ApproveWorkflowRunsTask,
 )
+from hubtty.db import Database
 from hubtty.gitrepo import EMPTY_TREE_SHA
 
 
@@ -225,6 +228,18 @@ def _get_commit_detail_urls(mock_sync):
     return urls
 
 
+@pytest.fixture
+def database(mock_app, tmp_path):
+    database = Database(mock_app, f'sqlite:///{tmp_path / "hubtty.db"}', None)
+    with database.getSession() as session:
+        session.createRepository(REPO)
+    try:
+        yield database
+    finally:
+        database.session.remove()
+        database.engine.dispose()
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -300,6 +315,155 @@ class TestSyncPullRequestCommitDetailSkip:
             "Known commit SHA_A should not be fetched"
         assert f'repos/{REPO}/commits/{SHA_B}' in detail_urls, \
             "New commit SHA_B should be fetched"
+
+
+class TestSyncPullRequestReviewedFlag:
+    """Invalidate review when commit membership changes, regardless of order."""
+
+    @patch('hubtty.sync.tasks.pull_request.gitrepo')
+    def test_commit_membership_across_syncs(
+            self, mock_gitrepo, mock_sync, database):
+        mock_gitrepo.EMPTY_TREE_SHA = EMPTY_TREE_SHA
+        remote_commits = _make_remote_commits(SHA_A, SHA_B)[1:]
+        _setup_sync(
+            mock_sync, _make_remote_pr(), remote_commits,
+            {sha: _make_commit_detail(sha) for sha in (SHA_A, SHA_B)},
+        )
+        mock_sync.app.db = database
+        SyncPullRequestTask(PR_ID).run(mock_sync)
+        with database.getSession() as session:
+            pr = session.getPullRequestByPullRequestID(PR_ID)
+            assert [c.sha for c in pr.commits] == [SHA_B]
+            pr.reviewed = True
+
+        # Adding an ancestor invalidates review even though the head stays B.
+        remote_commits[:] = _make_remote_commits(SHA_A, SHA_B)
+        task = SyncPullRequestTask(PR_ID)
+        task.run(mock_sync)
+        with database.getSession() as session:
+            pr = session.getPullRequestByPullRequestID(PR_ID)
+            assert [c.sha for c in pr.commits] == [SHA_B, SHA_A]
+            assert pr.reviewed is False
+            pr.reviewed = True
+        assert task.results[0].review_flag_changed is True
+
+        for _ in range(2):
+            task = SyncPullRequestTask(PR_ID)
+            task.run(mock_sync)
+            with database.getSession() as session:
+                pr = session.getPullRequestByPullRequestID(PR_ID)
+                # Reload the persisted insertion order after each sync.
+                assert [c.sha for c in pr.commits] == [SHA_B, SHA_A]
+                assert pr.reviewed is True
+            assert task.results[0].review_flag_changed is False
+
+        # Moving the head back to A must invalidate review despite local order.
+        remote_commits[:] = _make_remote_commits(SHA_A)
+        task = SyncPullRequestTask(PR_ID)
+        task.run(mock_sync)
+        with database.getSession() as session:
+            pr = session.getPullRequestByPullRequestID(PR_ID)
+            assert [c.sha for c in pr.commits] == [SHA_A]
+            assert pr.reviewed is False
+        assert task.results[0].review_flag_changed is True
+
+    @pytest.mark.parametrize(
+        'local_shas,remote_shas,reviewed,expected_reviewed', [
+            pytest.param([SHA_A], [SHA_A, SHA_B], True, False,
+                         id='new-commit'),
+            pytest.param([SHA_A], [SHA_B], True, False,
+                         id='force-push'),
+            pytest.param([SHA_A, SHA_B], [SHA_A], True, False,
+                         id='remove-head'),
+            pytest.param([], [SHA_A], True, False,
+                         id='previously-empty'),
+            pytest.param([SHA_A], [], True, False,
+                         id='now-empty'),
+            pytest.param([], [], True, True,
+                         id='still-empty'),
+            pytest.param([SHA_A], [SHA_A], True, True,
+                         id='unchanged-head'),
+            pytest.param([SHA_A, SHA_B], [SHA_B], True, False,
+                         id='unchanged-head-removed-ancestor'),
+            pytest.param([SHA_B], [SHA_A, SHA_B], True, False,
+                         id='unchanged-head-added-ancestor'),
+            pytest.param([SHA_A], [SHA_B], False, False,
+                         id='already-unreviewed'),
+        ])
+    @patch('hubtty.sync.tasks.pull_request.gitrepo')
+    def test_commit_set_change(self, mock_gitrepo, mock_sync, database,
+                               local_shas, remote_shas, reviewed,
+                               expected_reviewed):
+        mock_gitrepo.EMPTY_TREE_SHA = EMPTY_TREE_SHA
+        remote_commits = _make_remote_commits(*local_shas)
+        _setup_sync(
+            mock_sync, _make_remote_pr(), remote_commits,
+            {sha: _make_commit_detail(sha)
+             for sha in set(local_shas + remote_shas)},
+        )
+        mock_sync.app.db = database
+        SyncPullRequestTask(PR_ID).run(mock_sync)
+        with database.getSession() as session:
+            pr = session.getPullRequestByPullRequestID(PR_ID)
+            pr.reviewed = reviewed
+        mock_sync.app.repository_cache.clear.reset_mock()
+
+        remote_commits[:] = _make_remote_commits(*remote_shas)
+        task = SyncPullRequestTask(PR_ID)
+        task.run(mock_sync)
+
+        with database.getSession() as session:
+            pr = session.getPullRequestByPullRequestID(PR_ID)
+            assert pr.reviewed is expected_reviewed
+            assert {c.sha for c in pr.commits} == set(remote_shas)
+        assert task.results[0].review_flag_changed is (
+            reviewed != expected_reviewed)
+        assert mock_sync.app.repository_cache.clear.call_count == 1
+        assert (mock_sync.app.repository_cache.clear.call_args.args[0].key
+                == pr.repository_key)
+
+    @pytest.mark.parametrize('update', ['metadata', 'ci'])
+    @patch('hubtty.sync.tasks.pull_request.gitrepo')
+    def test_unchanged_head_updates(self, mock_gitrepo, mock_sync, update):
+        local_pr = MagicMock()
+        local_pr.pr_id = PR_ID
+        local_pr.number = 1
+        local_pr.state = 'open'
+        local_pr.reviewed = True
+        local_pr.labels = []
+        local_pr.repository.name = REPO
+        commit = MagicMock(sha=SHA_A)
+        local_pr.commits = [commit]
+        local_pr.getCommitBySha.return_value = commit
+        remote_pr = _make_remote_pr()
+        statuses = []
+        if update == 'metadata':
+            remote_pr.update(title='Updated title', body='Updated body',
+                             updated_at='2025-01-03T00:00:00Z')
+        else:
+            statuses = [{
+                'context': 'ci/test', 'state': 'success',
+                'target_url': 'https://example.com',
+                'description': 'Job succeeded',
+                'created_at': '2025-01-01T00:00:00Z',
+                'updated_at': '2025-01-03T00:00:00Z',
+            }]
+        _setup_sync(
+            mock_sync, remote_pr, _make_remote_commits(SHA_A), {},
+            local_pr=local_pr, local_commits_with_files={SHA_A},
+            statuses=statuses,
+        )
+
+        task = SyncPullRequestTask(PR_ID)
+        task.run(mock_sync)
+
+        assert local_pr.reviewed is True
+        assert task.results[0].review_flag_changed is False
+        if update == 'metadata':
+            assert local_pr.title == 'Updated title'
+            assert local_pr.body == 'Updated body'
+        else:
+            commit.createCheck.assert_called_once()
 
 
 class TestSyncPullRequestParentlessCommit:

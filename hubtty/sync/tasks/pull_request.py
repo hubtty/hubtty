@@ -207,6 +207,13 @@ class SyncPullRequestTask(Task):
                 result = PullRequestAddedEvent(pr.repository.key, pr.key)
             else:
                 result = PullRequestUpdatedEvent(pr.repository.key, pr.key)
+                # Compare membership before modifying local commits; their
+                # insertion order does not necessarily match Git history.
+                local_shas = {c.sha for c in pr.commits}
+                remote_shas = {c['sha'] for c in remote_commits}
+                if pr.reviewed and local_shas != remote_shas:
+                    pr.reviewed = False
+                    result.review_flag_changed = True
             app.repository_cache.clear(pr.repository)
             self.results.append(result)
             pr.author = account
