@@ -618,7 +618,9 @@ class HTTPClient:
                     f"(HTTP {r.status_code}): {r.text[:200]}"
                 ) from e
             if result.get('errors'):
-                raise GraphQLError(f"GraphQL error: {result['errors']}")
+                raise GraphQLError(
+                    f"GraphQL error: {result['errors']}",
+                    errors=result['errors'])
             return result.get('data') or {}
 
         # Unreachable: the loop always returns or raises.

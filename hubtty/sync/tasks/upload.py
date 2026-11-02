@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ..task import Task
-from ..exceptions import OfflineError
+from ..exceptions import GraphQLError, OfflineError
 
 if TYPE_CHECKING:
     from ..sync import Sync
@@ -303,6 +303,8 @@ class SendMergeTask(Task):
 
         with app.db.getSession() as session:
             pm = session.getPendingMerge(self.pending_merge_key)
+            if pm is None:
+                return
             pr = pm.pull_request
             pr_id = pr.pr_id
             merge_method = pm.merge_method
@@ -335,7 +337,8 @@ class SendMergeTask(Task):
             )
 
         # Delete pending merge and call API (inside session for
-        # rollback).
+        # rollback on transient or unrecognized failures).
+        rejection = None
         with app.db.getSession() as session:
             pm = session.getPendingMerge(self.pending_merge_key)
             if pm is None:
@@ -343,7 +346,21 @@ class SendMergeTask(Task):
             session.delete(pm)
             if merge_method == 'queue':
                 # Inside db session for rollback
-                sync.graphql(ENQUEUE_PULL_REQUEST_MUTATION, {'id': node_id})
+                try:
+                    sync.graphql(ENQUEUE_PULL_REQUEST_MUTATION, {'id': node_id})
+                except GraphQLError as e:
+                    # Only explicit enqueue validation errors consume the
+                    # pending action. Mixed or malformed errors roll back.
+                    if not (isinstance(e.errors, list) and e.errors and all(
+                            isinstance(error, dict)
+                            and error.get('type') == 'UNPROCESSABLE'
+                            and isinstance(error.get('path'), list)
+                            and error['path'][:1] == ['enqueuePullRequest']
+                            and isinstance(error.get('message'), str)
+                            and error['message'].strip()
+                            for error in e.errors)):
+                        raise
+                    rejection = '; '.join(error['message'] for error in e.errors)
             else:
                 data = dict(sha=sha, merge_method=merge_method)
                 if commit_title:
@@ -354,3 +371,11 @@ class SendMergeTask(Task):
                 sync.put(f'repos/{pr_id}/merge', data)
 
         sync.submitTask(SyncPullRequestTask(pr_id, priority=self.priority))
+        if rejection:
+            error_msg = (
+                f'Unable to add pull request {pr_id} to the merge queue: '
+                f'{rejection} The pending merge request was cleared. '
+                'Submit a new merge request after resolving the issue.'
+            )
+            self.log.warning(error_msg)
+            app.error(error_msg)
