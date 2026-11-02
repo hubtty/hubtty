@@ -15,7 +15,7 @@
 
 """Exceptions for the sync module."""
 
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 
 class OfflineError(Exception):
@@ -29,8 +29,17 @@ class RestrictedError(Exception):
 
 
 class GraphQLError(Exception):
-    """Raised when a GraphQL request returns errors in the response body."""
-    pass
+    """Raised when a GraphQL request fails.
+
+    Attributes:
+        errors: Structured errors returned by GraphQL, or an empty list
+            when no error entries are available.
+    """
+
+    def __init__(self, message: str,
+                 errors: Optional[List[Dict[str, Any]]] = None):
+        super().__init__(message)
+        self.errors = errors if errors is not None else []
 
 
 class RateLimitError(Exception):

@@ -697,11 +697,22 @@ class TestHTTPGraphQL:
         response = Mock()
         response.status_code = 200
         response.headers = {'X-RateLimit-Remaining': '100'}
-        response.text = json.dumps({'errors': [{'message': 'not found'}]})
+        errors = [{'type': 'NOT_FOUND', 'path': ['viewer'],
+                   'locations': [{'line': 1, 'column': 9}],
+                   'message': 'not found'}]
+        response.text = json.dumps({'errors': errors})
 
         with patch.object(http_client.session, 'post', return_value=response):
-            with pytest.raises(Exception, match='not found'):
+            with pytest.raises(GraphQLError, match='not found') as exc:
                 http_client.graphql('query { viewer { login } }')
+
+        assert str(exc.value) == f'GraphQL error: {errors}'
+        assert exc.value.errors == errors
+
+    def test_error_without_response_entries(self):
+        error = GraphQLError('GraphQL request failed')
+        assert str(error) == 'GraphQL request failed'
+        assert error.errors == []
 
     def test_uses_custom_response_callback(self, http_client):
         """A custom response_callback is used instead of checkResponse."""

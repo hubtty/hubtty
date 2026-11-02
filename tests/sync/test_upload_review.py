@@ -14,9 +14,16 @@
 
 """Tests for UploadReviewTask and SendMergeTask."""
 
+import datetime
+import logging
+
 import pytest
+import requests
 from unittest.mock import Mock, MagicMock, patch
 
+from hubtty.db import Database
+from hubtty.sync.exceptions import GraphQLError, OfflineError, RateLimitError
+from hubtty.sync.tasks.pull_request import SyncPullRequestTask
 from hubtty.sync.tasks.upload import (
     ENQUEUE_PULL_REQUEST_MUTATION,
     SendMergeTask,
@@ -282,6 +289,7 @@ class TestSendMergeTaskQueueMerge(object):
             ENQUEUE_PULL_REQUEST_MUTATION, {'id': 'NODE123'})
         sync.put.assert_not_called()
         session.delete.assert_called_once_with(pm)
+        sync.app.error.assert_not_called()
 
     def test_missing_node_id_syncs_then_enqueues(self):
         sync, session, pm, pr = _make_merge_env('queue', node_id=None)
@@ -305,3 +313,183 @@ class TestSendMergeTaskQueueMerge(object):
             with pytest.raises(Exception, match='node id'):
                 task.run(sync)
         sync.graphql.assert_not_called()
+
+
+CLOSED_PR_REJECTION = (
+    'Pull request is closed and Pull request 21 of 66 required status checks '
+    'are expected.'
+)
+CHECKS_REJECTION = 'Pull request 21 of 66 required status checks are expected.'
+
+
+def _enqueue_error(message=CLOSED_PR_REJECTION):
+    return {'type': 'UNPROCESSABLE', 'path': ['enqueuePullRequest'],
+            'locations': [{'line': 3, 'column': 3}], 'message': message}
+
+
+class TestSendMergeTaskRejection:
+    @pytest.mark.parametrize('reason', [CLOSED_PR_REJECTION, CHECKS_REJECTION])
+    def test_reports_rejection_and_commits_deletion(self, reason, caplog):
+        sync, session, pm, pr = _make_merge_env('queue')
+        sync.graphql.side_effect = GraphQLError(
+            'GraphQL error', errors=[_enqueue_error(reason)])
+
+        with caplog.at_level(logging.WARNING, logger='hubtty.sync'):
+            _run_merge(sync)
+
+        session.delete.assert_called_once_with(pm)
+        # Neither session exits with an exception that would roll back.
+        exits = sync.app.db.getSession.return_value.__exit__.call_args_list
+        assert len(exits) == 2
+        assert all(call.args == (None, None, None) for call in exits)
+        sync.app.error.assert_called_once()
+        message = sync.app.error.call_args.args[0]
+        assert PR_ID in message
+        assert reason in message
+        assert 'pending merge request was cleared' in message
+        assert 'Submit a new merge request' in message
+        sync.submitTask.assert_called_once()
+        assert any(r.message == message and r.exc_info is None
+                   for r in caplog.records)
+        sync.put.assert_not_called()
+
+    def test_combines_multiple_enqueue_validation_errors(self):
+        sync, session, pm, pr = _make_merge_env('queue')
+        sync.graphql.side_effect = GraphQLError(
+            'GraphQL error', errors=[_enqueue_error('Pull request is closed'),
+                                    _enqueue_error(CHECKS_REJECTION)])
+        _run_merge(sync)
+        message = sync.app.error.call_args.args[0]
+        assert 'Pull request is closed' in message
+        assert CHECKS_REJECTION in message
+
+    @pytest.mark.parametrize('errors', [
+        [],
+        [{'message': 'unknown failure'}],
+        [dict(_enqueue_error(), type='INTERNAL')],
+        [dict(_enqueue_error(), path=['otherMutation'])],
+        [_enqueue_error(), dict(_enqueue_error(), type='INTERNAL')],
+        [_enqueue_error(), dict(_enqueue_error(), path=['otherMutation'])],
+        [_enqueue_error(), None],
+        [None],
+        ['UNPROCESSABLE'],
+        {'type': 'UNPROCESSABLE'},
+        [dict(_enqueue_error(), path=None)],
+        [dict(_enqueue_error(), path='enqueuePullRequest')],
+        [dict(_enqueue_error(), message=None)],
+        [dict(_enqueue_error(), message='')],
+        [dict(_enqueue_error(), message='   ')],
+    ])
+    def test_unrecognized_mixed_or_malformed_errors_propagate(self, errors):
+        sync, session, pm, pr = _make_merge_env('queue')
+        error = GraphQLError('GraphQL error', errors=errors)
+        sync.graphql.side_effect = error
+
+        with pytest.raises(GraphQLError) as exc:
+            _run_merge(sync)
+
+        assert exc.value is error
+        exit_args = sync.app.db.getSession.return_value.__exit__.call_args.args
+        assert exit_args[0] is GraphQLError
+        sync.app.error.assert_not_called()
+        sync.submitTask.assert_not_called()
+
+    @pytest.mark.parametrize('lookup', ['initial', 'before-api'])
+    @pytest.mark.parametrize('method', ['queue', 'squash'])
+    def test_missing_pending_action_is_noop(self, lookup, method):
+        sync, session, pm, pr = _make_merge_env(method)
+        session.getPendingMerge.side_effect = (
+            [None] if lookup == 'initial' else [pm, None])
+        _run_merge(sync)
+        session.delete.assert_not_called()
+        sync.graphql.assert_not_called()
+        sync.put.assert_not_called()
+        sync.app.error.assert_not_called()
+        sync.submitTask.assert_not_called()
+
+
+@pytest.fixture
+def merge_database(mock_app, tmp_path):
+    database = Database(mock_app, f'sqlite:///{tmp_path / "hubtty.db"}', None)
+    try:
+        with database.getSession() as session:
+            repo = session.createRepository('owner/repo')
+            author = session.createAccount(1, username='author')
+            now = datetime.datetime.now(datetime.timezone.utc)
+            pr = repo.createPullRequest(
+                id=1, author=author, number=1, branch='main', pr_id=PR_ID,
+                title='Test PR', body='', created=now, updated=now,
+                state='open', additions=0, deletions=0,
+                html_url='https://github.com/owner/repo/pull/1',
+                merged=False, mergeable=True, node_id='NODE123')
+            pm = pr.createPendingMerge(SHA, 'queue')
+            key = pm.key
+        yield database, key
+    finally:
+        database.session.remove()
+        database.engine.dispose()
+
+
+class TestSendMergeTaskTransactions:
+    @pytest.mark.parametrize('reason', [CLOSED_PR_REJECTION, CHECKS_REJECTION])
+    def test_rejection_removes_pending_action(self, mock_sync, merge_database,
+                                              reason):
+        database, key = merge_database
+        mock_sync.app.db = database
+        mock_sync.graphql.side_effect = GraphQLError(
+            'GraphQL error', errors=[_enqueue_error(reason)])
+
+        def check_committed(message):
+            with database.getSession() as session:
+                assert session.getPendingMerge(key) is None
+            assert reason in message
+
+        mock_sync.app.error.side_effect = check_committed
+        SendMergeTask(key).run(mock_sync)
+
+        with database.getSession() as session:
+            assert session.getPendingMerges() == []
+        mock_sync.app.error.assert_called_once()
+        refresh = mock_sync.submitTask.call_args.args[0]
+        assert isinstance(refresh, SyncPullRequestTask)
+        assert refresh.pr_id == PR_ID
+
+        # Re-uploading pending actions cannot resubmit the rejected request.
+        mock_sync.submitTask.reset_mock()
+        from hubtty.sync.tasks.upload import UploadReviewsTask
+        UploadReviewsTask().run(mock_sync)
+        mock_sync.submitTask.assert_not_called()
+
+    @pytest.mark.parametrize('error', [
+        requests.ConnectionError('disconnected'),
+        requests.exceptions.ReadTimeout('timed out'),
+        OfflineError('Received 503 status code'),
+        RateLimitError('rate limited'),
+        GraphQLError('non-JSON response'),
+        GraphQLError('unknown failure', errors=[{'message': 'unknown failure'}]),
+        GraphQLError('mixed errors', errors=[
+            _enqueue_error(), dict(_enqueue_error(), type='INTERNAL')]),
+        GraphQLError('malformed errors', errors=[None]),
+    ])
+    def test_failure_rolls_back_deletion(self, mock_sync, merge_database, error):
+        database, key = merge_database
+        mock_sync.app.db = database
+        mock_sync.graphql.side_effect = error
+
+        with pytest.raises(type(error)) as exc:
+            SendMergeTask(key).run(mock_sync)
+
+        assert exc.value is error
+        with database.getSession() as session:
+            assert session.getPendingMerge(key) is not None
+        mock_sync.app.error.assert_not_called()
+        mock_sync.submitTask.assert_not_called()
+
+    def test_success_removes_pending_action(self, mock_sync, merge_database):
+        database, key = merge_database
+        mock_sync.app.db = database
+        SendMergeTask(key).run(mock_sync)
+        with database.getSession() as session:
+            assert session.getPendingMerge(key) is None
+        mock_sync.app.error.assert_not_called()
+        mock_sync.submitTask.assert_called_once()
